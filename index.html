@@ -6,7 +6,6 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#FAF9F6">
 <title>Card Scanner</title>
-
 <style>
   :root{
     --ink:#16161D;--paper:#FAF9F6;--accent:#B0184F;--accent-soft:#FBEDF2;
@@ -15,26 +14,36 @@
   *{box-sizing:border-box;margin:0;padding:0}
   html{-webkit-text-size-adjust:100%}
   body{
-    font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+    font-family:-apple-system,BlinkMacSystemFont,system-ui,'Segoe UI',sans-serif;
     background:var(--paper);color:var(--ink);line-height:1.6;
     padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
-    -webkit-font-smoothing:antialiased;
-    touch-action:manipulation;
+    -webkit-font-smoothing:antialiased;touch-action:manipulation;
   }
   .wrap{max-width:460px;margin:0 auto;padding:24px 18px 44px}
-
-  header{margin-bottom:24px}
+  header{margin-bottom:22px}
   h1{font-size:19px;font-weight:700;letter-spacing:-.02em}
   header p{font-size:13.5px;color:var(--muted);margin-top:3px}
 
   .drop{
-    border:1.5px dashed var(--rule);border-radius:14px;padding:44px 20px;
+    border:1.5px dashed var(--rule);border-radius:14px;padding:40px 20px;
     text-align:center;background:var(--field);cursor:pointer;
     transition:border-color .15s,background .15s;
   }
   .drop:hover,.drop:focus-visible{border-color:var(--accent);background:var(--accent-soft)}
   .drop strong{display:block;font-size:15.5px;font-weight:600;margin-bottom:6px}
   .drop span{font-size:13px;color:var(--muted)}
+
+  .setup{margin-bottom:18px}
+  .setup > span{display:block;font-size:12.5px;font-weight:600;color:var(--muted);margin-bottom:8px}
+  .seg{display:flex;gap:8px}
+  .seg button{
+    flex:1;font:inherit;font-size:14px;padding:11px 8px;border-radius:10px;
+    border:1px solid var(--rule);background:var(--field);color:var(--ink);
+    cursor:pointer;line-height:1.35;
+  }
+  .seg button small{display:block;font-size:11.5px;color:var(--muted)}
+  .seg button.on{background:var(--ink);border-color:var(--ink);color:#fff}
+  .seg button.on small{color:rgba(255,255,255,.6)}
 
   .hint{
     margin-top:18px;padding:13px 15px;background:var(--field);
@@ -43,9 +52,13 @@
   }
   .hint b{color:var(--ink);font-weight:600}
 
-  .bar{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px}
+  .bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
   .count{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
   .count b{color:var(--ink);font-weight:700;font-size:15px}
+  .tag{
+    font-size:12px;font-weight:600;color:var(--accent);background:var(--accent-soft);
+    padding:3px 11px;border-radius:100px;text-transform:uppercase;letter-spacing:.04em;
+  }
   .track{height:3px;background:var(--rule);border-radius:2px;overflow:hidden;margin-bottom:16px}
   .track i{display:block;height:100%;background:var(--accent);width:0;transition:width .25s ease}
 
@@ -56,19 +69,24 @@
   .stage canvas{display:block;width:100%;height:auto}
   .stage svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
   .stage polygon{fill:rgba(176,24,79,.14);stroke:var(--accent);stroke-width:2}
-  .handle{
-    position:absolute;width:44px;height:44px;margin:-22px 0 0 -22px;
-    touch-action:none;cursor:grab;
-  }
+  .handle{position:absolute;width:44px;height:44px;margin:-22px 0 0 -22px;touch-action:none;cursor:grab}
   .handle::after{
     content:'';position:absolute;inset:11px;border-radius:50%;
-    background:#fff;border:3px solid var(--accent);
-    box-shadow:0 1px 6px rgba(0,0,0,.35);
+    background:#fff;border:3px solid var(--accent);box-shadow:0 1px 6px rgba(0,0,0,.35);
   }
-  .handle.drag{cursor:grabbing}
   .handle.drag::after{background:var(--accent-soft)}
+  #h0::after{background:var(--accent);border-color:#fff}
+  #h0.drag::after{background:var(--accent-soft);border-color:var(--accent)}
+  .stagehint{font-size:12.5px;color:var(--muted);line-height:1.5}
 
-  .stagehint{font-size:12.5px;color:var(--muted);text-align:center;margin-bottom:14px}
+  .tools{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+  .tools .stagehint{flex:1}
+  .tool{
+    font:inherit;font-size:13px;padding:9px 14px;border-radius:100px;
+    border:1px solid var(--rule);background:var(--field);color:var(--ink);
+    cursor:pointer;white-space:nowrap;
+  }
+  .tool:hover{border-color:var(--accent);color:var(--accent)}
 
   .actions{display:flex;gap:10px}
   button.go{
@@ -82,25 +100,52 @@
   }
   button.skip:hover{border-color:var(--ink);color:var(--ink)}
 
-  .photo{
-    width:100%;aspect-ratio:3/4;object-fit:contain;background:var(--field);
-    border:1px solid var(--rule);border-radius:14px;margin-bottom:18px;display:block;
+  .pages{display:flex;gap:10px;margin-bottom:18px}
+  .pg{flex:1;text-align:center}
+  .pg img{
+    width:100%;aspect-ratio:1/1;object-fit:contain;background:var(--field);
+    border:1px solid var(--rule);border-radius:10px;display:block;padding:4px;
   }
+  .pg span{
+    display:block;font-size:11.5px;color:var(--muted);margin-top:5px;
+    text-transform:uppercase;letter-spacing:.04em;
+  }
+  .pg .bad{
+    width:100%;aspect-ratio:3/4;background:var(--field);
+    border:1px dashed var(--rule);border-radius:10px;
+    display:flex;align-items:center;justify-content:center;text-align:center;
+    font-size:11.5px;color:var(--muted);padding:10px;line-height:1.5;
+  }
+
+  .warn{
+    margin-bottom:16px;padding:12px 14px;border-radius:12px;
+    background:var(--accent-soft);border:1px solid rgba(176,24,79,.25);
+    font-size:12.5px;line-height:1.65;color:var(--ink);
+  }
+  .warn b{font-weight:600}
+
   .name{
-    background:var(--ink);color:#fff;border-radius:12px;padding:13px 15px;
-    margin-bottom:20px;font-size:14px;font-weight:500;letter-spacing:-.01em;
-    font-variant-numeric:tabular-nums;word-break:break-all;line-height:1.5;
+    background:var(--ink);border-radius:12px;padding:14px 16px;
+    margin-bottom:20px;font-weight:500;letter-spacing:0;
+    font-variant-numeric:tabular-nums;overflow-wrap:anywhere;line-height:1.7;
   }
-  .name em{font-style:normal;opacity:.45}
+  .name i{display:block;font-style:normal;font-size:13.5px;color:#fff}
+  .name i+i{margin-top:3px}
+  .name em i{color:rgba(255,255,255,.72)}
 
   label{display:block;font-size:12.5px;font-weight:600;color:var(--muted);margin-bottom:6px}
   .field{margin-bottom:16px}
-  input[type=text],input[type=date]{
+  input[type=text],input[type=date],select{
     width:100%;font:inherit;font-size:16px;padding:12px 14px;
     border:1px solid var(--rule);border-radius:10px;background:var(--field);
     color:var(--ink);-webkit-appearance:none;appearance:none;
   }
-  input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  select{
+    padding-right:34px;cursor:pointer;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' fill='none' stroke='%236E6E78' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+    background-repeat:no-repeat;background-position:right 12px center;
+  }
+  input:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
   .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
   .chip{
@@ -126,21 +171,32 @@
   </header>
 
   <section id="start">
+    <div class="setup">
+      <span>Photos per card</span>
+      <div class="seg" id="seg">
+        <button type="button" data-n="1">1<small>front</small></button>
+        <button type="button" data-n="2" class="on">2<small>front + inside</small></button>
+        <button type="button" data-n="3">3<small>+ back</small></button>
+      </div>
+    </div>
+
     <div class="drop" id="dropzone" tabindex="0" role="button">
       <strong>Choose Photos</strong>
-      <span>Take a photo or select several</span>
+      <span>Take photos or select several</span>
     </div>
     <input type="file" id="picker" accept="image/*" multiple class="hidden">
+
     <div class="hint">
-      <b>Tip:</b> Place the card on a dark surface (table, rug) and shoot from above.
-      Drag the four dots to the card's corners and it will be straightened.
+      <b>Shoot in order:</b> front, inside, front, inside… Photos get grouped into cards
+      using the number above, so keep the sequence consistent.
+      <br><b>Tip:</b> a dark surface makes the corners easy to see.
     </div>
   </section>
 
   <section id="crop" class="hidden">
     <div class="bar">
-      <span class="count"><b id="cur">1</b> / <span id="tot">1</span></span>
-      <span class="count" id="left"></span>
+      <span class="count">Card <b id="cardNo">1</b> / <span id="cardTot">1</span></span>
+      <span class="tag" id="pageTag">front</span>
     </div>
     <div class="track"><i id="fill"></i></div>
 
@@ -152,7 +208,11 @@
       <div class="handle" id="h2"></div>
       <div class="handle" id="h3"></div>
     </div>
-    <p class="stagehint">Drag the dots to the four corners of the card</p>
+    <div class="tools">
+      <p class="stagehint">Drag the dots to the card&rsquo;s four corners.<br>
+        The <b>filled dot</b> becomes the top-left of the saved image.</p>
+      <button type="button" class="tool" id="rot">&#8635; Rotate</button>
+    </div>
 
     <div class="actions">
       <button class="go" id="applyCrop">Straighten &amp; Next</button>
@@ -161,24 +221,72 @@
   </section>
 
   <section id="meta" class="hidden">
-    <img id="photo" class="photo" alt="Card preview">
+    <div class="warn hidden" id="warn">
+      <b>This browser can&rsquo;t open some of these photos</b> &mdash; usually iPhone
+      HEIC files. They&rsquo;re still saved unchanged, but can&rsquo;t be previewed or
+      straightened here. Use JPG/PNG on a computer, or run this on your iPhone where
+      HEIC works natively.
+    </div>
+    <div class="pages" id="thumbs"></div>
     <div class="name" id="preview"></div>
 
     <div class="field">
       <label for="sender">From</label>
-      <input type="text" id="sender" placeholder="Grandma Kim" autocomplete="off" enterkeyhint="done">
+      <input type="text" id="sender" placeholder="Grandma Kim" autocomplete="off" enterkeyhint="next">
       <div class="chips" id="chips"></div>
+    </div>
+
+    <div class="field">
+      <label for="recipient">To</label>
+      <input type="text" id="recipient" placeholder="Hazel" autocomplete="off" enterkeyhint="done">
+      <div class="chips" id="toChips"></div>
     </div>
 
     <div class="row">
       <div class="field">
         <label for="event">Occasion</label>
-        <input type="text" id="event" placeholder="HazelBirthday" autocomplete="off">
+        <select id="event">
+          <option value="Birthday">Birthday</option>
+          <option value="Anniversary">Anniversary</option>
+          <optgroup label="Holidays">
+            <option value="Christmas">Christmas</option>
+            <option value="Mothers Day">Mother&rsquo;s Day</option>
+            <option value="Fathers Day">Father&rsquo;s Day</option>
+            <option value="Valentines Day">Valentine&rsquo;s Day</option>
+            <option value="Easter">Easter</option>
+            <option value="Thanksgiving">Thanksgiving</option>
+            <option value="New Year">New Year</option>
+            <option value="Lunar New Year">Lunar New Year</option>
+            <option value="Hanukkah">Hanukkah</option>
+          </optgroup>
+          <optgroup label="Milestones">
+            <option value="Graduation">Graduation</option>
+            <option value="Wedding">Wedding</option>
+            <option value="New Baby">New Baby</option>
+            <option value="Housewarming">Housewarming</option>
+            <option value="Retirement">Retirement</option>
+            <option value="First Day of School">First Day of School</option>
+          </optgroup>
+          <optgroup label="Notes">
+            <option value="Thank You">Thank You</option>
+            <option value="Congratulations">Congratulations</option>
+            <option value="Get Well">Get Well</option>
+            <option value="Good Luck">Good Luck</option>
+            <option value="Sympathy">Sympathy</option>
+            <option value="Just Because">Just Because</option>
+          </optgroup>
+          <option value="__other">Other&hellip;</option>
+        </select>
       </div>
       <div class="field">
         <label for="date">Date</label>
         <input type="date" id="date">
       </div>
+    </div>
+
+    <div class="field hidden" id="otherWrap">
+      <label for="eventOther">Occasion name</label>
+      <input type="text" id="eventOther" placeholder="Baptism" autocomplete="off">
     </div>
 
     <div class="actions">
@@ -191,7 +299,7 @@
     <div class="done">
       <h2>All done</h2>
       <p id="tally"></p>
-      <button class="go" id="again" style="max-width:200px;margin:0 auto">Choose More Photos</button>
+      <button class="go" id="again" style="max-width:210px;margin:0 auto">Choose More Photos</button>
     </div>
   </section>
 
@@ -199,17 +307,24 @@
 
 <script>
 (function(){
-  var files=[],idx=0,saved=0,seen=[];
-  var img=null;          // current Image
-  var corners=[];        // [{x,y}] in natural image coords
-  var scale=1;           // display px per natural px
-  var warped=null;       // Blob of processed image
-  var warpedURL=null;
+  var LABELS=['front','inside','back','p4','p5'];
+
+  var files=[],perCard=2,cursor=0,cardNo=0;
+  var pages=[],pageIdx=0,pageCount=0;
+  var img=null,corners=[],scale=1,thumbURLs=[];
+  var savedCards=0,savedFiles=0,seen=[],seenTo=[];
 
   var $=function(id){return document.getElementById(id)};
   var picker=$('picker');
-
   $('date').value=new Date().toISOString().slice(0,10);
+
+  Array.prototype.forEach.call($('seg').children,function(b){
+    b.onclick=function(){
+      Array.prototype.forEach.call($('seg').children,function(x){x.classList.remove('on')});
+      b.classList.add('on');
+      perCard=parseInt(b.getAttribute('data-n'),10);
+    };
+  });
 
   $('dropzone').onclick=function(){picker.click()};
   $('dropzone').onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();picker.click()}};
@@ -217,37 +332,40 @@
 
   picker.onchange=function(){
     if(!picker.files.length)return;
-    files=Array.prototype.slice.call(picker.files).filter(function(f){return /^image\//.test(f.type)||/\.(heic|heif)$/i.test(f.name)});
+    files=Array.prototype.slice.call(picker.files).filter(function(f){
+      return /^image\//.test(f.type)||/\.(heic|heif)$/i.test(f.name);
+    });
     if(!files.length)return;
-    idx=0;saved=0;
+    cursor=0;cardNo=0;savedCards=0;savedFiles=0;
+    $('cardTot').textContent=Math.ceil(files.length/perCard);
     $('start').classList.add('hidden');
     $('finish').classList.add('hidden');
-    $('tot').textContent=files.length;
-    loadCurrent();
+    startCard();
   };
 
-  function loadCurrent(){
-    if(idx>=files.length)return finish();
+  function noteBad(){$('warn').classList.remove('hidden')}
+
+  function startCard(){
+    if(cursor>=files.length)return finish();
+    cardNo++;
+    $('warn').classList.add('hidden');
+    pages=[];pageIdx=0;
+    pageCount=Math.min(perCard,files.length-cursor);
+    $('cardNo').textContent=cardNo;
+    loadPage();
+  }
+
+  function loadPage(){
+    if(pageIdx>=pageCount)return toMeta();
     $('meta').classList.add('hidden');
     $('crop').classList.remove('hidden');
-    $('cur').textContent=idx+1;
-    $('left').textContent=(files.length-idx-1)+' left';
-    $('fill').style.width=(idx/files.length*100)+'%';
+    $('pageTag').textContent=LABELS[pageIdx]||('p'+(pageIdx+1));
+    $('fill').style.width=(cursor/files.length*100)+'%';
 
-    var u=URL.createObjectURL(files[idx]);
+    var u=URL.createObjectURL(files[cursor]);
     img=new Image();
-    img.onload=function(){
-      URL.revokeObjectURL(u);
-      drawStage();
-      initCorners();
-      paintOverlay();
-    };
-    img.onerror=function(){
-      URL.revokeObjectURL(u);
-      // undecodable (e.g. HEIC on non-Safari) — pass through untouched
-      warped=files[idx];
-      toMeta(URL.createObjectURL(files[idx]));
-    };
+    img.onload=function(){URL.revokeObjectURL(u);drawStage();initCorners();paintOverlay()};
+    img.onerror=function(){URL.revokeObjectURL(u);noteBad();acceptPage(files[cursor])};
     img.src=u;
   }
 
@@ -264,14 +382,12 @@
   }
 
   function initCorners(){
-    var W=img.naturalWidth,H=img.naturalHeight;
-    var ix=W*0.12,iy=H*0.12;
+    var W=img.naturalWidth,H=img.naturalHeight,ix=W*0.12,iy=H*0.12;
     corners=[{x:ix,y:iy},{x:W-ix,y:iy},{x:W-ix,y:H-iy},{x:ix,y:H-iy}];
   }
 
   function paintOverlay(){
-    var pts=corners.map(function(p){return p.x+','+p.y}).join(' ');
-    $('poly').setAttribute('points',pts);
+    $('poly').setAttribute('points',corners.map(function(p){return p.x+','+p.y}).join(' '));
     corners.forEach(function(p,i){
       var h=$('h'+i);
       h.style.left=(p.x/img.naturalWidth*100)+'%';
@@ -279,13 +395,10 @@
     });
   }
 
-  // drag handling
   [0,1,2,3].forEach(function(i){
     var h=$('h'+i);
     h.addEventListener('pointerdown',function(e){
-      e.preventDefault();
-      h.setPointerCapture(e.pointerId);
-      h.classList.add('drag');
+      e.preventDefault();h.setPointerCapture(e.pointerId);h.classList.add('drag');
       var move=function(ev){
         var r=$('stage').getBoundingClientRect();
         var x=(ev.clientX-r.left)/r.width*img.naturalWidth;
@@ -294,7 +407,7 @@
         corners[i].y=Math.max(0,Math.min(img.naturalHeight,y));
         paintOverlay();
       };
-      var up=function(ev){
+      var up=function(){
         h.classList.remove('drag');
         h.removeEventListener('pointermove',move);
         h.removeEventListener('pointerup',up);
@@ -306,20 +419,14 @@
     });
   });
 
-  // ---- perspective warp ----
-  // Solve homography H mapping dest rect corners -> src corners (dest->src),
-  // then inverse-map each dest pixel with bilinear sampling.
+  /* ---- perspective warp: do not modify ---- */
   function solveH(src,W,H){
-    // dest points
-    var d=[[0,0],[W,0],[W,H],[0,H]];
-    // build 8x9 system A·h=0 → solve 8x8 with h8=1
-    var A=[],b=[];
+    var d=[[0,0],[W,0],[W,H],[0,H]],A=[],b=[];
     for(var i=0;i<4;i++){
       var X=d[i][0],Y=d[i][1],x=src[i].x,y=src[i].y;
       A.push([X,Y,1,0,0,0,-x*X,-x*Y]);b.push(x);
       A.push([0,0,0,X,Y,1,-y*X,-y*Y]);b.push(y);
     }
-    // gaussian elimination
     for(var c=0;c<8;c++){
       var piv=c;
       for(var r=c+1;r<8;r++)if(Math.abs(A[r][c])>Math.abs(A[piv][c]))piv=r;
@@ -338,50 +445,35 @@
       for(var k2=r3+1;k2<8;k2++)s-=A[r3][k2]*h[k2];
       h[r3]=s/A[r3][r3];
     }
-    return h; // [h0..h7], h8=1
+    return h;
   }
-
   function dist(a,b){var dx=a.x-b.x,dy=a.y-b.y;return Math.sqrt(dx*dx+dy*dy)}
-
   function warp(){
     var W=Math.round((dist(corners[0],corners[1])+dist(corners[3],corners[2]))/2);
     var H=Math.round((dist(corners[0],corners[3])+dist(corners[1],corners[2]))/2);
     var cap=1600,m=Math.max(W,H);
     if(m>cap){W=Math.round(W*cap/m);H=Math.round(H*cap/m)}
     if(W<20||H<20)return null;
-
     var h=solveH(corners,W,H);
     if(!h)return null;
-
-    // draw source at natural size (capped for memory)
-    var sW=img.naturalWidth,sH=img.naturalHeight;
-    var sCap=2400,sm=Math.max(sW,sH),sf=1;
+    var sW=img.naturalWidth,sH=img.naturalHeight,sCap=2400,sm=Math.max(sW,sH),sf=1;
     if(sm>sCap){sf=sCap/sm;sW=Math.round(sW*sf);sH=Math.round(sH*sf)}
     var sc=document.createElement('canvas');sc.width=sW;sc.height=sH;
-    var sctx=sc.getContext('2d');
-    sctx.drawImage(img,0,0,sW,sH);
+    var sctx=sc.getContext('2d');sctx.drawImage(img,0,0,sW,sH);
     var sd=sctx.getImageData(0,0,sW,sH).data;
-
     var dc=document.createElement('canvas');dc.width=W;dc.height=H;
-    var dctx=dc.getContext('2d');
-    var out=dctx.createImageData(W,H);
-    var od=out.data;
-
+    var dctx=dc.getContext('2d'),out=dctx.createImageData(W,H),od=out.data;
     for(var Y=0;Y<H;Y++){
       for(var X=0;X<W;X++){
         var den=h[6]*X+h[7]*Y+1;
-        var sx=(h[0]*X+h[1]*Y+h[2])/den*sf;
-        var sy=(h[3]*X+h[4]*Y+h[5])/den*sf;
+        var sx=(h[0]*X+h[1]*Y+h[2])/den*sf, sy=(h[3]*X+h[4]*Y+h[5])/den*sf;
         var o=(Y*W+X)*4;
-        if(sx<0||sy<0||sx>=sW-1||sy>=sH-1){
-          od[o]=od[o+1]=od[o+2]=250;od[o+3]=255;continue;
-        }
+        if(sx<0||sy<0||sx>=sW-1||sy>=sH-1){od[o]=od[o+1]=od[o+2]=250;od[o+3]=255;continue}
         var x0=sx|0,y0=sy|0,fx=sx-x0,fy=sy-y0;
         var i00=(y0*sW+x0)*4,i10=i00+4,i01=i00+sW*4,i11=i01+4;
         for(var ch=0;ch<3;ch++){
-          od[o+ch]=
-            sd[i00+ch]*(1-fx)*(1-fy)+sd[i10+ch]*fx*(1-fy)+
-            sd[i01+ch]*(1-fx)*fy+sd[i11+ch]*fx*fy;
+          od[o+ch]=sd[i00+ch]*(1-fx)*(1-fy)+sd[i10+ch]*fx*(1-fy)+
+                   sd[i01+ch]*(1-fx)*fy+sd[i11+ch]*fx*fy;
         }
         od[o+3]=255;
       }
@@ -389,6 +481,7 @@
     dctx.putImageData(out,0,0);
     return dc;
   }
+  /* ---- end warp ---- */
 
   $('applyCrop').onclick=function(){
     var btn=$('applyCrop');btn.disabled=true;btn.textContent='Straightening\u2026';
@@ -396,84 +489,139 @@
       var dc=warp();
       btn.disabled=false;btn.textContent='Straighten & Next';
       if(!dc){alert('Selected area is too small. Adjust the dots and try again.');return}
-      dc.toBlob(function(bl){
-        warped=bl;
-        toMeta(URL.createObjectURL(bl));
-      },'image/jpeg',0.92);
+      dc.toBlob(function(bl){acceptPage(bl)},'image/jpeg',0.92);
     },30);
   };
 
-  $('noCrop').onclick=function(){
-    warped=files[idx];
-    toMeta(URL.createObjectURL(files[idx]));
+  /* Rotate 90° CW by re-labelling which corner maps to the output's top-left.
+     The quad on screen is unchanged — only the destination mapping shifts, so
+     warp() recomputes W/H swapped and the saved image comes out rotated. */
+  $('rot').onclick=function(){
+    if(corners.length!==4)return;
+    corners.unshift(corners.pop());
+    paintOverlay();
   };
 
-  function toMeta(url){
-    if(warpedURL)URL.revokeObjectURL(warpedURL);
-    warpedURL=url;
+  $('noCrop').onclick=function(){acceptPage(files[cursor])};
+
+  function acceptPage(blob){
+    pages.push(blob);
+    cursor++;pageIdx++;
+    loadPage();
+  }
+
+  function toMeta(){
     $('crop').classList.add('hidden');
     $('meta').classList.remove('hidden');
-    $('photo').src=url;
+    thumbURLs.forEach(URL.revokeObjectURL);thumbURLs=[];
+    var t=$('thumbs');t.innerHTML='';
+    pages.forEach(function(bl,i){
+      var u=URL.createObjectURL(bl);thumbURLs.push(u);
+      var lbl=LABELS[i]||('p'+(i+1));
+      var d=document.createElement('div');d.className='pg';
+      var im=document.createElement('img');im.src=u;im.alt=lbl;
+      im.onerror=function(){
+        var ph=document.createElement('div');
+        ph.className='bad';ph.textContent='No preview';
+        if(im.parentNode)d.replaceChild(ph,im);
+        noteBad();
+      };
+      var sp=document.createElement('span');sp.textContent=lbl;
+      d.appendChild(im);d.appendChild(sp);t.appendChild(d);
+    });
     $('sender').value='';
-    paintName();
-    chips();
+    paintName();chips();
     $('sender').focus();
   }
 
   function clean(s){return (s||'').replace(/[\/\\:*?"<>|]/g,'').replace(/\s+/g,' ').trim()}
 
-  function filename(){
+  function occasion(){
+    var v=$('event').value;
+    return clean(v==='__other'?$('eventOther').value:v);
+  }
+
+  function base(){
     var d=$('date').value||'Date';
-    var e=clean($('event').value)||'Occasion';
+    var e=occasion()||'Occasion';
+    var r=clean($('recipient').value);
     var s=clean($('sender').value)||'Sender';
-    var ext=(warped&&warped.type==='image/png')?'png':'jpg';
-    return d+' '+e+' '+s+'.'+ext;
+    return d+' '+e+(r?' - '+r:'')+' from '+s;
+  }
+
+  function nameFor(i){
+    var ext=(pages[i]&&pages[i].type==='image/png')?'png':'jpg';
+    if(pages.length===1)return base()+'.'+ext;
+    return base()+' - '+(LABELS[i]||('p'+(i+1)))+'.'+ext;
   }
 
   function esc(t){var d=document.createElement('div');d.textContent=t;return d.innerHTML}
 
   function paintName(){
     var s=clean($('sender').value);
-    var n=filename();
-    $('preview').innerHTML=s?esc(n):'<em>'+esc(n)+'</em>';
+    var html=pages.map(function(_,i){return '<i>'+esc(nameFor(i))+'</i>'}).join('');
+    $('preview').innerHTML=s?html:'<em>'+html+'</em>';
     $('save').disabled=!s;
   }
 
-  function chips(){
-    var c=$('chips');c.innerHTML='';
-    seen.slice(-6).reverse().forEach(function(n){
+  function chipRow(box,list,input){
+    box.innerHTML='';
+    list.slice(-6).reverse().forEach(function(n){
       var b=document.createElement('button');
       b.className='chip';b.type='button';b.textContent=n;
-      b.onclick=function(){$('sender').value=n;paintName()};
-      c.appendChild(b);
+      b.onclick=function(){input.value=n;paintName()};
+      box.appendChild(b);
     });
   }
 
-  ['sender','event','date'].forEach(function(id){
+  function chips(){
+    chipRow($('chips'),seen,$('sender'));
+    chipRow($('toChips'),seenTo,$('recipient'));
+  }
+
+  ['sender','recipient','event','eventOther','date'].forEach(function(id){
     $(id).addEventListener('input',paintName);
   });
+
+  $('event').addEventListener('change',function(){
+    var other=$('event').value==='__other';
+    $('otherWrap').classList.toggle('hidden',!other);
+    if(other)$('eventOther').focus();
+    paintName();
+  });
+
   $('sender').addEventListener('keydown',function(e){
+    if(e.key==='Enter'){e.preventDefault();$('recipient').focus()}
+  });
+  $('recipient').addEventListener('keydown',function(e){
     if(e.key==='Enter'&&!$('save').disabled){e.preventDefault();doSave()}
   });
 
-  $('skipCard').onclick=function(){idx++;loadCurrent()};
+  $('skipCard').onclick=function(){startCard()};
   $('save').onclick=doSave;
 
   function doSave(){
     var s=clean($('sender').value);
     if(!s)return;
-    var out=new File([warped],filename(),{type:warped.type||'image/jpeg'});
+    var out=pages.map(function(bl,i){
+      return new File([bl],nameFor(i),{type:bl.type||'image/jpeg'});
+    });
     if(seen.indexOf(s)===-1)seen.push(s);
-    saved++;
-    if(navigator.canShare&&navigator.canShare({files:[out]})){
-      navigator.share({files:[out]}).then(next,function(err){
-        if(err&&err.name==='AbortError'){saved--;return}
-        download(out);next();
+    var r=clean($('recipient').value);
+    if(r&&seenTo.indexOf(r)===-1)seenTo.push(r);
+
+    if(navigator.canShare&&navigator.canShare({files:out})){
+      navigator.share({files:out}).then(function(){finishCard(out.length)},function(err){
+        if(err&&err.name==='AbortError')return;
+        out.forEach(download);finishCard(out.length);
       });
     }else{
-      download(out);next();
+      out.forEach(function(f,i){setTimeout(function(){download(f)},i*350)});
+      finishCard(out.length);
     }
   }
+
+  function finishCard(n){savedCards++;savedFiles+=n;startCard()}
 
   function download(f){
     var u=URL.createObjectURL(f);
@@ -483,18 +631,16 @@
     setTimeout(function(){URL.revokeObjectURL(u)},1500);
   }
 
-  function next(){idx++;loadCurrent()}
-
-  window.addEventListener('resize',function(){
-    if(img&&!$('crop').classList.contains('hidden')){drawStage();paintOverlay();}
-  });
-
   function finish(){
     $('crop').classList.add('hidden');
     $('meta').classList.add('hidden');
     $('finish').classList.remove('hidden');
-    $('tally').textContent=saved+' cards straightened and named. Drop them in your shared folder.';
+    $('tally').textContent=savedCards+' cards saved ('+savedFiles+' files). Drop them in your shared folder.';
   }
+
+  window.addEventListener('resize',function(){
+    if(img&&!$('crop').classList.contains('hidden')){drawStage();paintOverlay()}
+  });
 })();
 </script>
 </body>
