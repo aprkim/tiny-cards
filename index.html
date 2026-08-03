@@ -165,6 +165,25 @@
   .altlink:hover,.altlink:focus-visible{border-bottom-color:var(--accent)}
   .footlink{margin-top:20px;text-align:center}
 
+  .opt{
+    margin-top:18px;padding:14px 15px;background:var(--field);
+    border:1px solid var(--rule);border-radius:12px;
+  }
+  .opt .row{display:flex;align-items:flex-start;gap:12px}
+  .opt .txt{flex:1;min-width:0}
+  .opt b{display:block;font-size:13.5px;font-weight:600;margin-bottom:2px}
+  .opt small{display:block;font-size:12px;color:var(--muted);line-height:1.6}
+  .sw{
+    position:relative;flex-shrink:0;width:46px;height:28px;border-radius:100px;
+    background:var(--rule);border:none;cursor:pointer;transition:background .18s;padding:0;
+  }
+  .sw::after{
+    content:'';position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;
+    background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .18s;
+  }
+  .sw[aria-checked=true]{background:var(--accent)}
+  .sw[aria-checked=true]::after{transform:translateX(18px)}
+
   .hidden{display:none}
   @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -197,6 +216,17 @@
       <b>Shoot in order:</b> front, inside, front, inside… Photos get grouped into cards
       using the number above, so keep the sequence consistent.
       <br><b>Tip:</b> a dark surface makes the corners easy to see.
+    </div>
+
+    <div class="opt">
+      <div class="row">
+        <div class="txt">
+          <b>Keep a library on this device</b>
+          <small id="libNote">Saved cards stay in this browser so you can reopen them later.</small>
+        </div>
+        <button type="button" class="sw" id="libToggle" role="switch" aria-checked="false"
+                aria-label="Keep a library on this device"></button>
+      </div>
     </div>
 
     <div class="footlink">
@@ -393,7 +423,40 @@
                       :'Already have cards? Browse your archive →';
     }).catch(function(){});
   }
-  refreshLibLink();
+
+  /* ---- library on/off ----
+     Default OFF on phones: photos are usually taken on a phone precisely so
+     they do NOT pile up on it. Desktops default ON, where a local library is
+     convenient and storage is cheap. Either way the choice is remembered. */
+  var LIB_KEY='tinyCards_keepLocal';
+  function isPhone(){
+    return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)||
+           (navigator.maxTouchPoints>1&&/Mac/.test(navigator.platform));
+  }
+  var keepLocal;
+  try{
+    var stored=localStorage.getItem(LIB_KEY);
+    keepLocal=stored===null?!isPhone():stored==='1';
+  }catch(e){keepLocal=!isPhone()}
+
+  function paintToggle(){
+    var t=$('libToggle');
+    if(t)t.setAttribute('aria-checked',keepLocal?'true':'false');
+    var n=$('libNote');
+    if(n)n.textContent=keepLocal
+      ? 'Saved cards stay in this browser so you can reopen them later.'
+      : 'Nothing is kept here. Cards leave only as the files you export.';
+    refreshLibLink();
+  }
+
+  if($('libToggle')){
+    $('libToggle').onclick=function(){
+      keepLocal=!keepLocal;
+      try{localStorage.setItem(LIB_KEY,keepLocal?'1':'0')}catch(e){}
+      paintToggle();
+    };
+  }
+  paintToggle();
 
   Array.prototype.forEach.call($('seg').children,function(b){
     b.onclick=function(){
@@ -687,9 +750,9 @@
     var r=clean($('recipient').value);
     if(r&&seenTo.indexOf(r)===-1)seenTo.push(r);
 
-    // Persist to the on-device library. Fire-and-forget: a storage failure
-    // must never block the export, which is the copy that actually matters.
-    libPut({
+    // Persist to the on-device library only if the user wants one here.
+    // Fire-and-forget: a storage failure must never block the export.
+    if(keepLocal)libPut({
       id:String(Date.now())+'-'+Math.round(Math.random()*1e6),
       date:$('date').value||'',
       occasion:occasion(),
@@ -729,11 +792,12 @@
     $('meta').classList.add('hidden');
     $('finish').classList.remove('hidden');
     $('tally').textContent=savedCards+' cards saved ('+savedFiles+' files). '+
-      (libFailed?'Could not save to this device’s library — your exported files are unaffected.'
-               :'Kept in your library on this device, and exported as files.');
+      (!keepLocal ? 'Nothing was kept on this device.'
+       : libFailed ? 'Could not save to this device’s library — your exported files are unaffected.'
+                   : 'Kept in your library on this device, and exported as files.');
     refreshLibLink();
     var f=$('finLink');
-    if(f)f.textContent=libFailed?'Open the archive →':'Open your library →';
+    if(f)f.textContent=(keepLocal&&!libFailed)?'Open your library →':'Open the archive →';
   }
 
   window.addEventListener('resize',function(){
