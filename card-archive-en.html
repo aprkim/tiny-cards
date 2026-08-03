@@ -82,10 +82,19 @@
 
   .box{
     position:fixed;inset:0;background:rgba(22,22,29,.94);z-index:50;
-    display:flex;flex-direction:column;align-items:center;justify-content:center;
-    padding:22px;gap:14px;
+    display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
+    padding:22px;gap:14px;overflow-y:auto;
   }
+  /* Auto-margin pseudo-elements centre the content while still allowing it to
+     scroll. justify-content:center would clip the top once the edit form makes
+     the contents taller than the viewport, putting Save out of reach. */
+  .box::before,.box::after{content:'';flex:0 0 auto}
+  .box::before{margin-top:auto}
+  .box::after{margin-bottom:auto}
+  .box>*{flex:0 0 auto}
   .box img{max-width:100%;max-height:calc(100vh - 200px);object-fit:contain;border-radius:8px}
+  /* Give the form room on short screens */
+  .box.editing img{max-height:32vh}
   .box .cap{color:#fff;text-align:center}
   .box .cap strong{display:block;font-size:16px;font-weight:600}
   .box .cap small{font-size:13px;opacity:.6;font-variant-numeric:tabular-nums}
@@ -222,7 +231,7 @@
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
 <script>
 (function(){
-  var cards=[],urls=[],filter=null,openCard=null,openPage=0,fromLibrary=false;
+  var cards=[],urls=[],filter=null,openCard=null,openPage=0,fromLibrary=false,fromCloud=false;
   var $=function(id){return document.getElementById(id)};
   var picker=$('picker'),drop=$('drop');
 
@@ -288,7 +297,19 @@
     appId:"1:497477643272:web:9f8e43fbffd18003e5f5bd"
   };
   var CODE_KEY='tinywins_sync_code';
-  var fbDb=null,fbStore=null,authP=null;
+  var fbDb=null,fbStore=null,authP=null,cloudCode='';
+
+  /* The whole card list lives in one document, so changing a single card is a
+     read-modify-write of that array. Fine for one person editing their own
+     archive; it would need a subcollection if several people edited at once. */
+  function cloudMutate(fn){
+    var ref=fbDb.collection('tinyCards').doc(cloudCode);
+    return ref.get().then(function(doc){
+      var rows=(doc.exists&&doc.data().cards)||[];
+      var next=fn(rows.slice());
+      return ref.set({cards:next,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+    });
+  }
 
   function syncCode(){try{return localStorage.getItem(CODE_KEY)||''}catch(e){return''}}
 
@@ -332,13 +353,13 @@
           return {row:row,urls:urlsFor.filter(Boolean)};
         });
       })).then(function(resolved){
-        cards=[];fromLibrary=false;
+        cards=[];fromLibrary=false;fromCloud=true;cloudCode=code;
         resolved.forEach(function(x){
           if(!x.urls.length)return;
           cards.push({
             key:x.row.id,id:x.row.id,date:x.row.date||'',year:(x.row.date||'').slice(0,4),
             event:x.row.occasion||'Unsorted',person:x.row.sender||'Unknown',
-            recipient:x.row.recipient||'',ok:!!x.row.date,
+            recipient:x.row.recipient||'',ok:!!x.row.date,raw:x.row,
             pages:x.urls.map(function(u,i){return {url:u,label:(x.row.labels&&x.row.labels[i])||''}})
           });
         });
@@ -359,7 +380,7 @@
   function loadLibrary(){
     libAll().then(function(rows){
       urls.forEach(URL.revokeObjectURL);
-      cards=[];urls=[];fromLibrary=true;
+      cards=[];urls=[];fromLibrary=true;fromCloud=false;
       rows.forEach(function(row){
         var pages=(row.pages||[]).map(function(bl,i){
           var u=URL.createObjectURL(bl);urls.push(u);
@@ -429,7 +450,7 @@
   picker.onchange=function(){
     if(!picker.files.length)return;
     urls.forEach(URL.revokeObjectURL);
-    cards=[];urls=[];fromLibrary=false;
+    cards=[];urls=[];fromLibrary=false;fromCloud=false;
     var byKey={};
 
     Array.prototype.slice.call(picker.files).forEach(function(f){
@@ -543,16 +564,17 @@
         nav.appendChild(b);
       });
     }
-    // Editing and deleting only make sense for cards we own in the library;
-    // folder-loaded cards are just files on disk we have no write access to.
-    $('boxTools').classList.toggle('hidden',!fromLibrary);
-    $('boxForm').classList.add('hidden');
+    // Editing and deleting apply to cards we own — the on-device library or
+    // the cloud archive. Folder-loaded cards are just files on disk we have
+    // no write access to, so the controls stay hidden for those.
+    $('boxTools').classList.toggle('hidden',!(fromLibrary||fromCloud));
+    $('boxForm').classList.add('hidden');$('box').classList.remove('editing');
     $('box').classList.remove('hidden');
   }
 
   function close(){
     $('box').classList.add('hidden');$('boxImg').src='';openCard=null;
-    $('boxForm').classList.add('hidden');
+    $('boxForm').classList.add('hidden');$('box').classList.remove('editing');
   }
 
   /* ---- library editing ---- */
@@ -563,9 +585,13 @@
     $('eRecipient').value=openCard.recipient||'';
     $('eEvent').value=openCard.event==='Unsorted'?'':openCard.event;
     $('eDate').value=openCard.date||'';
-    $('boxForm').classList.toggle('hidden');
+    var hidden=$('boxForm').classList.toggle('hidden');
+    $('box').classList.toggle('editing',!hidden);
   };
-  $('eCancel').onclick=function(e){e.stopPropagation();$('boxForm').classList.add('hidden')};
+  $('eCancel').onclick=function(e){
+    e.stopPropagation();
+    $('boxForm').classList.add('hidden');$('box').classList.remove('editing');
+  };
 
   $('eSave').onclick=function(e){
     e.stopPropagation();
@@ -575,27 +601,65 @@
     row.recipient=$('eRecipient').value.trim();
     row.occasion=$('eEvent').value.trim()||'Unsorted';
     row.date=$('eDate').value||'';
-    libPut(row).then(function(){
+
+    var save=fromCloud
+      ? cloudMutate(function(rows){
+          return rows.map(function(x){
+            if(x.id!==row.id)return x;
+            x.sender=row.sender;x.recipient=row.recipient;
+            x.occasion=row.occasion;x.date=row.date;
+            return x;
+          });
+        })
+      : libPut(row);
+
+    save.then(function(){
       openCard.person=row.sender;openCard.recipient=row.recipient;
       openCard.event=row.occasion;openCard.date=row.date;
       openCard.year=row.date.slice(0,4);openCard.ok=!!row.date;
-      $('boxForm').classList.add('hidden');
+      $('boxForm').classList.add('hidden');$('box').classList.remove('editing');
       $('boxName').textContent=openCard.person+(openCard.recipient?' → '+openCard.recipient:'');
       $('boxSub').textContent=(openCard.date?openCard.date+' · ':'')+openCard.event;
       filter=null;people();render();
-    }).catch(function(){alert('Could not save the change.')});
+    }).catch(function(e){
+      alert('Could not save the change.');
+      if(window.console)console.warn(e);
+    });
   };
 
   $('boxDel').onclick=function(e){
     e.stopPropagation();
     if(!openCard)return;
-    if(!confirm('Delete this card from your library? Exported files are not affected.'))return;
-    var id=openCard.id;
-    libDel(id).then(function(){
-      openCard.pages.forEach(function(p){URL.revokeObjectURL(p.url)});
+    var where=fromCloud?'your archive (on every device)':'your library';
+    if(!confirm('Delete this card from '+where+'? Exported files are not affected.'))return;
+    var id=openCard.id,card=openCard;
+
+    var del;
+    if(fromCloud){
+      // Remove the images first, then the index entry. If an image delete
+      // fails the entry survives, which is recoverable; the reverse would
+      // orphan files nothing points at.
+      var paths=(card.raw&&card.raw.paths)||[];
+      del=Promise.all(paths.map(function(p){
+        return fbStore.ref().child(p).delete().catch(function(){});
+      })).then(function(){
+        return cloudMutate(function(rows){
+          return rows.filter(function(x){return x.id!==id});
+        });
+      });
+    }else{
+      del=libDel(id).then(function(){
+        card.pages.forEach(function(p){URL.revokeObjectURL(p.url)});
+      });
+    }
+
+    del.then(function(){
       cards=cards.filter(function(c){return c.id!==id});
       close();filter=null;people();render();
-    }).catch(function(){alert('Could not delete that card.')});
+    }).catch(function(e){
+      alert('Could not delete that card.');
+      if(window.console)console.warn(e);
+    });
   };
 
   $('boxDl').onclick=function(e){
@@ -605,16 +669,29 @@
     var clean=function(s){return (s||'').replace(/[\/\\:*?"<>|]/g,'').replace(/\s+/g,' ').trim()};
     var base=(c.date||'Date')+' '+(clean(c.event)||'Occasion')+
              (c.recipient?' - '+clean(c.recipient):'')+' from '+(clean(c.person)||'Sender');
-    (c.blobs||[]).forEach(function(bl,i){
-      setTimeout(function(){
-        var name=base+((c.blobs.length>1)?' - '+((c.pages[i]&&c.pages[i].label)||('p'+(i+1))):'')+
-                 (bl.type==='image/png'?'.png':'.jpg');
-        var u=URL.createObjectURL(bl);
-        var a=document.createElement('a');a.href=u;a.download=name;
-        document.body.appendChild(a);a.click();a.remove();
-        setTimeout(function(){URL.revokeObjectURL(u)},1500);
-      },i*350);
-    });
+    var n=c.pages.length;
+    var nameFor=function(i,type){
+      return base+(n>1?' - '+((c.pages[i]&&c.pages[i].label)||('p'+(i+1))):'')+
+             (type==='image/png'?'.png':'.jpg');
+    };
+    var push=function(blob,i){
+      var u=URL.createObjectURL(blob);
+      var a=document.createElement('a');a.href=u;a.download=nameFor(i,blob.type);
+      document.body.appendChild(a);a.click();a.remove();
+      setTimeout(function(){URL.revokeObjectURL(u)},1500);
+    };
+
+    if(c.blobs&&c.blobs.length){                 // library card: blobs in hand
+      c.blobs.forEach(function(bl,i){setTimeout(function(){push(bl,i)},i*350)});
+    }else{                                        // cloud card: fetch first
+      c.pages.forEach(function(pg,i){
+        setTimeout(function(){
+          fetch(pg.url).then(function(r){return r.blob()})
+            .then(function(bl){push(bl,i)})
+            .catch(function(){alert('Could not download that page.')});
+        },i*350);
+      });
+    }
   };
 
   $('boxClose').onclick=close;
