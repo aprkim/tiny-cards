@@ -35,12 +35,19 @@
   h1{font-size:19px;font-weight:700;letter-spacing:-.02em}
   header p{font-size:13.5px;color:var(--muted);margin-top:3px}
 
+  /* Equal-weight choices get identical boxes, matched even when a caption
+     wraps to two lines on a narrow screen. */
   .drop{
-    border:1.5px dashed var(--rule);border-radius:14px;padding:42px 20px;
+    border:1.5px dashed var(--rule);border-radius:14px;padding:22px 20px;
     text-align:center;background:var(--field);cursor:pointer;
     transition:border-color .15s,background .15s;
+    min-height:128px;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
   }
-  .drop:hover,.drop:focus-visible{border-color:var(--accent);background:var(--accent-soft)}
+  /* Secondary must not adopt the primary's accent look on hover, or the two
+     become indistinguishable while the pointer is over one of them. */
+  .drop:hover,.drop:focus-visible{border-color:#BFBAAE;background:#F3F1EB}
+  .drop:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   .drop strong{display:block;font-size:15.5px;font-weight:600;margin-bottom:6px}
   .drop span{font-size:13px;color:var(--muted)}
   .hint{
@@ -122,6 +129,7 @@
     border-style:solid;border-color:var(--accent);background:var(--accent-soft);margin-bottom:14px;
   }
   .drop.lib strong{color:var(--accent)}
+  .drop.lib:hover,.drop.lib:focus-visible{border-color:#8E1340;background:#F7DCE6}
 
   .rowbtns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:4px}
   .minibtn{
