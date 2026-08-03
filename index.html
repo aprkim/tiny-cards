@@ -275,6 +275,17 @@
     <div class="opt">
       <div class="row">
         <div class="txt">
+          <b>Also export as files</b>
+          <small id="expNote">Opens the share sheet so you can file each card yourself.</small>
+        </div>
+        <button type="button" class="sw" id="expToggle" role="switch" aria-checked="true"
+                aria-label="Also export as files"></button>
+      </div>
+    </div>
+
+    <div class="opt">
+      <div class="row">
+        <div class="txt">
           <b>Keep a library on this device</b>
           <small id="libNote">Saved cards stay in this browser so you can reopen them later.</small>
         </div>
@@ -587,6 +598,41 @@
   var useCloud;
   try{useCloud=localStorage.getItem(CLOUD_KEY)==='1'}catch(e){useCloud=false}
 
+  /* Exporting files is what the share sheet is for. Once cards upload to the
+     archive it is just an extra tap per card, and on a phone it puts back the
+     very files you were trying not to keep — so it defaults off when the
+     archive is on. An explicit choice always wins over that default. */
+  var EXPORT_KEY='tinyCards_exportFiles',exportExplicit=false,exportFiles;
+  try{
+    var ev=localStorage.getItem(EXPORT_KEY);
+    exportExplicit=ev!==null;
+    exportFiles=exportExplicit?ev==='1':!useCloud;
+  }catch(e){exportFiles=!useCloud}
+
+  function paintExport(){
+    // Never leave every destination off — that would make Save do nothing.
+    if(!useCloud&&!exportFiles)exportFiles=true;
+    var t=$('expToggle');
+    if(t)t.setAttribute('aria-checked',exportFiles?'true':'false');
+    var n=$('expNote');
+    if(n)n.textContent=exportFiles
+      ? (useCloud?'Also opens the share sheet after each upload.'
+                 :'Opens the share sheet so you can file each card yourself.')
+      : 'Off — cards go straight to your archive with no share sheet.';
+  }
+
+  if($('expToggle')){
+    $('expToggle').onclick=function(){
+      if(!useCloud&&exportFiles){
+        alert('Turn on “Send cards to your archive” first, otherwise saving a card would do nothing.');
+        return;
+      }
+      exportFiles=!exportFiles;exportExplicit=true;
+      try{localStorage.setItem(EXPORT_KEY,exportFiles?'1':'0')}catch(e){}
+      paintExport();
+    };
+  }
+
   function paintCloud(){
     var t=$('cloudToggle');
     if(t)t.setAttribute('aria-checked',useCloud?'true':'false');
@@ -596,6 +642,8 @@
     if(n)n.textContent=useCloud
       ? 'Cards upload to your archive. Open it anywhere with this code.'
       : 'Not connected — cards leave only as the files you export.';
+    if(!exportExplicit)exportFiles=!useCloud;   // follow the sensible default
+    paintExport();
   }
 
   function connectCloud(){
@@ -1063,9 +1111,14 @@
       else if(ok===false)cloudFailed=true;
     });
 
+    if(!exportFiles)return finishCard(0);   // archive only — no share sheet
+
     if(navigator.canShare&&navigator.canShare({files:out})){
       navigator.share({files:out}).then(function(){finishCard(out.length)},function(err){
-        if(err&&err.name==='AbortError')return;
+        // Dismissing the share sheet used to strand the user on this screen
+        // even though the card was already saved, and tapping Save again
+        // uploaded a duplicate. Cancelling now just skips the export.
+        if(err&&err.name==='AbortError')return finishCard(0);
         out.forEach(download);finishCard(out.length);
       });
     }else{
@@ -1096,8 +1149,9 @@
     if(useCloud)where.push(cloudFailed?'the archive could not be reached':'sent to your archive');
     if(keepLocal)where.push(libFailed?'this device’s library failed':'kept in this device’s library');
     if(!where.length)where.push('nothing was kept on this device');
-    $('tally').textContent=savedCards+' cards saved ('+savedFiles+' files) — '+
-      where.join(', ')+'.'+((cloudFailed||libFailed)?' Your exported files are unaffected.':'');
+    $('tally').textContent=savedCards+' card'+(savedCards===1?'':'s')+' saved'+
+      (savedFiles?' ('+savedFiles+' files)':'')+' — '+where.join(', ')+'.'+
+      ((cloudFailed||libFailed)?' Your exported files are unaffected.':'');
     refreshLibLink();
     var f=$('finLink');
     if(f)f.textContent=(keepLocal&&!libFailed)?'Open your library →':'Open the archive →';
