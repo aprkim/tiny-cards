@@ -2,7 +2,20 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<!-- No user-scalable=no: this is a photo app, and checking whether a crop
+     caught the card edge is exactly when you want to pinch-zoom. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Scan greeting cards with your phone: straighten, name, and file them. Nothing is kept on your device unless you ask.">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<meta property="og:title" content="Tiny Cards">
+<meta property="og:description" content="Scan greeting cards with your phone: straighten, name, and file them.">
+<meta property="og:image" content="https://cards.tinywins.space/og-image.png">
+<meta property="og:url" content="https://cards.tinywins.space/">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Tiny Cards">
+<meta name="twitter:description" content="Scan greeting cards with your phone: straighten, name, and file them.">
+<meta name="twitter:image" content="https://cards.tinywins.space/og-image.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#FAF9F6">
 <title>Card Scanner</title>
@@ -87,6 +100,8 @@
     background:#fff;border:3px solid var(--accent);box-shadow:0 1px 6px rgba(0,0,0,.35);
   }
   .handle.drag::after{background:var(--accent-soft)}
+  .handle:focus-visible{outline:none}
+  .handle:focus-visible::after{box-shadow:0 0 0 3px #fff,0 0 0 6px var(--accent)}
   #h0::after{background:var(--accent);border-color:#fff}
   #h0.drag::after{background:var(--accent-soft);border-color:var(--accent)}
   .stagehint{font-size:12.5px;color:var(--muted);line-height:1.5}
@@ -214,6 +229,12 @@
   .upbar{height:3px;background:rgba(176,24,79,.18);border-radius:2px;overflow:hidden;margin-top:8px}
   .upbar i{display:block;height:100%;background:var(--accent);width:0;transition:width .2s ease}
 
+  .suitelink{
+    display:inline-block;color:#94A3B8;text-decoration:none;font-size:13.5px;
+    margin-bottom:12px;transition:color .2s;
+  }
+  .suitelink:hover,.suitelink:focus-visible{color:#64748b;text-decoration:underline}
+
   .hidden{display:none}
   @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -221,6 +242,7 @@
 <body>
 <div class="wrap">
 
+    <a href="https://tinywins.space" class="suitelink">&larr; TinyWins</a>
   <header>
     <h1>Card Scanner</h1>
     <p>Crop, name, export. You choose where cards go.</p>
@@ -309,10 +331,10 @@
     <div class="stage" id="stage">
       <canvas id="cv"></canvas>
       <svg><polygon id="poly" points=""/></svg>
-      <div class="handle" id="h0"></div>
-      <div class="handle" id="h1"></div>
-      <div class="handle" id="h2"></div>
-      <div class="handle" id="h3"></div>
+      <div class="handle" id="h0" tabindex="0" role="slider" aria-label="Top-left corner (arrow keys to move)"></div>
+      <div class="handle" id="h1" tabindex="0" role="slider" aria-label="Top-right corner (arrow keys to move)"></div>
+      <div class="handle" id="h2" tabindex="0" role="slider" aria-label="Bottom-right corner (arrow keys to move)"></div>
+      <div class="handle" id="h3" tabindex="0" role="slider" aria-label="Bottom-left corner (arrow keys to move)"></div>
     </div>
     <div class="tools">
       <p class="stagehint">Drag the dots to the card&rsquo;s four corners.<br>
@@ -879,6 +901,22 @@
       h.addEventListener('pointerup',up);
       h.addEventListener('pointercancel',up);
     });
+
+    // Dragging was pointer-only, leaving no way to place a corner without a
+    // mouse or touch. Arrow keys nudge; Shift moves in bigger steps.
+    h.addEventListener('keydown',function(e){
+      var step=e.shiftKey?20:4,dx=0,dy=0;
+      if(e.key==='ArrowLeft')dx=-step;
+      else if(e.key==='ArrowRight')dx=step;
+      else if(e.key==='ArrowUp')dy=-step;
+      else if(e.key==='ArrowDown')dy=step;
+      else return;
+      e.preventDefault();
+      if(!img)return;
+      corners[i].x=Math.max(0,Math.min(img.naturalWidth,corners[i].x+dx));
+      corners[i].y=Math.max(0,Math.min(img.naturalHeight,corners[i].y+dy));
+      paintOverlay();
+    });
   });
 
   /* ---- perspective warp: do not modify ---- */
@@ -1160,6 +1198,17 @@
 
   window.addEventListener('resize',function(){
     if(img&&!$('crop').classList.contains('hidden')){drawStage();paintOverlay()}
+  });
+
+  /* Everything lives in this tab until a card is saved, so a stray refresh or
+     swipe-back silently destroys the batch. Warn only when work would be lost:
+     pages captured but not yet named, or photos still queued. */
+  window.addEventListener('beforeunload',function(e){
+    var unsaved=pages.length>0||(mode==='batch'&&files.length&&cursor<files.length);
+    if(!unsaved)return;
+    e.preventDefault();
+    e.returnValue='';   // required by older browsers to trigger the prompt
+    return '';
   });
 })();
 </script>

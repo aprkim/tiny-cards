@@ -6,6 +6,17 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#FAF9F6">
 <title>Card Archive</title>
+<meta name="description" content="Browse your scanned greeting cards by sender, occasion, and year.">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<meta property="og:title" content="Tiny Cards — Archive">
+<meta property="og:description" content="Browse your scanned greeting cards by sender, occasion, and year.">
+<meta property="og:image" content="https://cards.tinywins.space/og-image.png">
+<meta property="og:url" content="https://cards.tinywins.space/card-archive-en.html">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Tiny Cards — Archive">
+<meta name="twitter:description" content="Browse your scanned greeting cards by sender, occasion, and year.">
+<meta name="twitter:image" content="https://cards.tinywins.space/og-image.png">
 <style>
   :root{
     --ink:#16161D;--paper:#FAF9F6;--accent:#B0184F;--accent-soft:#FBEDF2;
@@ -146,6 +157,12 @@
   .altlink:hover,.altlink:focus-visible{border-bottom-color:var(--accent)}
   .footlink{margin-top:20px;text-align:center}
 
+  .suitelink{
+    display:inline-block;color:#94A3B8;text-decoration:none;font-size:13.5px;
+    margin-bottom:12px;transition:color .2s;
+  }
+  .suitelink:hover,.suitelink:focus-visible{color:#64748b;text-decoration:underline}
+
   .hidden{display:none}
   @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -153,6 +170,7 @@
 <body>
 <div class="wrap">
 
+    <a href="https://tinywins.space" class="suitelink">&larr; TinyWins</a>
   <header>
     <h1>Card Archive</h1>
     <p>Open your cloud archive, this device&rsquo;s library, or a folder of files.</p>
@@ -494,17 +512,33 @@
 
   function esc(t){var d=document.createElement('div');d.textContent=t;return d.innerHTML}
 
+  var showAllPeople=false;
+
   function people(){
     var c={},box=$('people');box.innerHTML='';
     cards.forEach(function(x){if(x.ok)c[x.person]=(c[x.person]||0)+1});
-    Object.keys(c).sort(function(a,b){return c[b]-c[a]||a.localeCompare(b)})
-      .slice(0,14).forEach(function(n){
-        var b=document.createElement('button');
-        b.className='chip'+(filter===n?' on':'');b.type='button';
-        b.innerHTML=esc(n)+'<b>'+c[n]+'</b>';
-        b.onclick=function(){filter=(filter===n?null:n);people();render()};
-        box.appendChild(b);
-      });
+    var names=Object.keys(c).sort(function(a,b){return c[b]-c[a]||a.localeCompare(b)});
+
+    // Previously this silently cut off at 14, so senders beyond that simply
+    // did not appear and nothing said so. Now the rest are one tap away.
+    var LIMIT=14;
+    var shown=(showAllPeople||names.length<=LIMIT)?names:names.slice(0,LIMIT);
+
+    shown.forEach(function(n){
+      var b=document.createElement('button');
+      b.className='chip'+(filter===n?' on':'');b.type='button';
+      b.innerHTML=esc(n)+'<b>'+c[n]+'</b>';
+      b.onclick=function(){filter=(filter===n?null:n);people();render()};
+      box.appendChild(b);
+    });
+
+    if(names.length>LIMIT){
+      var more=document.createElement('button');
+      more.className='chip';more.type='button';
+      more.textContent=showAllPeople?'Show fewer':'+'+(names.length-LIMIT)+' more';
+      more.onclick=function(){showAllPeople=!showAllPeople;people()};
+      box.appendChild(more);
+    }
   }
 
   function render(){
