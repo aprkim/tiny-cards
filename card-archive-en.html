@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#FAF9F6">
+<title>Card Archive</title>
+<style>
+  :root{
+    --ink:#16161D;--paper:#FAF9F6;--accent:#B0184F;--accent-soft:#FBEDF2;
+    --muted:#6E6E78;--rule:#E4E2DB;--field:#FFFFFF;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,system-ui,'Segoe UI',sans-serif;
+    background:var(--paper);color:var(--ink);line-height:1.6;
+    padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:760px;margin:0 auto;padding:26px 18px 60px}
+  header{margin-bottom:22px}
+  h1{font-size:19px;font-weight:700;letter-spacing:-.02em}
+  header p{font-size:13.5px;color:var(--muted);margin-top:3px}
+
+  .drop{
+    border:1.5px dashed var(--rule);border-radius:14px;padding:42px 20px;
+    text-align:center;background:var(--field);cursor:pointer;
+    transition:border-color .15s,background .15s;
+  }
+  .drop:hover,.drop:focus-visible{border-color:var(--accent);background:var(--accent-soft)}
+  .drop strong{display:block;font-size:15.5px;font-weight:600;margin-bottom:6px}
+  .drop span{font-size:13px;color:var(--muted)}
+  .hint{
+    margin-top:18px;padding:13px 15px;background:var(--field);
+    border:1px solid var(--rule);border-radius:12px;
+    font-size:13px;color:var(--muted);line-height:1.75;
+  }
+  .hint b{color:var(--ink);font-weight:600}
+  .hint code{font-size:12.5px;background:var(--paper);padding:2px 6px;border-radius:5px;color:var(--ink)}
+
+  input[type=search]{
+    width:100%;font:inherit;font-size:16px;padding:12px 14px;
+    border:1px solid var(--rule);border-radius:10px;background:var(--field);
+    color:var(--ink);-webkit-appearance:none;appearance:none;
+  }
+  input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+  .chip{
+    font:inherit;font-size:13px;padding:6px 13px;border-radius:100px;
+    border:1px solid var(--rule);background:var(--field);color:var(--ink);cursor:pointer;
+  }
+  .chip:hover{border-color:var(--accent);color:var(--accent)}
+  .chip.on{background:var(--ink);border-color:var(--ink);color:#fff}
+  .chip b{font-weight:500;opacity:.5;margin-left:5px}
+
+  .meta{font-size:13px;color:var(--muted);margin:22px 0 12px;font-variant-numeric:tabular-nums}
+
+  .group{margin-bottom:34px}
+  .group h2{
+    font-size:14.5px;font-weight:700;letter-spacing:-.01em;
+    padding-bottom:9px;border-bottom:1px solid var(--rule);margin-bottom:16px;
+  }
+  .group h2 span{font-weight:500;color:var(--muted);margin-left:8px;font-size:13px}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:14px}
+  .card{cursor:pointer;border:none;background:none;padding:0;font:inherit;text-align:left;position:relative}
+  .card img{
+    width:100%;aspect-ratio:3/4;object-fit:cover;background:var(--field);
+    border:1px solid var(--rule);border-radius:10px;display:block;
+  }
+  .card:hover img{border-color:var(--accent)}
+  .card .n{
+    position:absolute;top:7px;right:7px;background:rgba(22,22,29,.82);color:#fff;
+    font-size:11px;font-weight:600;padding:2px 8px;border-radius:100px;
+  }
+  .card p{font-size:13.5px;font-weight:600;margin-top:8px;letter-spacing:-.01em}
+  .card small{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+
+  .empty{text-align:center;padding:48px 20px;color:var(--muted);font-size:14px}
+
+  .box{
+    position:fixed;inset:0;background:rgba(22,22,29,.94);z-index:50;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding:22px;gap:14px;
+  }
+  .box img{max-width:100%;max-height:calc(100vh - 200px);object-fit:contain;border-radius:8px}
+  .box .cap{color:#fff;text-align:center}
+  .box .cap strong{display:block;font-size:16px;font-weight:600}
+  .box .cap small{font-size:13px;opacity:.6;font-variant-numeric:tabular-nums}
+  .box .nav{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+  .box button{
+    font:inherit;font-size:13.5px;padding:9px 18px;border-radius:100px;
+    border:1px solid rgba(255,255,255,.3);background:none;color:#fff;cursor:pointer;
+    text-transform:capitalize;
+  }
+  .box button:hover{background:rgba(255,255,255,.12)}
+  .box button.on{background:#fff;color:var(--ink);border-color:#fff}
+
+  .hidden{display:none}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>Card Archive</h1>
+    <p>Reads your folder. Nothing is uploaded or stored.</p>
+  </header>
+
+  <section id="start">
+    <div class="drop" id="drop" tabindex="0" role="button">
+      <strong>Open Your Card Photos</strong>
+      <span>Select all of them at once</span>
+    </div>
+    <input type="file" id="picker" accept="image/*" multiple class="hidden">
+    <div class="hint">
+      The filename is the data. <code>2026-08-02 HazelBirthday Grandma Kim - front.jpg</code>
+      is read as date, occasion, sender, and page. Multi-page cards are grouped automatically.
+      Anything that doesn't match lands in <b>Unsorted</b>, so nothing disappears.
+    </div>
+  </section>
+
+  <section id="view" class="hidden">
+    <input type="search" id="q" placeholder="Search a name or occasion" autocomplete="off">
+    <div class="chips" id="people"></div>
+    <p class="meta" id="meta"></p>
+    <div id="groups"></div>
+  </section>
+
+</div>
+
+<div class="box hidden" id="box">
+  <img id="boxImg" alt="">
+  <div class="cap">
+    <strong id="boxName"></strong>
+    <small id="boxSub"></small>
+  </div>
+  <div class="nav" id="boxNav"></div>
+  <button id="boxClose">Close</button>
+</div>
+
+<script>
+(function(){
+  var cards=[],urls=[],filter=null,openCard=null,openPage=0;
+  var $=function(id){return document.getElementById(id)};
+  var picker=$('picker'),drop=$('drop');
+
+  drop.onclick=function(){picker.click()};
+  drop.onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();picker.click()}};
+
+  var RE=/^(\d{4})-(\d{2})-(\d{2})\s+(\S+)\s+(.+)$/;
+  var PAGE=/^(.*?)\s+-\s+(front|inside|back|p\d+)$/i;
+  var ORDER={front:0,inside:1,back:2};
+
+  picker.onchange=function(){
+    if(!picker.files.length)return;
+    urls.forEach(URL.revokeObjectURL);
+    cards=[];urls=[];
+    var byKey={};
+
+    Array.prototype.slice.call(picker.files).forEach(function(f){
+      if(!/^image\//.test(f.type))return;
+      var stem=f.name.replace(/\.[^.]+$/,'');
+      var u=URL.createObjectURL(f);urls.push(u);
+
+      var m=stem.match(RE);
+      if(!m){
+        cards.push({key:stem,date:'',year:'',event:'Unsorted',person:stem,ok:false,
+                    pages:[{url:u,label:''}]});
+        return;
+      }
+      var rest=m[5].trim(),label='';
+      var pm=rest.match(PAGE);
+      if(pm){rest=pm[1].trim();label=pm[2].toLowerCase()}
+
+      var key=m[1]+m[2]+m[3]+'|'+m[4]+'|'+rest;
+      if(!byKey[key]){
+        byKey[key]={key:key,date:m[1]+'-'+m[2]+'-'+m[3],year:m[1],
+                    event:m[4],person:rest,ok:true,pages:[]};
+        cards.push(byKey[key]);
+      }
+      byKey[key].pages.push({url:u,label:label});
+    });
+
+    cards.forEach(function(c){
+      c.pages.sort(function(a,b){
+        var x=ORDER[a.label],y=ORDER[b.label];
+        if(x===undefined)x=9;if(y===undefined)y=9;
+        return x-y||a.label.localeCompare(b.label);
+      });
+    });
+
+    cards.sort(function(a,b){
+      if(a.date===b.date)return a.person.localeCompare(b.person);
+      return b.date.localeCompare(a.date);
+    });
+
+    $('start').classList.add('hidden');
+    $('view').classList.remove('hidden');
+    people();render();
+  };
+
+  function esc(t){var d=document.createElement('div');d.textContent=t;return d.innerHTML}
+
+  function people(){
+    var c={},box=$('people');box.innerHTML='';
+    cards.forEach(function(x){if(x.ok)c[x.person]=(c[x.person]||0)+1});
+    Object.keys(c).sort(function(a,b){return c[b]-c[a]||a.localeCompare(b)})
+      .slice(0,14).forEach(function(n){
+        var b=document.createElement('button');
+        b.className='chip'+(filter===n?' on':'');b.type='button';
+        b.innerHTML=esc(n)+'<b>'+c[n]+'</b>';
+        b.onclick=function(){filter=(filter===n?null:n);people();render()};
+        box.appendChild(b);
+      });
+  }
+
+  function render(){
+    var q=$('q').value.trim().toLowerCase();
+    var list=cards.filter(function(x){
+      if(filter&&x.person!==filter)return false;
+      if(!q)return true;
+      return (x.person+' '+x.event+' '+x.date).toLowerCase().indexOf(q)>-1;
+    });
+
+    var who={},shots=0;
+    list.forEach(function(x){who[x.person]=1;shots+=x.pages.length});
+    $('meta').textContent=list.length+' cards \u00b7 '+shots+' photos \u00b7 '+Object.keys(who).length+' people';
+
+    var buckets={},order=[];
+    list.forEach(function(x){
+      var k=x.ok?(x.year+' '+x.event):'Unsorted';
+      if(!buckets[k]){buckets[k]=[];order.push(k)}
+      buckets[k].push(x);
+    });
+
+    var out=$('groups');out.innerHTML='';
+    if(!list.length){out.innerHTML='<p class="empty">No cards match.</p>';return}
+
+    order.forEach(function(k){
+      var sec=document.createElement('div');sec.className='group';
+      var h=document.createElement('h2');
+      h.innerHTML=esc(k)+'<span>'+buckets[k].length+' cards</span>';
+      sec.appendChild(h);
+      var g=document.createElement('div');g.className='grid';
+      buckets[k].forEach(function(x){
+        var b=document.createElement('button');b.className='card';b.type='button';
+        var badge=x.pages.length>1?'<span class="n">'+x.pages.length+'</span>':'';
+        b.innerHTML='<img loading="lazy" src="'+x.pages[0].url+'" alt="'+esc(x.person)+'">'+badge+
+                    '<p>'+esc(x.person)+'</p><small>'+esc(x.date||'no date')+'</small>';
+        b.onclick=function(){show(x,0)};
+        g.appendChild(b);
+      });
+      sec.appendChild(g);out.appendChild(sec);
+    });
+  }
+
+  function show(card,page){
+    openCard=card;openPage=page;
+    var p=card.pages[page];
+    $('boxImg').src=p.url;
+    $('boxName').textContent=card.person;
+    $('boxSub').textContent=(card.date?card.date+' \u00b7 ':'')+card.event;
+    var nav=$('boxNav');nav.innerHTML='';
+    if(card.pages.length>1){
+      card.pages.forEach(function(pg,i){
+        var b=document.createElement('button');
+        b.type='button';b.textContent=pg.label||('p'+(i+1));
+        if(i===page)b.className='on';
+        b.onclick=function(e){e.stopPropagation();show(card,i)};
+        nav.appendChild(b);
+      });
+    }
+    $('box').classList.remove('hidden');
+  }
+
+  function close(){$('box').classList.add('hidden');$('boxImg').src='';openCard=null}
+
+  $('boxClose').onclick=close;
+  $('box').onclick=function(e){if(e.target===$('box'))close()};
+  document.addEventListener('keydown',function(e){
+    if(e.key==='Escape')close();
+    if(!openCard)return;
+    if(e.key==='ArrowRight'&&openPage<openCard.pages.length-1)show(openCard,openPage+1);
+    if(e.key==='ArrowLeft'&&openPage>0)show(openCard,openPage-1);
+  });
+  $('q').addEventListener('input',render);
+})();
+</script>
+</body>
+</html>

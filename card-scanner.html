@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>카드 스캐너</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<style>
+  :root{
+    --ink:#16161D;--paper:#FAF9F6;--accent:#B0184F;--accent-soft:#FBEDF2;
+    --muted:#6E6E78;--rule:#E4E2DB;--field:#FFFFFF;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    font-family:'Pretendard Variable',Pretendard,-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+    background:var(--paper);color:var(--ink);line-height:1.6;
+    padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+    -webkit-font-smoothing:antialiased;
+    touch-action:manipulation;
+  }
+  .wrap{max-width:460px;margin:0 auto;padding:24px 18px 44px}
+
+  header{margin-bottom:24px}
+  h1{font-size:19px;font-weight:700;letter-spacing:-.02em}
+  header p{font-size:13.5px;color:var(--muted);margin-top:3px}
+
+  .drop{
+    border:1.5px dashed var(--rule);border-radius:14px;padding:44px 20px;
+    text-align:center;background:var(--field);cursor:pointer;
+    transition:border-color .15s,background .15s;
+  }
+  .drop:hover,.drop:focus-visible{border-color:var(--accent);background:var(--accent-soft)}
+  .drop strong{display:block;font-size:15.5px;font-weight:600;margin-bottom:6px}
+  .drop span{font-size:13px;color:var(--muted)}
+
+  .hint{
+    margin-top:18px;padding:13px 15px;background:var(--field);
+    border:1px solid var(--rule);border-radius:12px;
+    font-size:13px;color:var(--muted);line-height:1.7;
+  }
+  .hint b{color:var(--ink);font-weight:600}
+
+  .bar{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px}
+  .count{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .count b{color:var(--ink);font-weight:700;font-size:15px}
+  .track{height:3px;background:var(--rule);border-radius:2px;overflow:hidden;margin-bottom:16px}
+  .track i{display:block;height:100%;background:var(--accent);width:0;transition:width .25s ease}
+
+  .stage{
+    position:relative;background:#26262E;border-radius:14px;
+    overflow:hidden;margin-bottom:14px;user-select:none;-webkit-user-select:none;
+  }
+  .stage canvas{display:block;width:100%;height:auto}
+  .stage svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+  .stage polygon{fill:rgba(176,24,79,.14);stroke:var(--accent);stroke-width:2}
+  .handle{
+    position:absolute;width:44px;height:44px;margin:-22px 0 0 -22px;
+    touch-action:none;cursor:grab;
+  }
+  .handle::after{
+    content:'';position:absolute;inset:11px;border-radius:50%;
+    background:#fff;border:3px solid var(--accent);
+    box-shadow:0 1px 6px rgba(0,0,0,.35);
+  }
+  .handle.drag{cursor:grabbing}
+  .handle.drag::after{background:var(--accent-soft)}
+
+  .stagehint{font-size:12.5px;color:var(--muted);text-align:center;margin-bottom:14px}
+
+  .actions{display:flex;gap:10px}
+  button.go{
+    flex:1;font:inherit;font-size:15.5px;font-weight:600;padding:15px;
+    border:none;border-radius:12px;background:var(--accent);color:#fff;cursor:pointer;
+  }
+  button.go:disabled{background:var(--rule);color:var(--muted);cursor:not-allowed}
+  button.skip{
+    font:inherit;font-size:14px;padding:15px 16px;border:1px solid var(--rule);
+    border-radius:12px;background:var(--field);color:var(--muted);cursor:pointer;
+  }
+  button.skip:hover{border-color:var(--ink);color:var(--ink)}
+
+  .photo{
+    width:100%;aspect-ratio:3/4;object-fit:contain;background:var(--field);
+    border:1px solid var(--rule);border-radius:14px;margin-bottom:18px;display:block;
+  }
+  .name{
+    background:var(--ink);color:#fff;border-radius:12px;padding:13px 15px;
+    margin-bottom:20px;font-size:14px;font-weight:500;letter-spacing:-.01em;
+    font-variant-numeric:tabular-nums;word-break:break-all;line-height:1.5;
+  }
+  .name em{font-style:normal;opacity:.45}
+
+  label{display:block;font-size:12.5px;font-weight:600;color:var(--muted);margin-bottom:6px}
+  .field{margin-bottom:16px}
+  input[type=text],input[type=date]{
+    width:100%;font:inherit;font-size:16px;padding:12px 14px;
+    border:1px solid var(--rule);border-radius:10px;background:var(--field);
+    color:var(--ink);-webkit-appearance:none;appearance:none;
+  }
+  input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .chip{
+    font:inherit;font-size:13px;padding:5px 12px;border-radius:100px;
+    border:1px solid var(--rule);background:var(--field);color:var(--ink);cursor:pointer;
+  }
+  .chip:hover{border-color:var(--accent);color:var(--accent)}
+
+  .done{text-align:center;padding:52px 20px}
+  .done h2{font-size:20px;font-weight:700;margin-bottom:8px}
+  .done p{font-size:14px;color:var(--muted);margin-bottom:24px}
+
+  .hidden{display:none}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>카드 스캐너</h1>
+    <p>크롭하고, 이름 붙이고, 내보냅니다. 저장은 안 해요.</p>
+  </header>
+
+  <section id="start">
+    <div class="drop" id="dropzone" tabindex="0" role="button">
+      <strong>사진 고르기</strong>
+      <span>카메라로 찍거나 여러 장 선택</span>
+    </div>
+    <input type="file" id="picker" accept="image/*" multiple class="hidden">
+    <div class="hint">
+      <b>잘 찍는 법:</b> 어두운 바닥(식탁, 러그)에 카드를 놓고 위에서 찍으세요.
+      모서리 점 4개를 카드 꼭짓점에 맞추면 반듯하게 펴 드립니다.
+    </div>
+  </section>
+
+  <section id="crop" class="hidden">
+    <div class="bar">
+      <span class="count"><b id="cur">1</b> / <span id="tot">1</span></span>
+      <span class="count" id="left"></span>
+    </div>
+    <div class="track"><i id="fill"></i></div>
+
+    <div class="stage" id="stage">
+      <canvas id="cv"></canvas>
+      <svg><polygon id="poly" points=""/></svg>
+      <div class="handle" id="h0"></div>
+      <div class="handle" id="h1"></div>
+      <div class="handle" id="h2"></div>
+      <div class="handle" id="h3"></div>
+    </div>
+    <p class="stagehint">점을 끌어서 카드 네 귀퉁이에 맞추세요</p>
+
+    <div class="actions">
+      <button class="go" id="applyCrop">펴서 다음으로</button>
+      <button class="skip" id="noCrop">크롭 없이</button>
+    </div>
+  </section>
+
+  <section id="meta" class="hidden">
+    <img id="photo" class="photo" alt="카드 미리보기">
+    <div class="name" id="preview"></div>
+
+    <div class="field">
+      <label for="sender">보낸 사람</label>
+      <input type="text" id="sender" placeholder="김서연" autocomplete="off" enterkeyhint="done">
+      <div class="chips" id="chips"></div>
+    </div>
+
+    <div class="row">
+      <div class="field">
+        <label for="event">행사</label>
+        <input type="text" id="event" placeholder="헤이즐생일" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="date">날짜</label>
+        <input type="date" id="date">
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="go" id="save">저장하고 다음</button>
+      <button class="skip" id="skipCard">건너뛰기</button>
+    </div>
+  </section>
+
+  <section id="finish" class="hidden">
+    <div class="done">
+      <h2>다 됐어요</h2>
+      <p id="tally"></p>
+      <button class="go" id="again" style="max-width:200px;margin:0 auto">사진 더 고르기</button>
+    </div>
+  </section>
+
+</div>
+
+<script>
+(function(){
+  var files=[],idx=0,saved=0,seen=[];
+  var img=null;          // current Image
+  var corners=[];        // [{x,y}] in natural image coords
+  var scale=1;           // display px per natural px
+  var warped=null;       // Blob of processed image
+  var warpedURL=null;
+
+  var $=function(id){return document.getElementById(id)};
+  var picker=$('picker');
+
+  $('date').value=new Date().toISOString().slice(0,10);
+
+  $('dropzone').onclick=function(){picker.click()};
+  $('dropzone').onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();picker.click()}};
+  $('again').onclick=function(){picker.click()};
+
+  picker.onchange=function(){
+    if(!picker.files.length)return;
+    files=Array.prototype.slice.call(picker.files).filter(function(f){return /^image\//.test(f.type)||/\.(heic|heif)$/i.test(f.name)});
+    if(!files.length)return;
+    idx=0;saved=0;
+    $('start').classList.add('hidden');
+    $('finish').classList.add('hidden');
+    $('tot').textContent=files.length;
+    loadCurrent();
+  };
+
+  function loadCurrent(){
+    if(idx>=files.length)return finish();
+    $('meta').classList.add('hidden');
+    $('crop').classList.remove('hidden');
+    $('cur').textContent=idx+1;
+    $('left').textContent=(files.length-idx-1)+'장 남음';
+    $('fill').style.width=(idx/files.length*100)+'%';
+
+    var u=URL.createObjectURL(files[idx]);
+    img=new Image();
+    img.onload=function(){
+      URL.revokeObjectURL(u);
+      drawStage();
+      initCorners();
+      paintOverlay();
+    };
+    img.onerror=function(){
+      URL.revokeObjectURL(u);
+      // undecodable (e.g. HEIC on non-Safari) — pass through untouched
+      warped=files[idx];
+      toMeta(URL.createObjectURL(files[idx]));
+    };
+    img.src=u;
+  }
+
+  function drawStage(){
+    var cv=$('cv');
+    var maxW=$('stage').clientWidth||360;
+    scale=Math.min(1,maxW/img.naturalWidth);
+    cv.width=Math.round(img.naturalWidth*scale);
+    cv.height=Math.round(img.naturalHeight*scale);
+    cv.getContext('2d').drawImage(img,0,0,cv.width,cv.height);
+  }
+
+  function initCorners(){
+    var W=img.naturalWidth,H=img.naturalHeight;
+    var ix=W*0.12,iy=H*0.12;
+    corners=[{x:ix,y:iy},{x:W-ix,y:iy},{x:W-ix,y:H-iy},{x:ix,y:H-iy}];
+  }
+
+  function paintOverlay(){
+    var pts=corners.map(function(p){return (p.x*scale)+','+(p.y*scale)}).join(' ');
+    $('poly').setAttribute('points',pts);
+    corners.forEach(function(p,i){
+      var h=$('h'+i);
+      h.style.left=(p.x*scale)+'px';
+      h.style.top=(p.y*scale)+'px';
+    });
+  }
+
+  // drag handling
+  [0,1,2,3].forEach(function(i){
+    var h=$('h'+i);
+    h.addEventListener('pointerdown',function(e){
+      e.preventDefault();
+      h.setPointerCapture(e.pointerId);
+      h.classList.add('drag');
+      var move=function(ev){
+        var r=$('stage').getBoundingClientRect();
+        var x=(ev.clientX-r.left)/scale, y=(ev.clientY-r.top)/scale;
+        corners[i].x=Math.max(0,Math.min(img.naturalWidth,x));
+        corners[i].y=Math.max(0,Math.min(img.naturalHeight,y));
+        paintOverlay();
+      };
+      var up=function(ev){
+        h.classList.remove('drag');
+        h.removeEventListener('pointermove',move);
+        h.removeEventListener('pointerup',up);
+        h.removeEventListener('pointercancel',up);
+      };
+      h.addEventListener('pointermove',move);
+      h.addEventListener('pointerup',up);
+      h.addEventListener('pointercancel',up);
+    });
+  });
+
+  // ---- perspective warp ----
+  // Solve homography H mapping dest rect corners -> src corners (dest->src),
+  // then inverse-map each dest pixel with bilinear sampling.
+  function solveH(src,W,H){
+    // dest points
+    var d=[[0,0],[W,0],[W,H],[0,H]];
+    // build 8x9 system A·h=0 → solve 8x8 with h8=1
+    var A=[],b=[];
+    for(var i=0;i<4;i++){
+      var X=d[i][0],Y=d[i][1],x=src[i].x,y=src[i].y;
+      A.push([X,Y,1,0,0,0,-x*X,-x*Y]);b.push(x);
+      A.push([0,0,0,X,Y,1,-y*X,-y*Y]);b.push(y);
+    }
+    // gaussian elimination
+    for(var c=0;c<8;c++){
+      var piv=c;
+      for(var r=c+1;r<8;r++)if(Math.abs(A[r][c])>Math.abs(A[piv][c]))piv=r;
+      var t=A[c];A[c]=A[piv];A[piv]=t;
+      var tb=b[c];b[c]=b[piv];b[piv]=tb;
+      if(Math.abs(A[c][c])<1e-10)return null;
+      for(var r2=c+1;r2<8;r2++){
+        var f=A[r2][c]/A[c][c];
+        for(var k=c;k<8;k++)A[r2][k]-=f*A[c][k];
+        b[r2]-=f*b[c];
+      }
+    }
+    var h=new Array(8);
+    for(var r3=7;r3>=0;r3--){
+      var s=b[r3];
+      for(var k2=r3+1;k2<8;k2++)s-=A[r3][k2]*h[k2];
+      h[r3]=s/A[r3][r3];
+    }
+    return h; // [h0..h7], h8=1
+  }
+
+  function dist(a,b){var dx=a.x-b.x,dy=a.y-b.y;return Math.sqrt(dx*dx+dy*dy)}
+
+  function warp(){
+    var W=Math.round((dist(corners[0],corners[1])+dist(corners[3],corners[2]))/2);
+    var H=Math.round((dist(corners[0],corners[3])+dist(corners[1],corners[2]))/2);
+    var cap=1600,m=Math.max(W,H);
+    if(m>cap){W=Math.round(W*cap/m);H=Math.round(H*cap/m)}
+    if(W<20||H<20)return null;
+
+    var h=solveH(corners,W,H);
+    if(!h)return null;
+
+    // draw source at natural size (capped for memory)
+    var sW=img.naturalWidth,sH=img.naturalHeight;
+    var sCap=2400,sm=Math.max(sW,sH),sf=1;
+    if(sm>sCap){sf=sCap/sm;sW=Math.round(sW*sf);sH=Math.round(sH*sf)}
+    var sc=document.createElement('canvas');sc.width=sW;sc.height=sH;
+    var sctx=sc.getContext('2d');
+    sctx.drawImage(img,0,0,sW,sH);
+    var sd=sctx.getImageData(0,0,sW,sH).data;
+
+    var dc=document.createElement('canvas');dc.width=W;dc.height=H;
+    var dctx=dc.getContext('2d');
+    var out=dctx.createImageData(W,H);
+    var od=out.data;
+
+    for(var Y=0;Y<H;Y++){
+      for(var X=0;X<W;X++){
+        var den=h[6]*X+h[7]*Y+1;
+        var sx=(h[0]*X+h[1]*Y+h[2])/den*sf;
+        var sy=(h[3]*X+h[4]*Y+h[5])/den*sf;
+        var o=(Y*W+X)*4;
+        if(sx<0||sy<0||sx>=sW-1||sy>=sH-1){
+          od[o]=od[o+1]=od[o+2]=250;od[o+3]=255;continue;
+        }
+        var x0=sx|0,y0=sy|0,fx=sx-x0,fy=sy-y0;
+        var i00=(y0*sW+x0)*4,i10=i00+4,i01=i00+sW*4,i11=i01+4;
+        for(var ch=0;ch<3;ch++){
+          od[o+ch]=
+            sd[i00+ch]*(1-fx)*(1-fy)+sd[i10+ch]*fx*(1-fy)+
+            sd[i01+ch]*(1-fx)*fy+sd[i11+ch]*fx*fy;
+        }
+        od[o+3]=255;
+      }
+    }
+    dctx.putImageData(out,0,0);
+    return dc;
+  }
+
+  $('applyCrop').onclick=function(){
+    var btn=$('applyCrop');btn.disabled=true;btn.textContent='펴는 중…';
+    setTimeout(function(){
+      var dc=warp();
+      btn.disabled=false;btn.textContent='펴서 다음으로';
+      if(!dc){alert('영역이 너무 작아요. 점을 다시 맞춰주세요.');return}
+      dc.toBlob(function(bl){
+        warped=bl;
+        toMeta(URL.createObjectURL(bl));
+      },'image/jpeg',0.92);
+    },30);
+  };
+
+  $('noCrop').onclick=function(){
+    warped=files[idx];
+    toMeta(URL.createObjectURL(files[idx]));
+  };
+
+  function toMeta(url){
+    if(warpedURL)URL.revokeObjectURL(warpedURL);
+    warpedURL=url;
+    $('crop').classList.add('hidden');
+    $('meta').classList.remove('hidden');
+    $('photo').src=url;
+    $('sender').value='';
+    paintName();
+    chips();
+    $('sender').focus();
+  }
+
+  function clean(s){return (s||'').replace(/[\/\\:*?"<>|]/g,'').replace(/\s+/g,' ').trim()}
+
+  function filename(){
+    var d=$('date').value||'날짜';
+    var e=clean($('event').value)||'행사';
+    var s=clean($('sender').value)||'보낸사람';
+    var ext=(warped&&warped.type==='image/png')?'png':'jpg';
+    return d+' '+e+' '+s+'.'+ext;
+  }
+
+  function esc(t){var d=document.createElement('div');d.textContent=t;return d.innerHTML}
+
+  function paintName(){
+    var s=clean($('sender').value);
+    var n=filename();
+    $('preview').innerHTML=s?esc(n):'<em>'+esc(n)+'</em>';
+    $('save').disabled=!s;
+  }
+
+  function chips(){
+    var c=$('chips');c.innerHTML='';
+    seen.slice(-6).reverse().forEach(function(n){
+      var b=document.createElement('button');
+      b.className='chip';b.type='button';b.textContent=n;
+      b.onclick=function(){$('sender').value=n;paintName()};
+      c.appendChild(b);
+    });
+  }
+
+  ['sender','event','date'].forEach(function(id){
+    $(id).addEventListener('input',paintName);
+  });
+  $('sender').addEventListener('keydown',function(e){
+    if(e.key==='Enter'&&!$('save').disabled){e.preventDefault();doSave()}
+  });
+
+  $('skipCard').onclick=function(){idx++;loadCurrent()};
+  $('save').onclick=doSave;
+
+  function doSave(){
+    var s=clean($('sender').value);
+    if(!s)return;
+    var out=new File([warped],filename(),{type:warped.type||'image/jpeg'});
+    if(seen.indexOf(s)===-1)seen.push(s);
+    saved++;
+    if(navigator.canShare&&navigator.canShare({files:[out]})){
+      navigator.share({files:[out]}).then(next,function(err){
+        if(err&&err.name==='AbortError'){saved--;return}
+        download(out);next();
+      });
+    }else{
+      download(out);next();
+    }
+  }
+
+  function download(f){
+    var u=URL.createObjectURL(f);
+    var a=document.createElement('a');
+    a.href=u;a.download=f.name;
+    document.body.appendChild(a);a.click();a.remove();
+    setTimeout(function(){URL.revokeObjectURL(u)},1500);
+  }
+
+  function next(){idx++;loadCurrent()}
+
+  function finish(){
+    $('crop').classList.add('hidden');
+    $('meta').classList.add('hidden');
+    $('finish').classList.remove('hidden');
+    $('tally').textContent=saved+'장을 펴서 이름 붙였어요. 공유 폴더에 넣어두세요.';
+  }
+})();
+</script>
+</body>
+</html>
