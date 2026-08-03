@@ -58,8 +58,9 @@
     margin:16px 0 12px;text-transform:uppercase;letter-spacing:.06em;
   }
 
-  .setup{margin-bottom:18px}
+  .setup{margin-top:18px;margin-bottom:18px}
   .setup > span{display:block;font-size:12.5px;font-weight:600;color:var(--muted);margin-bottom:8px}
+  .setup > span em{font-style:normal;font-weight:500;opacity:.75}
   .seg{display:flex;gap:8px}
   .seg button{
     flex:1;font:inherit;font-size:14px;padding:11px 8px;border-radius:10px;
@@ -255,10 +256,16 @@
     </div>
     <input type="file" id="camera" accept="image/*" capture="environment" class="hidden">
 
-    <p class="orline">or use photos you already took</p>
+    <p class="orline">or</p>
+
+    <div class="drop" id="dropzone" tabindex="0" role="button">
+      <strong>Choose Photos</strong>
+      <span>Use photos you already took</span>
+    </div>
+    <input type="file" id="picker" accept="image/*" multiple class="hidden">
 
     <div class="setup">
-      <span>Photos per card</span>
+      <span>Photos per card <em>when choosing</em></span>
       <div class="seg" id="seg">
         <button type="button" data-n="1">1<small>front</small></button>
         <button type="button" data-n="2" class="on">2<small>front + inside</small></button>
@@ -266,16 +273,11 @@
       </div>
     </div>
 
-    <div class="drop" id="dropzone" tabindex="0" role="button">
-      <strong>Choose Photos</strong>
-      <span>Grouped into cards using the number above</span>
-    </div>
-    <input type="file" id="picker" accept="image/*" multiple class="hidden">
-
     <div class="hint">
       <b>Taking photos:</b> shoot the front, then tap <b>Add another page</b> for the inside.
       Nothing is written to your camera roll.
       <br><b>Choosing photos:</b> they are grouped in order — front, inside, front, inside…
+      using the setting above.
       <br><b>Tip:</b> a dark surface makes the corners easy to see.
     </div>
 
@@ -778,17 +780,23 @@
     if(e.key==='Enter'||e.key===' '){e.preventDefault();mode='capture';startCapture()}
   };
 
+  // Backing out of the camera fires no event at all, so nothing here may change
+  // what is on screen until a photo actually arrives — otherwise cancelling
+  // leaves the user staring at an empty page with no way back.
+  var pendingNewCard=false;
+
   function startCapture(){
-    cardNo++;pages=[];pageIdx=0;
+    pages=[];pageIdx=0;pendingNewCard=true;
     $('warn').classList.add('hidden');
-    $('start').classList.add('hidden');
-    $('finish').classList.add('hidden');
     openCamera();
   }
 
   camera.onchange=function(){
     var f=camera.files&&camera.files[0];
-    if(!f)return;
+    if(!f)return;                      // cancelled: leave the screen as it was
+    if(pendingNewCard){cardNo++;pendingNewCard=false}
+    $('start').classList.add('hidden');
+    $('finish').classList.add('hidden');
     $('meta').classList.add('hidden');
     $('crop').classList.remove('hidden');
     $('cardNo').textContent=cardNo;
