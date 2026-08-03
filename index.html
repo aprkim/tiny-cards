@@ -33,6 +33,18 @@
   .drop strong{display:block;font-size:15.5px;font-weight:600;margin-bottom:6px}
   .drop span{font-size:13px;color:var(--muted)}
 
+  .drop.cam{
+    border-style:solid;border-color:var(--accent);background:var(--accent-soft);
+    margin-bottom:10px;padding:34px 20px;
+  }
+  .drop.cam strong{color:var(--accent)}
+  .drop:not(.cam){padding:26px 20px}
+
+  .orline{
+    text-align:center;font-size:12px;color:var(--muted);
+    margin:16px 0 12px;text-transform:uppercase;letter-spacing:.06em;
+  }
+
   .setup{margin-bottom:18px}
   .setup > span{display:block;font-size:12.5px;font-weight:600;color:var(--muted);margin-bottom:8px}
   .seg{display:flex;gap:8px}
@@ -197,6 +209,14 @@
   </header>
 
   <section id="start">
+    <div class="drop cam" id="camzone" tabindex="0" role="button">
+      <strong>Take Photos</strong>
+      <span>Shoot each page in the app &middot; never saved to your camera roll</span>
+    </div>
+    <input type="file" id="camera" accept="image/*" capture="environment" class="hidden">
+
+    <p class="orline">or use photos you already took</p>
+
     <div class="setup">
       <span>Photos per card</span>
       <div class="seg" id="seg">
@@ -208,13 +228,14 @@
 
     <div class="drop" id="dropzone" tabindex="0" role="button">
       <strong>Choose Photos</strong>
-      <span>Take photos or select several</span>
+      <span>Grouped into cards using the number above</span>
     </div>
     <input type="file" id="picker" accept="image/*" multiple class="hidden">
 
     <div class="hint">
-      <b>Shoot in order:</b> front, inside, front, inside… Photos get grouped into cards
-      using the number above, so keep the sequence consistent.
+      <b>Taking photos:</b> shoot the front, then tap <b>Add another page</b> for the inside.
+      Nothing is written to your camera roll.
+      <br><b>Choosing photos:</b> they are grouped in order — front, inside, front, inside…
       <br><b>Tip:</b> a dark surface makes the corners easy to see.
     </div>
 
@@ -269,6 +290,9 @@
       HEIC works natively.
     </div>
     <div class="pages" id="thumbs"></div>
+    <div class="footlink hidden" id="addPageWrap" style="margin-top:0;margin-bottom:16px">
+      <button type="button" class="tool" id="addPage">+ Add another page</button>
+    </div>
     <div class="name" id="preview"></div>
 
     <div class="field">
@@ -466,9 +490,59 @@
     };
   });
 
-  $('dropzone').onclick=function(){picker.click()};
-  $('dropzone').onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();picker.click()}};
-  $('again').onclick=function(){picker.click()};
+  /* ---- capture mode ----
+     'batch'   : pick many photos at once, grouped by the per-card setting
+     'capture' : shoot one page at a time. iOS hands each photo straight to
+                 the page, so nothing lands in the camera roll — which is the
+                 whole point of shooting from inside the app. */
+  var mode='batch';
+  var camera=$('camera');
+
+  function openCamera(){
+    camera.value='';        // otherwise re-taking an identical file fires nothing
+    camera.click();
+  }
+
+  $('camzone').onclick=function(){mode='capture';startCapture()};
+  $('camzone').onkeydown=function(e){
+    if(e.key==='Enter'||e.key===' '){e.preventDefault();mode='capture';startCapture()}
+  };
+
+  function startCapture(){
+    cardNo++;pages=[];pageIdx=0;
+    $('warn').classList.add('hidden');
+    $('start').classList.add('hidden');
+    $('finish').classList.add('hidden');
+    openCamera();
+  }
+
+  camera.onchange=function(){
+    var f=camera.files&&camera.files[0];
+    if(!f)return;
+    $('meta').classList.add('hidden');
+    $('crop').classList.remove('hidden');
+    $('cardNo').textContent=cardNo;
+    $('cardTot').textContent=cardNo;
+    $('pageTag').textContent=LABELS[pageIdx]||('p'+(pageIdx+1));
+    $('fill').style.width='0%';
+
+    var u=URL.createObjectURL(f);
+    img=new Image();
+    img.onload=function(){URL.revokeObjectURL(u);drawStage();initCorners();paintOverlay()};
+    img.onerror=function(){URL.revokeObjectURL(u);noteBad();acceptPage(f)};
+    img.src=u;
+  };
+
+  $('addPage').onclick=function(){openCamera()};
+
+  $('dropzone').onclick=function(){mode='batch';picker.value='';picker.click()};
+  $('dropzone').onkeydown=function(e){
+    if(e.key==='Enter'||e.key===' '){e.preventDefault();mode='batch';picker.value='';picker.click()}
+  };
+  $('again').onclick=function(){
+    if(mode==='capture')return startCapture();
+    picker.value='';picker.click();
+  };
 
   picker.onchange=function(){
     if(!picker.files.length)return;
@@ -646,7 +720,11 @@
 
   function acceptPage(blob){
     pages.push(blob);
-    cursor++;pageIdx++;
+    pageIdx++;
+    // In capture mode there is no queue to walk — go straight to naming,
+    // where "Add another page" reopens the camera for this same card.
+    if(mode==='capture')return toMeta();
+    cursor++;
     loadPage();
   }
 
@@ -669,9 +747,11 @@
       var sp=document.createElement('span');sp.textContent=lbl;
       d.appendChild(im);d.appendChild(sp);t.appendChild(d);
     });
-    $('sender').value='';
+    $('addPageWrap').classList.toggle('hidden',mode!=='capture');
+    // Keep the sender when adding pages to the card already being named
+    if(!pages.length||pages.length===1)$('sender').value='';
     paintName();chips();
-    $('sender').focus();
+    if(mode!=='capture')$('sender').focus();
   }
 
   function clean(s){return (s||'').replace(/[\/\\:*?"<>|]/g,'').replace(/\s+/g,' ').trim()}
@@ -737,7 +817,10 @@
     if(e.key==='Enter'&&!$('save').disabled){e.preventDefault();doSave()}
   });
 
-  $('skipCard').onclick=function(){startCard()};
+  $('skipCard').onclick=function(){
+    if(mode==='capture'){pages=[];pageIdx=0;return finish()}  // discard, offer the next card
+    startCard();
+  };
   $('save').onclick=doSave;
 
   function doSave(){
@@ -777,7 +860,11 @@
     }
   }
 
-  function finishCard(n){savedCards++;savedFiles+=n;startCard()}
+  function finishCard(n){
+    savedCards++;savedFiles+=n;
+    if(mode==='capture')return finish();  // one card at a time; offer the next
+    startCard();
+  }
 
   function download(f){
     var u=URL.createObjectURL(f);
@@ -798,6 +885,7 @@
     refreshLibLink();
     var f=$('finLink');
     if(f)f.textContent=(keepLocal&&!libFailed)?'Open your library →':'Open the archive →';
+    $('again').textContent=mode==='capture'?'Take Another Card':'Choose More Photos';
   }
 
   window.addEventListener('resize',function(){
