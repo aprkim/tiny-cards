@@ -3,18 +3,23 @@ rules_version = '2';
 // Cards are addressed by sync code, mirroring the Firestore pattern in tiny-do.
 // The sync code is the shared secret: knowing it grants access to that space.
 //
-// Note the shape of the match. Because the only rule is nested one level under
-// /cards/{syncCode}, a client cannot list /cards itself — so sync codes cannot
-// be enumerated. Listing is only possible inside a prefix you already know.
+// `get` and NOT `read`. In Storage rules `read` means `get` + `list`, and
+// granting `list` was enough to enumerate every sync code: a request for
+// prefix "cards/" with delimiter "/" came back with the full set of codes as
+// prefixes, even though the rule is nested a level below. Nesting the match
+// does not protect the parent prefix — only withholding `list` does.
+//
+// Consequence: no client can list anything here, so the archive cannot learn
+// what a space holds by walking Storage. Card metadata lives in Firestore
+// instead, and images are fetched by exact path.
 service firebase.storage {
   match /b/{bucket}/o {
 
     match /cards/{syncCode}/{allPaths=**} {
-      // Anonymous auth is enough; the sync code is what scopes access.
-      allow read: if request.auth != null;
+      allow get: if request.auth != null;
 
-      // Writes additionally must be images and of a sane size, so a leaked
-      // code cannot be used to park arbitrary files in the bucket.
+      // Writes must be images of a sane size, so a leaked code cannot be
+      // used to park arbitrary files in the bucket.
       allow write: if request.auth != null
                    && request.resource.size < 15 * 1024 * 1024
                    && request.resource.contentType.matches('image/.*');
