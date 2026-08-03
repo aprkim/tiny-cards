@@ -158,6 +158,13 @@
   .done h2{font-size:20px;font-weight:700;margin-bottom:8px}
   .done p{font-size:14px;color:var(--muted);margin-bottom:24px}
 
+  .altlink{
+    display:inline-block;font-size:13.5px;color:var(--accent);
+    text-decoration:none;border-bottom:1px solid transparent;
+  }
+  .altlink:hover,.altlink:focus-visible{border-bottom-color:var(--accent)}
+  .footlink{margin-top:20px;text-align:center}
+
   .hidden{display:none}
   @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -190,6 +197,10 @@
       <b>Shoot in order:</b> front, inside, front, inside… Photos get grouped into cards
       using the number above, so keep the sequence consistent.
       <br><b>Tip:</b> a dark surface makes the corners easy to see.
+    </div>
+
+    <div class="footlink">
+      <a class="altlink" href="card-archive-en.html">Already have cards? Browse your archive &rarr;</a>
     </div>
   </section>
 
@@ -300,6 +311,9 @@
       <h2>All done</h2>
       <p id="tally"></p>
       <button class="go" id="again" style="max-width:210px;margin:0 auto">Choose More Photos</button>
+      <div class="footlink">
+        <a class="altlink" href="card-archive-en.html">Browse your card archive &rarr;</a>
+      </div>
     </div>
   </section>
 

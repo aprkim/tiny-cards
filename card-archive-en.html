@@ -98,6 +98,13 @@
   .box button:hover{background:rgba(255,255,255,.12)}
   .box button.on{background:#fff;color:var(--ink);border-color:#fff}
 
+  .altlink{
+    display:inline-block;font-size:13.5px;color:var(--accent);
+    text-decoration:none;border-bottom:1px solid transparent;
+  }
+  .altlink:hover,.altlink:focus-visible{border-bottom-color:var(--accent)}
+  .footlink{margin-top:20px;text-align:center}
+
   .hidden{display:none}
   @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -122,6 +129,10 @@
       <code>2026-08-02 HazelBirthday Grandma Kim.jpg</code> still work.
       Multi-page cards are grouped automatically, and anything that doesn't match
       lands in <b>Unsorted</b>, so nothing disappears.
+    </div>
+
+    <div class="footlink">
+      <a class="altlink" href="./">&larr; Scan new cards</a>
     </div>
   </section>
 
