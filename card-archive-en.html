@@ -73,7 +73,13 @@
   .chip.on{background:var(--ink);border-color:var(--ink);color:#fff}
   .chip b{font-weight:500;opacity:.5;margin-left:5px}
 
-  .meta{font-size:13px;color:var(--muted);margin:22px 0 12px;font-variant-numeric:tabular-nums}
+  .metarow{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:22px 0 12px}
+  .meta{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .dangerbtn{
+    font:inherit;font-size:12.5px;padding:6px 13px;border-radius:100px;flex-shrink:0;
+    border:1px solid var(--rule);background:var(--field);color:var(--muted);cursor:pointer;
+  }
+  .dangerbtn:hover{border-color:#BF3143;color:#BF3143;background:#FEF2F2}
 
   .group{margin-bottom:34px}
   .group h2{
@@ -165,6 +171,15 @@
   .altlink:hover,.altlink:focus-visible{border-bottom-color:var(--accent)}
   .footlink{margin-top:20px;text-align:center}
 
+  /* Always visible, so there is a way back to the scanner while browsing —
+     the one in the start section disappears as soon as cards are open. */
+  .topbar{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .scanlink{
+    display:inline-block;color:var(--accent);text-decoration:none;font-size:13.5px;
+    font-weight:600;margin-bottom:12px;border-bottom:1px solid transparent;
+  }
+  .scanlink:hover,.scanlink:focus-visible{border-bottom-color:var(--accent)}
+
   .suitelink{
     display:inline-block;color:#94A3B8;text-decoration:none;font-size:13.5px;
     margin-bottom:12px;transition:color .2s;
@@ -178,7 +193,10 @@
 <body>
 <div class="wrap">
 
-    <a href="https://tinywins.space" class="suitelink">&larr; TinyWins</a>
+    <div class="topbar">
+      <a href="https://tinywins.space" class="suitelink">&larr; TinyWins</a>
+      <a href="./" class="scanlink">Scan new cards &rarr;</a>
+    </div>
   <header>
     <h1>Card Archive</h1>
     <p>Open your cloud archive, this device&rsquo;s library, or a folder of files.</p>
@@ -216,7 +234,10 @@
   <section id="view" class="hidden">
     <input type="search" id="q" placeholder="Search a name or occasion" autocomplete="off">
     <div class="chips" id="people"></div>
-    <p class="meta" id="meta"></p>
+    <div class="metarow">
+      <p class="meta" id="meta"></p>
+      <button type="button" class="dangerbtn hidden" id="wipe">Delete all…</button>
+    </div>
     <div id="groups"></div>
   </section>
 
@@ -298,6 +319,7 @@
   var libAll=function(){return libReq('readonly',function(s){return s.getAll()})};
   var libDel=function(id){return libReq('readwrite',function(s){return s.delete(id)})};
   var libPut=function(c){return libReq('readwrite',function(s){return s.put(c)})};
+  var libClear=function(){return libReq('readwrite',function(s){return s.clear()})};
 
   // Offer the library button only when there is actually something in it
   libAll().then(function(rows){
@@ -560,6 +582,8 @@
     var who={},shots=0;
     list.forEach(function(x){who[x.person]=1;shots+=x.pages.length});
     $('meta').textContent=list.length+' cards \u00b7 '+shots+' photos \u00b7 '+Object.keys(who).length+' people';
+    // Only offer a bulk delete for stores we own; folder files are read-only
+    $('wipe').classList.toggle('hidden',!((fromCloud||fromLibrary)&&cards.length));
 
     var buckets={},order=[];
     list.forEach(function(x){
@@ -750,6 +774,56 @@
     if(e.key==='ArrowLeft'&&openPage>0)show(openCard,openPage-1);
   });
   $('q').addEventListener('input',render);
+
+  /* ---- delete everything ----
+     Irreversible and, for the cloud archive, affects every device sharing the
+     code. A plain confirm() is too easy to click through for that, so this
+     asks the user to type the word. */
+  $('wipe').onclick=function(){
+    var n=cards.length;
+    if(!n)return;
+    var where=fromCloud?'your archive — on every device using this code'
+                       :'this device’s library';
+    var typed=prompt('Delete all '+n+' card'+(n===1?'':'s')+' from '+where+'?\n\n'+
+                     'This cannot be undone. Exported files are not affected.\n\n'+
+                     'Type DELETE to confirm:');
+    if(!typed||typed.trim().toUpperCase()!=='DELETE')return;
+
+    $('wipe').disabled=true;$('wipe').textContent='Deleting…';
+
+    var job;
+    if(fromCloud){
+      var paths=[];
+      cards.forEach(function(c){
+        if(c.raw&&c.raw.paths)paths=paths.concat(c.raw.paths);
+      });
+      // Images first, then the index — a failure here leaves recoverable
+      // entries rather than files nothing points at.
+      job=Promise.all(paths.map(function(p){
+        return fbStore.ref().child(p).delete().catch(function(){});
+      })).then(function(){
+        return fbDb.collection('tinyCards').doc(cloudCode).delete();
+      });
+    }else{
+      job=libClear().then(function(){
+        urls.forEach(URL.revokeObjectURL);urls=[];
+      });
+    }
+
+    job.then(function(){
+      cards=[];filter=null;
+      $('wipe').disabled=false;$('wipe').textContent='Delete all…';
+      people();render();
+      $('view').classList.add('hidden');
+      $('start').classList.remove('hidden');
+      $('cloudSub').textContent='Cards you sent to the cloud';
+      $('libOpen').classList.add('hidden');
+    }).catch(function(e){
+      $('wipe').disabled=false;$('wipe').textContent='Delete all…';
+      alert('Could not delete everything. Some cards may remain.');
+      if(window.console)console.warn(e);
+    });
+  };
 })();
 </script>
 </body>

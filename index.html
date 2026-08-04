@@ -126,6 +126,18 @@
   }
   .tool:hover{border-color:var(--accent);color:var(--accent)}
 
+  /* Rotate only re-labels which corner becomes top-left, so the quad on screen
+     does not move and the change was invisible until the file was saved. This
+     shows the actual result. */
+  .pvwrap{display:flex;flex-direction:column;align-items:center;gap:3px;flex-shrink:0}
+  .pvwrap canvas{
+    max-width:54px;max-height:54px;border-radius:4px;
+    border:1px solid var(--rule);background:#fff;display:block;
+  }
+  .pvwrap span{
+    font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;
+  }
+
   .actions{display:flex;gap:10px}
   button.go{
     flex:1;font:inherit;font-size:15.5px;font-weight:600;padding:15px;
@@ -351,6 +363,10 @@
     <div class="tools">
       <p class="stagehint">Drag the dots to the card&rsquo;s four corners.<br>
         The <b>filled dot</b> becomes the top-left of the saved image.</p>
+      <div class="pvwrap">
+        <canvas id="pv" aria-label="Preview of the straightened card"></canvas>
+        <span>result</span>
+      </div>
       <button type="button" class="tool" id="rot">&#8635; Rotate</button>
     </div>
 
@@ -558,6 +574,8 @@
       ? 'Saved cards stay in this browser so you can reopen them later.'
       : 'Nothing is kept here. Cards leave only as the files you export.';
     refreshLibLink();
+    // Turning the library off may leave export as the only destination
+    if(typeof paintExport==='function')paintExport();
   }
 
   if($('libToggle')){
@@ -644,21 +662,27 @@
   }catch(e){exportFiles=!useCloud}
 
   function paintExport(){
+    // paintToggle() runs earlier in this file than the export state is set up,
+    // so bail until it exists rather than acting on undefined.
+    if(typeof exportFiles==='undefined')return;
     // Never leave every destination off — that would make Save do nothing.
-    if(!useCloud&&!exportFiles)exportFiles=true;
+    // The on-device library counts: with it on, exporting is optional even
+    // when the cloud archive is not connected.
+    if(!useCloud&&!keepLocal&&!exportFiles)exportFiles=true;
     var t=$('expToggle');
     if(t)t.setAttribute('aria-checked',exportFiles?'true':'false');
     var n=$('expNote');
     if(n)n.textContent=exportFiles
       ? (useCloud?'Also opens the share sheet after each upload.'
                  :'Opens the share sheet so you can file each card yourself.')
-      : 'Off — cards go straight to your archive with no share sheet.';
+      : (useCloud?'Off — cards go straight to your archive, no share sheet.'
+                 :'Off — cards are kept in this device’s library only.');
   }
 
   if($('expToggle')){
     $('expToggle').onclick=function(){
-      if(!useCloud&&exportFiles){
-        alert('Turn on “Send cards to your archive” first, otherwise saving a card would do nothing.');
+      if(exportFiles&&!useCloud&&!keepLocal){
+        alert('Turn on “Send cards to your archive” or “Keep a library on this device” first, otherwise saving a card would do nothing.');
         return;
       }
       exportFiles=!exportFiles;exportExplicit=true;
@@ -816,7 +840,7 @@
 
     var u=URL.createObjectURL(f);
     img=new Image();
-    img.onload=function(){URL.revokeObjectURL(u);drawStage();initCorners();paintOverlay()};
+    img.onload=function(){URL.revokeObjectURL(u);drawStage();initCorners();paintOverlay();paintPreview()};
     img.onerror=function(){URL.revokeObjectURL(u);noteBad();acceptPage(f)};
     img.src=u;
   };
@@ -866,7 +890,7 @@
 
     var u=URL.createObjectURL(files[cursor]);
     img=new Image();
-    img.onload=function(){URL.revokeObjectURL(u);drawStage();initCorners();paintOverlay()};
+    img.onload=function(){URL.revokeObjectURL(u);drawStage();initCorners();paintOverlay();paintPreview()};
     img.onerror=function(){URL.revokeObjectURL(u);noteBad();acceptPage(files[cursor])};
     img.src=u;
   }
@@ -911,6 +935,7 @@
       };
       var up=function(){
         h.classList.remove('drag');
+        paintPreview();
         h.removeEventListener('pointermove',move);
         h.removeEventListener('pointerup',up);
         h.removeEventListener('pointercancel',up);
@@ -933,7 +958,7 @@
       if(!img)return;
       corners[i].x=Math.max(0,Math.min(img.naturalWidth,corners[i].x+dx));
       corners[i].y=Math.max(0,Math.min(img.naturalHeight,corners[i].y+dy));
-      paintOverlay();
+      paintOverlay();paintPreview();
     });
   });
 
@@ -1018,7 +1043,47 @@
     if(corners.length!==4)return;
     corners.unshift(corners.pop());
     paintOverlay();
+    paintPreview();
   };
+
+  /* Small live preview of what warp() will produce. It samples the already
+     drawn display canvas rather than the full-size image, so it costs almost
+     nothing; nearest-neighbour is fine at this size. */
+  function paintPreview(){
+    var pv=$('pv'),src=$('cv');
+    if(!pv||!src)return;
+    var clear=function(){pv.width=1;pv.height=1};
+    if(!img||!src.width||corners.length!==4)return clear();
+
+    var c=corners.map(function(p){return {x:p.x*scale,y:p.y*scale}});
+    var W=(dist(c[0],c[1])+dist(c[3],c[2]))/2;
+    var H=(dist(c[0],c[3])+dist(c[1],c[2]))/2;
+    if(W<4||H<4)return clear();
+
+    var k=54/Math.max(W,H);
+    var oW=Math.max(2,Math.round(W*k)),oH=Math.max(2,Math.round(H*k));
+    var h=solveH(c,oW,oH);
+    if(!h)return clear();
+
+    var sd;
+    try{sd=src.getContext('2d').getImageData(0,0,src.width,src.height).data}
+    catch(e){return clear()}   // tainted canvas: skip rather than break
+
+    var sW=src.width,sH=src.height;
+    pv.width=oW;pv.height=oH;
+    var dctx=pv.getContext('2d'),out=dctx.createImageData(oW,oH),od=out.data;
+    for(var Y=0;Y<oH;Y++){
+      for(var X=0;X<oW;X++){
+        var den=h[6]*X+h[7]*Y+1;
+        var sx=(h[0]*X+h[1]*Y+h[2])/den, sy=(h[3]*X+h[4]*Y+h[5])/den;
+        var o=(Y*oW+X)*4;
+        if(sx<0||sy<0||sx>=sW||sy>=sH){od[o]=od[o+1]=od[o+2]=250;od[o+3]=255;continue}
+        var i0=(((sy|0)*sW)+(sx|0))*4;
+        od[o]=sd[i0];od[o+1]=sd[i0+1];od[o+2]=sd[i0+2];od[o+3]=255;
+      }
+    }
+    dctx.putImageData(out,0,0);
+  }
 
   $('noCrop').onclick=function(){acceptPage(files[cursor])};
 
@@ -1215,7 +1280,7 @@
   }
 
   window.addEventListener('resize',function(){
-    if(img&&!$('crop').classList.contains('hidden')){drawStage();paintOverlay()}
+    if(img&&!$('crop').classList.contains('hidden')){drawStage();paintOverlay();paintPreview()}
   });
 
   /* Everything lives in this tab until a card is saved, so a stray refresh or
