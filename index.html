@@ -68,6 +68,41 @@
     margin:16px 0 12px;text-transform:uppercase;letter-spacing:.06em;
   }
 
+  /* ---- home screen ---- */
+  .hero{text-align:center;padding:8px 0 0}
+  .heroart{position:relative;height:132px;margin:6px auto 26px;width:112px}
+  .heroart span{position:absolute;border-radius:12px;background:#fff;border:2.5px solid var(--accent)}
+  .heroart .c1{inset:12px 22px 12px 0;transform:rotate(-9deg);background:var(--accent-soft)}
+  .heroart .c2{inset:0 0 0 24px;display:flex;align-items:center;justify-content:center}
+  .heroart svg{width:38px;height:38px;fill:var(--accent)}
+
+  .gbtn{
+    display:inline-flex;align-items:center;justify-content:center;gap:10px;
+    width:100%;font:inherit;font-size:15.5px;font-weight:600;padding:14px 18px;
+    border:1px solid var(--rule);border-radius:12px;background:#fff;color:var(--ink);
+    cursor:pointer;transition:border-color .15s,box-shadow .15s;
+  }
+  .gbtn:hover,.gbtn:focus-visible{border-color:#BFBAAE;box-shadow:0 1px 4px rgba(0,0,0,.07)}
+  .gbtn[disabled]{opacity:.55;cursor:progress}
+
+  .herowhy{
+    font-size:13px;color:var(--muted);line-height:1.65;margin:14px 4px 0;
+  }
+
+  .who{font-size:13.5px;color:var(--muted);margin-bottom:18px}
+  .backhome{margin-bottom:14px}
+  .backhome .linkbtn{padding:0;font-size:13.5px;text-decoration:none;color:var(--muted)}
+  .backhome .linkbtn:hover{color:var(--ink);text-decoration:underline}
+  .linkbtn{
+    font:inherit;font-size:13px;background:none;border:none;padding:0 0 0 8px;
+    color:var(--accent);cursor:pointer;text-decoration:underline;
+  }
+  .homeacts{display:flex;flex-direction:column;gap:10px}
+  .homeacts .go{display:block;text-align:center;text-decoration:none;line-height:1.4}
+  .homeacts .go.alt{
+    background:var(--field);color:var(--accent);border:1.5px solid var(--accent);
+  }
+
   .setup{margin-top:18px;margin-bottom:18px}
   .setup > span{display:block;font-size:12.5px;font-weight:600;color:var(--muted);margin-bottom:8px}
   .setup > span em{font-style:normal;font-weight:500;opacity:.75}
@@ -267,11 +302,53 @@
 
     <a href="https://tinywins.space" class="suitelink">&larr; TinyWins</a>
   <header>
-    <h1>Card Scanner</h1>
-    <p>Crop, name, export. You choose where cards go.</p>
+    <h1 id="pageTitle">Tiny Cards</h1>
+    <p id="pageSub">Scan greeting cards and keep them for good.</p>
   </header>
 
-  <section id="start">
+  <!-- Landing screen. Sign-in used to be a toggle buried in the scanner's
+       settings, which put the archive — the reason to sign in at all — behind
+       the scanning flow. -->
+  <section id="home">
+    <div class="hero">
+      <div class="heroart" aria-hidden="true">
+        <span class="c1"></span>
+        <span class="c2">
+          <svg viewBox="0 0 24 24"><path d="M12 20.5l-6.9-6.6C2.6 11.5 3.4 7.6 6.6 6.4c1.9-.7 4 .1 5.4 1.8 1.4-1.7 3.5-2.5 5.4-1.8 3.2 1.2 4 5.1 1.5 7.5L12 20.5z"/></svg>
+        </span>
+      </div>
+
+      <div id="signedOut">
+        <button type="button" class="gbtn" id="googleBtn">
+          <svg viewBox="0 0 18 18" width="18" height="18" aria-hidden="true">
+            <path fill="#4285F4" d="M17.6 9.2c0-.6-.1-1.3-.2-1.9H9v3.5h4.8a4.1 4.1 0 01-1.8 2.7v2.2h2.9c1.7-1.6 2.7-3.9 2.7-6.5z"/>
+            <path fill="#34A853" d="M9 18c2.4 0 4.5-.8 6-2.2l-2.9-2.3c-.8.5-1.8.9-3.1.9-2.4 0-4.4-1.6-5.1-3.8H.9v2.3A9 9 0 009 18z"/>
+            <path fill="#FBBC05" d="M3.9 10.6a5.4 5.4 0 010-3.4V4.9H.9a9 9 0 000 8.1l3-2.4z"/>
+            <path fill="#EA4335" d="M9 3.6c1.3 0 2.5.5 3.4 1.3l2.6-2.6A9 9 0 00.9 4.9l3 2.3C4.6 5.1 6.6 3.6 9 3.6z"/>
+          </svg>
+          <span>Sign in with Google</span>
+        </button>
+        <p class="herowhy">Your cards are saved to your account, so you can open
+          them on any device. Nothing to remember.</p>
+        <div class="footlink">
+          <a class="altlink" href="#" id="skipSignIn">Scan without an account &rarr;</a>
+        </div>
+      </div>
+
+      <div id="signedIn" class="hidden">
+        <p class="who"><span id="whoText">Signed in</span>
+          <button type="button" class="linkbtn" id="signOutBtn">Sign out</button></p>
+        <div class="homeacts">
+          <button type="button" class="go" id="goScan">Scan Cards</button>
+          <a class="go alt" href="card-archive-en.html" id="goArchive">My Archive</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="start" class="hidden">
+    <p class="backhome"><button type="button" class="linkbtn" id="backHome">&larr; Home</button></p>
+
     <div class="drop cam" id="camzone" tabindex="0" role="button">
       <strong>Take Photos</strong>
       <span>Shoot each page in the app &middot; never saved to your camera roll</span>
@@ -774,18 +851,84 @@
     };
   }
 
+  /* ---- home screen ----
+     Signing in is what makes the archive work, so it is the first thing on
+     screen rather than a toggle buried in the scanner's settings. Scanning
+     without an account still works — export and the on-device library do not
+     need one — so there is a way past it. */
+  function showHome(){
+    $('home').classList.remove('hidden');
+    ['start','crop','meta','finish'].forEach(function(id){$(id).classList.add('hidden')});
+    $('pageTitle').textContent='Tiny Cards';
+    $('pageSub').textContent='Scan greeting cards and keep them for good.';
+    paintHome();
+  }
+  function showScanner(){
+    $('home').classList.add('hidden');
+    $('start').classList.remove('hidden');
+    $('pageTitle').textContent='Card Scanner';
+    $('pageSub').textContent='Crop, name, export. You choose where cards go.';
+  }
+  function paintHome(){
+    var inEl=$('signedIn'),outEl=$('signedOut');
+    if(!inEl)return;
+    inEl.classList.toggle('hidden',!authUser);
+    outEl.classList.toggle('hidden',!!authUser);
+    if(authUser)$('whoText').textContent='Signed in as '+
+      (authUser.email||authUser.displayName||'your account');
+  }
+
+  if($('googleBtn')){
+    $('googleBtn').onclick=function(){
+      var btn=$('googleBtn');
+      btn.disabled=true;btn.querySelector('span').textContent='Signing in…';
+      signIn().then(function(u){
+        if(!u)return;                       // redirect: we come back later
+        // Signing in is a statement of intent, so switch uploading on
+        useCloud=true;
+        try{localStorage.setItem(CLOUD_KEY,'1')}catch(e){}
+        paintCloud();paintHome();
+      }).catch(function(e){
+        var code=e&&e.code||'';
+        if(/unauthorized-domain/.test(code)){
+          alert('This site is not authorised for sign-in yet. Add cards.tinywins.space in the Firebase console under Authentication → Settings → Authorized domains.');
+        }else if(!/popup-closed-by-user|cancelled-popup-request/.test(code)){
+          alert('Could not sign in. Check your connection and try again.');
+        }
+        if(window.console)console.warn(e);
+      }).then(function(){
+        btn.disabled=false;btn.querySelector('span').textContent='Sign in with Google';
+      });
+    };
+  }
+  if($('skipSignIn')){
+    $('skipSignIn').onclick=function(e){e.preventDefault();showScanner()};
+  }
+  if($('goScan'))$('goScan').onclick=showScanner;
+  if($('backHome'))$('backHome').onclick=showHome;
+  if($('signOutBtn')){
+    $('signOutBtn').onclick=function(){
+      signOutUser().then(function(){
+        useCloud=false;
+        try{localStorage.setItem(CLOUD_KEY,'0')}catch(e){}
+        paintCloud();paintHome();
+      });
+    };
+  }
+
   // Pick up an existing session, and any redirect coming back from Google
   currentUser().then(function(u){
-    paintCloud();
+    if(u){useCloud=true;try{localStorage.setItem(CLOUD_KEY,'1')}catch(e){}}
+    paintCloud();paintHome();
     if(!u&&fbReady){
       firebase.auth().getRedirectResult().then(function(r){
         if(r&&r.user){authUser=r.user;useCloud=true;
           try{localStorage.setItem(CLOUD_KEY,'1')}catch(e){}
-          paintCloud();}
+          paintCloud();paintHome();}
       }).catch(function(){});
     }
   });
-  paintCloud();
+  paintCloud();paintHome();
 
   function upProgress(txt,pct,isErr){
     var b=$('upBox');
