@@ -173,18 +173,12 @@
 
   /* Always visible, so there is a way back to the scanner while browsing —
      the one in the start section disappears as soon as cards are open. */
-  .topbar{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .topbar{display:flex;align-items:center;justify-content:flex-end;gap:12px}
   .scanlink{
     display:inline-block;color:var(--accent);text-decoration:none;font-size:13.5px;
     font-weight:600;margin-bottom:12px;border-bottom:1px solid transparent;
   }
   .scanlink:hover,.scanlink:focus-visible{border-bottom-color:var(--accent)}
-
-  .suitelink{
-    display:inline-block;color:#94A3B8;text-decoration:none;font-size:13.5px;
-    margin-bottom:12px;transition:color .2s;
-  }
-  .suitelink:hover,.suitelink:focus-visible{color:#64748b;text-decoration:underline}
 
   .hidden{display:none}
   @media (prefers-reduced-motion:reduce){*{transition:none!important}}
@@ -194,7 +188,6 @@
 <div class="wrap">
 
     <div class="topbar">
-      <a href="https://tinywins.space" class="suitelink">&larr; TinyWins</a>
       <a href="./" class="scanlink">Scan new cards &rarr;</a>
     </div>
   <header>

@@ -85,10 +85,6 @@
   .gbtn:hover,.gbtn:focus-visible{border-color:#BFBAAE;box-shadow:0 1px 4px rgba(0,0,0,.07)}
   .gbtn[disabled]{opacity:.55;cursor:progress}
 
-  .herowhy{
-    font-size:13px;color:var(--muted);line-height:1.65;margin:14px 4px 0;
-  }
-
   .who{font-size:13.5px;color:var(--muted);margin-bottom:18px}
   .backhome{margin-bottom:14px}
   .backhome .linkbtn{padding:0;font-size:13.5px;text-decoration:none;color:var(--muted)}
@@ -249,6 +245,7 @@
   }
   .altlink:hover,.altlink:focus-visible{border-bottom-color:var(--accent)}
   .footlink{margin-top:20px;text-align:center}
+  #signedOut .footlink{margin-top:16px}
 
   .opt{
     margin-top:18px;padding:14px 15px;background:var(--field);
@@ -287,12 +284,6 @@
   .upbar{height:3px;background:rgba(176,24,79,.18);border-radius:2px;overflow:hidden;margin-top:8px}
   .upbar i{display:block;height:100%;background:var(--accent);width:0;transition:width .2s ease}
 
-  .suitelink{
-    display:inline-block;color:#94A3B8;text-decoration:none;font-size:13.5px;
-    margin-bottom:12px;transition:color .2s;
-  }
-  .suitelink:hover,.suitelink:focus-visible{color:#64748b;text-decoration:underline}
-
   .hidden{display:none}
   @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -300,7 +291,6 @@
 <body>
 <div class="wrap">
 
-    <a href="https://tinywins.space" class="suitelink">&larr; TinyWins</a>
   <header>
     <h1 id="pageTitle">Tiny Cards</h1>
     <p id="pageSub">Scan greeting cards and keep them for good.</p>
@@ -328,8 +318,6 @@
           </svg>
           <span>Sign in with Google</span>
         </button>
-        <p class="herowhy">Your cards are saved to your account, so you can open
-          them on any device. Nothing to remember.</p>
         <div class="footlink">
           <a class="altlink" href="#" id="skipSignIn">Scan without an account &rarr;</a>
         </div>
