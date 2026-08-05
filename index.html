@@ -207,6 +207,15 @@
     display:block;font-size:11.5px;color:var(--muted);margin-top:5px;
     text-transform:uppercase;letter-spacing:.04em;
   }
+  /* Thumbnails double as a way back into the crop for that page */
+  button.pg{
+    font:inherit;background:none;border:none;padding:0;cursor:pointer;
+    -webkit-appearance:none;appearance:none;
+  }
+  button.pg img{transition:border-color .15s}
+  button.pg:hover img,button.pg:focus-visible img{border-color:var(--accent)}
+  button.pg:hover span,button.pg:focus-visible span{color:var(--accent)}
+  button.pg:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:12px}
   .pg .bad{
     width:100%;aspect-ratio:3/4;background:var(--field);
     border:1px dashed var(--rule);border-radius:10px;
@@ -554,6 +563,10 @@
 
   var files=[],perCard=2,cursor=0,cardNo=0;
   var pages=[],pageIdx=0,pageCount=0;
+  /* The warped output alone is not enough to fix a bad crop later, so the
+     source photo and the corners used are kept per page. redoIndex is the page
+     being re-cropped, or -1 when adding a new one. */
+  var sources=[],cornerSets=[],curSource=null,redoIndex=-1;
   var img=null,corners=[],scale=1,thumbURLs=[];
   var savedCards=0,savedFiles=0,seen=[],seenTo=[];
   var savedToCloud=0,cloudFailed=false;
@@ -899,7 +912,7 @@
   var pendingNewCard=false;
 
   function startCapture(){
-    pages=[];pageIdx=0;pendingNewCard=true;
+    pages=[];sources=[];cornerSets=[];redoIndex=-1;pageIdx=0;pendingNewCard=true;
     $('warn').classList.add('hidden');
     openCamera();
   }
@@ -917,6 +930,7 @@
     $('pageTag').textContent=LABELS[pageIdx]||('p'+(pageIdx+1));
     $('fill').style.width='0%';
 
+    curSource=f;
     var u=URL.createObjectURL(f);
     img=new Image();
     img.onload=function(){URL.revokeObjectURL(u);drawStage();initCorners();paintOverlay();paintPreview()};
@@ -954,7 +968,7 @@
     if(cursor>=files.length)return finish();
     cardNo++;
     $('warn').classList.add('hidden');
-    pages=[];pageIdx=0;
+    pages=[];sources=[];cornerSets=[];redoIndex=-1;pageIdx=0;
     pageCount=Math.min(perCard,files.length-cursor);
     $('cardNo').textContent=cardNo;
     loadPage();
@@ -967,6 +981,7 @@
     $('pageTag').textContent=LABELS[pageIdx]||('p'+(pageIdx+1));
     $('fill').style.width=(cursor/files.length*100)+'%';
 
+    curSource=files[cursor];
     var u=URL.createObjectURL(files[cursor]);
     img=new Image();
     img.onload=function(){URL.revokeObjectURL(u);drawStage();initCorners();paintOverlay();paintPreview()};
@@ -1164,16 +1179,53 @@
     dctx.putImageData(out,0,0);
   }
 
-  $('noCrop').onclick=function(){acceptPage(files[cursor])};
+  $('noCrop').onclick=function(){acceptPage(curSource||files[cursor])};
 
   function acceptPage(blob){
+    if(redoIndex>-1){                       // re-cropping an existing page
+      pages[redoIndex]=blob;
+      cornerSets[redoIndex]=corners.slice();
+      redoIndex=-1;
+      $('applyCrop').textContent='Straighten & Next';
+      return toMeta();
+    }
     pages.push(blob);
+    sources.push(curSource);
+    cornerSets.push(corners.slice());
     pageIdx++;
     // In capture mode there is no queue to walk — go straight to naming,
     // where "Add another page" reopens the camera for this same card.
     if(mode==='capture')return toMeta();
     cursor++;
     loadPage();
+  }
+
+  /* Re-crop a page already taken. Restores the source and the corners last
+     used, so a corner that was slightly off can be nudged rather than placed
+     from scratch. */
+  function redoPage(i){
+    var src=sources[i];
+    if(!src)return;
+    redoIndex=i;
+    curSource=src;
+    $('meta').classList.add('hidden');
+    $('crop').classList.remove('hidden');
+    $('pageTag').textContent=(LABELS[i]||('p'+(i+1)))+' · redo';
+    $('applyCrop').textContent='Straighten & Replace';
+
+    var u=URL.createObjectURL(src);
+    img=new Image();
+    img.onload=function(){
+      URL.revokeObjectURL(u);
+      drawStage();
+      var saved=cornerSets[i];
+      corners=(saved&&saved.length===4)
+        ? saved.map(function(p){return {x:p.x,y:p.y}})
+        : (initCorners(),corners);
+      paintOverlay();paintPreview();
+    };
+    img.onerror=function(){URL.revokeObjectURL(u);redoIndex=-1;toMeta()};
+    img.src=u;
   }
 
   function toMeta(){
@@ -1184,7 +1236,17 @@
     pages.forEach(function(bl,i){
       var u=URL.createObjectURL(bl);thumbURLs.push(u);
       var lbl=LABELS[i]||('p'+(i+1));
-      var d=document.createElement('div');d.className='pg';
+      // A page could not be re-cropped once accepted, and a misplaced corner
+      // is only obvious here, next to the other pages. Tapping reopens it.
+      var canRedo=!!sources[i];
+      var d=document.createElement(canRedo?'button':'div');
+      d.className='pg'+(canRedo?' redoable':'');
+      if(canRedo){
+        d.type='button';
+        d.title='Redo this crop';
+        d.setAttribute('aria-label','Redo the crop for '+lbl);
+        d.onclick=function(){redoPage(i)};
+      }
       var im=document.createElement('img');im.src=u;im.alt=lbl;
       im.onerror=function(){
         var ph=document.createElement('div');
@@ -1192,7 +1254,8 @@
         if(im.parentNode)d.replaceChild(ph,im);
         noteBad();
       };
-      var sp=document.createElement('span');sp.textContent=lbl;
+      var sp=document.createElement('span');
+      sp.textContent=canRedo?(lbl+' · redo'):lbl;
       d.appendChild(im);d.appendChild(sp);t.appendChild(d);
     });
     upHide();
@@ -1268,7 +1331,7 @@
 
   $('skipCard').onclick=function(){
     if(!confirm('Discard this card without saving it?'))return;
-    pages=[];pageIdx=0;
+    pages=[];sources=[];cornerSets=[];redoIndex=-1;pageIdx=0;
     if(mode==='capture'){
       // Same continue-scanning behaviour as saving, minus the save
       finish();pendingNewCard=true;openCamera();
@@ -1326,7 +1389,7 @@
     // The card is saved, so its pages are no longer unsaved work. Without this
     // the beforeunload guard kept firing after a finished batch, warning about
     // losing something that had already gone where it was meant to.
-    pages=[];pageIdx=0;
+    pages=[];sources=[];cornerSets=[];redoIndex=-1;pageIdx=0;
 
     if(mode==='capture'){
       // Reopen the camera straight away rather than stopping at the tally
