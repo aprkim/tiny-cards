@@ -406,19 +406,8 @@
       </div>
     </div>
 
-    <div class="opt">
-      <div class="row">
-        <div class="txt">
-          <b>Keep a library on this device</b>
-          <small id="libNote">Saved cards stay in this browser so you can reopen them later.</small>
-        </div>
-        <button type="button" class="sw" id="libToggle" role="switch" aria-checked="false"
-                aria-label="Keep a library on this device"></button>
-      </div>
-    </div>
-
     <div class="footlink">
-      <a class="altlink" id="libLink" href="card-archive-en.html">Already have cards? Browse your archive &rarr;</a>
+      <a class="altlink" href="card-archive-en.html">Already have cards? Browse your archive &rarr;</a>
     </div>
   </section>
 
@@ -560,117 +549,11 @@
   var pages=[],pageIdx=0,pageCount=0;
   var img=null,corners=[],scale=1,thumbURLs=[];
   var savedCards=0,savedFiles=0,seen=[],seenTo=[];
-  var savedToLib=0,libFailed=false;
   var savedToCloud=0,cloudFailed=false;
 
   var $=function(id){return document.getElementById(id)};
   var picker=$('picker');
   $('date').value=new Date().toISOString().slice(0,10);
-
-  /* ==================== LIBRARY (IndexedDB) ====================
-     Saved cards live in the browser on this device. Blobs go in
-     directly — IndexedDB stores them without base64 bloat.
-     This is a working library, NOT a backup: clearing site data
-     erases it, and it does not travel between devices. The export
-     (share sheet / download) is still the durable copy. */
-  var DB='tinyCards',STORE='cards',dbp=null;
-
-  function idb(){
-    if(dbp)return dbp;
-    dbp=new Promise(function(res,rej){
-      if(!window.indexedDB)return rej(new Error('no indexedDB'));
-      var r=indexedDB.open(DB,1);
-      r.onupgradeneeded=function(){
-        var d=r.result;
-        if(!d.objectStoreNames.contains(STORE)){
-          var st=d.createObjectStore(STORE,{keyPath:'id'});
-          st.createIndex('date','date');
-        }
-      };
-      r.onsuccess=function(){res(r.result)};
-      r.onerror=function(){rej(r.error)};
-    });
-    return dbp;
-  }
-
-  // Requests must be issued synchronously inside the transaction callback,
-  // so each helper opens its own transaction and fires immediately.
-  function libPut(card){
-    return idb().then(function(d){
-      return new Promise(function(res,rej){
-        var q=d.transaction(STORE,'readwrite').objectStore(STORE).put(card);
-        q.onsuccess=function(){res(true)};
-        q.onerror=function(){rej(q.error)};
-      });
-    });
-  }
-
-  function libCount(){
-    return idb().then(function(d){
-      return new Promise(function(res,rej){
-        var q=d.transaction(STORE,'readonly').objectStore(STORE).count();
-        q.onsuccess=function(){res(q.result||0)};
-        q.onerror=function(){rej(q.error)};
-      });
-    });
-  }
-
-  // Ask the browser not to evict us. Safari grants this to Home Screen
-  // web apps; elsewhere it is a no-op and we carry on regardless.
-  if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(function(){});
-
-  function refreshLibLink(){
-    libCount().then(function(n){
-      var el=$('libLink');
-      if(!el)return;
-      el.textContent=n?'Browse your library ('+n+' card'+(n===1?'':'s')+') →'
-                      :'Already have cards? Browse your archive →';
-    }).catch(function(){});
-  }
-
-  /* ---- library on/off ----
-     Default OFF on phones: photos are usually taken on a phone precisely so
-     they do NOT pile up on it. Desktops default ON, where a local library is
-     convenient and storage is cheap. Either way the choice is remembered. */
-  var LIB_KEY='tinyCards_keepLocal';
-  function isPhone(){
-    return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)||
-           (navigator.maxTouchPoints>1&&/Mac/.test(navigator.platform));
-  }
-  var keepLocal;
-  try{
-    var stored=localStorage.getItem(LIB_KEY);
-    keepLocal=stored===null?!isPhone():stored==='1';
-  }catch(e){keepLocal=!isPhone()}
-
-  function paintToggle(){
-    var t=$('libToggle');
-    if(t)t.setAttribute('aria-checked',keepLocal?'true':'false');
-    var n=$('libNote');
-    if(n)n.textContent=keepLocal
-      ? 'Saved cards stay in this browser so you can reopen them later.'
-      : 'Nothing is kept here. Cards leave only as the files you export.';
-    refreshLibLink();
-    // Turning the library off may leave export as the only destination
-    if(typeof paintExport==='function')paintExport();
-  }
-
-  if($('libToggle')){
-    $('libToggle').onclick=function(){
-      keepLocal=!keepLocal;
-      try{localStorage.setItem(LIB_KEY,keepLocal?'1':'0')}catch(e){}
-      paintToggle();
-    };
-  }
-  paintToggle();
-
-  Array.prototype.forEach.call($('seg').children,function(b){
-    b.onclick=function(){
-      Array.prototype.forEach.call($('seg').children,function(x){x.classList.remove('on')});
-      b.classList.add('on');
-      perCard=parseInt(b.getAttribute('data-n'),10);
-    };
-  });
 
   /* ==================== ARCHIVE (Firebase) ====================
      Images go to Cloud Storage at cards/{uid}/{cardId}/{label}.jpg, keyed to
@@ -763,27 +646,24 @@
   }catch(e){exportFiles=!useCloud}
 
   function paintExport(){
-    // paintToggle() runs earlier in this file than the export state is set up,
-    // so bail until it exists rather than acting on undefined.
+    // Can be reached before the export state is set up, so bail rather than
+    // acting on undefined.
     if(typeof exportFiles==='undefined')return;
     // Never leave every destination off — that would make Save do nothing.
-    // The on-device library counts: with it on, exporting is optional even
-    // when the cloud archive is not connected.
-    if(!useCloud&&!keepLocal&&!exportFiles)exportFiles=true;
+    if(!useCloud&&!exportFiles)exportFiles=true;
     var t=$('expToggle');
     if(t)t.setAttribute('aria-checked',exportFiles?'true':'false');
     var n=$('expNote');
     if(n)n.textContent=exportFiles
       ? (useCloud?'Also opens the share sheet after each upload.'
                  :'Opens the share sheet so you can file each card yourself.')
-      : (useCloud?'Off — cards go straight to your archive, no share sheet.'
-                 :'Off — cards are kept in this device’s library only.');
+      : 'Off — cards go straight to your archive, no share sheet.';
   }
 
   if($('expToggle')){
     $('expToggle').onclick=function(){
-      if(exportFiles&&!useCloud&&!keepLocal){
-        alert('Turn on “Send cards to your archive” or “Keep a library on this device” first, otherwise saving a card would do nothing.');
+      if(exportFiles&&!useCloud){
+        alert('Turn on “Send cards to your archive” first, otherwise saving a card would do nothing.');
         return;
       }
       exportFiles=!exportFiles;exportExplicit=true;
@@ -1405,18 +1285,6 @@
       savedAt:Date.now()
     };
 
-    // Persist to the on-device library only if the user wants one here.
-    // Fire-and-forget: a storage failure must never block the export.
-    if(keepLocal){
-      var local={};
-      for(var k in card)local[k]=card[k];
-      local.pages=pages.slice();
-      libPut(local).then(function(){savedToLib++}).catch(function(e){
-        libFailed=true;
-        if(window.console)console.warn('Library save failed:',e);
-      });
-    }
-
     // Upload to the archive. Also fire-and-forget — the export is the copy
     // that must never depend on the network.
     cloudSave(card,pages.slice()).then(function(ok){
@@ -1442,6 +1310,10 @@
 
   function finishCard(n){
     savedCards++;savedFiles+=n;
+    // The card is saved, so its pages are no longer unsaved work. Without this
+    // the beforeunload guard kept firing after a finished batch, warning about
+    // losing something that had already gone where it was meant to.
+    pages=[];pageIdx=0;
     if(mode==='capture')return finish();  // one card at a time; offer the next
     startCard();
   }
@@ -1460,14 +1332,12 @@
     $('finish').classList.remove('hidden');
     var where=[];
     if(useCloud)where.push(cloudFailed?'the archive could not be reached':'sent to your archive');
-    if(keepLocal)where.push(libFailed?'this device’s library failed':'kept in this device’s library');
     if(!where.length)where.push('nothing was kept on this device');
     $('tally').textContent=savedCards+' card'+(savedCards===1?'':'s')+' saved'+
       (savedFiles?' ('+savedFiles+' files)':'')+' — '+where.join(', ')+'.'+
-      ((cloudFailed||libFailed)?' Your exported files are unaffected.':'');
-    refreshLibLink();
+      (cloudFailed?' Your exported files are unaffected.':'');
     var f=$('finLink');
-    if(f)f.textContent=(keepLocal&&!libFailed)?'Open your library →':'Open the archive →';
+    if(f)f.textContent='Open the archive →';
     $('again').textContent=mode==='capture'?'Take Another Card':'Choose More Photos';
   }
 

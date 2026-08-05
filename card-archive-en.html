@@ -202,8 +202,8 @@
     </div>
 
     <div class="drop lib hidden" id="libOpen" tabindex="0" role="button">
-      <strong id="libTitle">Open Your Library</strong>
-      <span id="libSub">Cards saved on this device</span>
+      <strong id="libTitle">Cards Saved On This Device</strong>
+      <span id="libSub">From before cards moved to your account</span>
     </div>
 
     <div class="drop" id="drop" tabindex="0" role="button">
@@ -314,11 +314,15 @@
   var libPut=function(c){return libReq('readwrite',function(s){return s.put(c)})};
   var libClear=function(){return libReq('readwrite',function(s){return s.clear()})};
 
-  // Offer the library button only when there is actually something in it
+  /* The on-device library is retired: the scanner no longer writes to it, and
+     the cloud archive replaces it. This reader stays so anything saved before
+     the change can still be opened, downloaded or deleted. The button hides
+     itself once the store is empty, so it disappears on its own. */
   libAll().then(function(rows){
     if(!rows||!rows.length)return;
-    $('libTitle').textContent='Open Your Library';
-    $('libSub').textContent=rows.length+' card'+(rows.length===1?'':'s')+' saved on this device';
+    $('libTitle').textContent='Cards Saved On This Device';
+    $('libSub').textContent=rows.length+' card'+(rows.length===1?'':'s')+
+      ' from before cards moved to your account — download or delete them here';
     $('libOpen').classList.remove('hidden');
   }).catch(function(){});
 
