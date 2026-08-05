@@ -682,9 +682,15 @@
      Storage rules deny `list`, so the archive can never walk the bucket to
      find files — the per-card metadata written to Firestore records which
      paths exist. */
+  /* authDomain is auth.tinywins.space, not the default firebaseapp.com one.
+     Sign-in hops through that domain, and Safari partitions storage per site:
+     with the handler on firebaseapp.com it could not read the sessionStorage
+     it had just written, and every iPhone sign-in died with "missing initial
+     state". auth.tinywins.space shares a registrable domain with this page,
+     so the browser treats them as one site and the hop works. */
   var FB={
     apiKey:"AIzaSyBycFP3HfMF7tyshQixvwzoaAE3Df8Fz_8",
-    authDomain:"tiny-wins25.firebaseapp.com",
+    authDomain:"auth.tinywins.space",
     projectId:"tiny-wins25",
     storageBucket:"tiny-wins25.firebasestorage.app",
     messagingSenderId:"497477643272",
