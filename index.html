@@ -93,11 +93,23 @@
     font:inherit;font-size:13px;background:none;border:none;padding:0 0 0 8px;
     color:var(--accent);cursor:pointer;text-decoration:underline;
   }
+  /* The base rule is `button.go`, so the archive link matched none of it and
+     came out short and unstyled. Both actions are declared here in full, with
+     a transparent border on the primary so the secondary's outline does not
+     make it taller. */
   .homeacts{display:flex;flex-direction:column;gap:10px}
-  .homeacts .go{display:block;text-align:center;text-decoration:none;line-height:1.4}
-  .homeacts .go.alt{
-    background:var(--field);color:var(--accent);border:1.5px solid var(--accent);
+  .homeacts .go{
+    display:block;width:100%;text-align:center;text-decoration:none;
+    font:inherit;font-size:15.5px;font-weight:600;line-height:1.4;
+    padding:15px;border-radius:12px;cursor:pointer;
+    background:var(--accent);color:#fff;border:1.5px solid transparent;
+    transition:background .15s,border-color .15s;
   }
+  .homeacts .go:hover,.homeacts .go:focus-visible{background:#8E1340}
+  .homeacts .go.alt{
+    background:var(--field);color:var(--accent);border-color:var(--accent);
+  }
+  .homeacts .go.alt:hover,.homeacts .go.alt:focus-visible{background:var(--accent-soft)}
 
   .setup{margin-top:18px;margin-bottom:18px}
   .setup > span{display:block;font-size:12.5px;font-weight:600;color:var(--muted);margin-bottom:8px}
