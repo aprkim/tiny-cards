@@ -131,11 +131,11 @@
   .box button:hover{background:rgba(255,255,255,.12)}
   .box button.on{background:#fff;color:var(--ink);border-color:#fff}
 
-  .drop.lib{
+  .drop.primary{
     border-style:solid;border-color:var(--accent);background:var(--accent-soft);margin-bottom:14px;
   }
-  .drop.lib strong{color:var(--accent)}
-  .drop.lib:hover,.drop.lib:focus-visible{border-color:#8E1340;background:#F7DCE6}
+  .drop.primary strong{color:var(--accent)}
+  .drop.primary:hover,.drop.primary:focus-visible{border-color:#8E1340;background:#F7DCE6}
 
   .rowbtns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:4px}
   .minibtn{
@@ -196,14 +196,9 @@
   </header>
 
   <section id="start">
-    <div class="drop lib" id="cloudOpen" tabindex="0" role="button">
+    <div class="drop primary" id="cloudOpen" tabindex="0" role="button">
       <strong id="cloudTitle">Open Your Archive</strong>
       <span id="cloudSub">Cards you sent to the cloud</span>
-    </div>
-
-    <div class="drop lib hidden" id="libOpen" tabindex="0" role="button">
-      <strong id="libTitle">Cards Saved On This Device</strong>
-      <span id="libSub">From before cards moved to your account</span>
     </div>
 
     <div class="drop" id="drop" tabindex="0" role="button">
@@ -271,63 +266,12 @@
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
 <script>
 (function(){
-  var cards=[],urls=[],filter=null,openCard=null,openPage=0,fromLibrary=false,fromCloud=false;
+  var cards=[],urls=[],filter=null,openCard=null,openPage=0,fromCloud=false;
   var $=function(id){return document.getElementById(id)};
   var picker=$('picker'),drop=$('drop');
 
   drop.onclick=function(){picker.click()};
   drop.onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();picker.click()}};
-
-  /* ==================== LIBRARY (IndexedDB) ====================
-     Same store the scanner writes to. Read-write here so cards can be
-     re-labelled or removed after the fact. */
-  var DB='tinyCards',STORE='cards',dbp=null;
-
-  function idb(){
-    if(dbp)return dbp;
-    dbp=new Promise(function(res,rej){
-      if(!window.indexedDB)return rej(new Error('no indexedDB'));
-      var r=indexedDB.open(DB,1);
-      r.onupgradeneeded=function(){
-        var d=r.result;
-        if(!d.objectStoreNames.contains(STORE)){
-          var st=d.createObjectStore(STORE,{keyPath:'id'});
-          st.createIndex('date','date');
-        }
-      };
-      r.onsuccess=function(){res(r.result)};
-      r.onerror=function(){rej(r.error)};
-    });
-    return dbp;
-  }
-  function libReq(mode,fn){
-    return idb().then(function(d){
-      return new Promise(function(res,rej){
-        var q=fn(d.transaction(STORE,mode).objectStore(STORE));
-        q.onsuccess=function(){res(q.result)};
-        q.onerror=function(){rej(q.error)};
-      });
-    });
-  }
-  var libAll=function(){return libReq('readonly',function(s){return s.getAll()})};
-  var libDel=function(id){return libReq('readwrite',function(s){return s.delete(id)})};
-  var libPut=function(c){return libReq('readwrite',function(s){return s.put(c)})};
-  var libClear=function(){return libReq('readwrite',function(s){return s.clear()})};
-
-  /* The on-device library is retired: the scanner no longer writes to it, and
-     the cloud archive replaces it. This reader stays so anything saved before
-     the change can still be opened, downloaded or deleted. The button hides
-     itself once the store is empty, so it disappears on its own. */
-  libAll().then(function(rows){
-    if(!rows||!rows.length)return;
-    $('libTitle').textContent='Cards Saved On This Device';
-    $('libSub').textContent=rows.length+' card'+(rows.length===1?'':'s')+
-      ' from before cards moved to your account — download or delete them here';
-    $('libOpen').classList.remove('hidden');
-  }).catch(function(){});
-
-  $('libOpen').onclick=loadLibrary;
-  $('libOpen').onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();loadLibrary()}};
 
   /* ==================== ARCHIVE (Firebase) ====================
      Storage rules deny `list`, so the bucket cannot be walked. The Firestore
@@ -446,7 +390,7 @@
           return {row:row,urls:urlsFor.filter(Boolean)};
         });
       })).then(function(resolved){
-        cards=[];fromLibrary=false;fromCloud=true;
+        cards=[];fromCloud=true;
         resolved.forEach(function(x){
           if(!x.urls.length)return;
           cards.push({
@@ -473,35 +417,6 @@
       }else{
         $('cloudSub').textContent='Could not reach the archive.';
       }
-      if(window.console)console.warn(e);
-    });
-  }
-
-  function loadLibrary(){
-    libAll().then(function(rows){
-      urls.forEach(URL.revokeObjectURL);
-      cards=[];urls=[];fromLibrary=true;fromCloud=false;
-      rows.forEach(function(row){
-        var pages=(row.pages||[]).map(function(bl,i){
-          var u=URL.createObjectURL(bl);urls.push(u);
-          return {url:u,label:(row.labels&&row.labels[i])||''};
-        });
-        if(!pages.length)return;
-        cards.push({
-          key:row.id,id:row.id,date:row.date||'',year:(row.date||'').slice(0,4),
-          event:row.occasion||'Unsorted',person:row.sender||'Unknown',
-          recipient:row.recipient||'',ok:!!row.date,pages:pages,blobs:row.pages||[],raw:row
-        });
-      });
-      cards.sort(function(a,b){
-        if(a.date===b.date)return a.person.localeCompare(b.person);
-        return b.date.localeCompare(a.date);
-      });
-      $('start').classList.add('hidden');
-      $('view').classList.remove('hidden');
-      people();render();
-    }).catch(function(e){
-      alert('Could not open the library on this device.');
       if(window.console)console.warn(e);
     });
   }
@@ -550,7 +465,7 @@
   picker.onchange=function(){
     if(!picker.files.length)return;
     urls.forEach(URL.revokeObjectURL);
-    cards=[];urls=[];fromLibrary=false;fromCloud=false;
+    cards=[];urls=[];fromCloud=false;
     var byKey={};
 
     Array.prototype.slice.call(picker.files).forEach(function(f){
@@ -635,7 +550,7 @@
     list.forEach(function(x){who[x.person]=1;shots+=x.pages.length});
     $('meta').textContent=list.length+' cards \u00b7 '+shots+' photos \u00b7 '+Object.keys(who).length+' people';
     // Only offer a bulk delete for stores we own; folder files are read-only
-    $('wipe').classList.toggle('hidden',!((fromCloud||fromLibrary)&&cards.length));
+    $('wipe').classList.toggle('hidden',!(fromCloud&&cards.length));
 
     var buckets={},order=[];
     list.forEach(function(x){
@@ -682,10 +597,9 @@
         nav.appendChild(b);
       });
     }
-    // Editing and deleting apply to cards we own — the on-device library or
-    // the cloud archive. Folder-loaded cards are just files on disk we have
-    // no write access to, so the controls stay hidden for those.
-    $('boxTools').classList.toggle('hidden',!(fromLibrary||fromCloud));
+    // Folder-loaded cards are files on disk we cannot write, so editing and
+    // deleting are offered only for cards in the cloud archive.
+    $('boxTools').classList.toggle('hidden',!fromCloud);
     $('boxForm').classList.add('hidden');$('box').classList.remove('editing');
     $('box').classList.remove('hidden');
   }
@@ -720,18 +634,14 @@
     row.occasion=$('eEvent').value.trim()||'Unsorted';
     row.date=$('eDate').value||'';
 
-    var save=fromCloud
-      ? cloudMutate(function(rows){
-          return rows.map(function(x){
-            if(x.id!==row.id)return x;
-            x.sender=row.sender;x.recipient=row.recipient;
-            x.occasion=row.occasion;x.date=row.date;
-            return x;
-          });
-        })
-      : libPut(row);
-
-    save.then(function(){
+    cloudMutate(function(rows){
+      return rows.map(function(x){
+        if(x.id!==row.id)return x;
+        x.sender=row.sender;x.recipient=row.recipient;
+        x.occasion=row.occasion;x.date=row.date;
+        return x;
+      });
+    }).then(function(){
       openCard.person=row.sender;openCard.recipient=row.recipient;
       openCard.event=row.occasion;openCard.date=row.date;
       openCard.year=row.date.slice(0,4);openCard.ok=!!row.date;
@@ -748,30 +658,20 @@
   $('boxDel').onclick=function(e){
     e.stopPropagation();
     if(!openCard)return;
-    var where=fromCloud?'your archive (on every device)':'your library';
-    if(!confirm('Delete this card from '+where+'? Exported files are not affected.'))return;
+    if(!confirm('Delete this card from your archive (on every device)? Exported files are not affected.'))return;
     var id=openCard.id,card=openCard;
 
-    var del;
-    if(fromCloud){
-      // Remove the images first, then the index entry. If an image delete
-      // fails the entry survives, which is recoverable; the reverse would
-      // orphan files nothing points at.
-      var paths=(card.raw&&card.raw.paths)||[];
-      del=Promise.all(paths.map(function(p){
-        return fbStore.ref().child(p).delete().catch(function(){});
-      })).then(function(){
-        return cloudMutate(function(rows){
-          return rows.filter(function(x){return x.id!==id});
-        });
+    // Remove the images first, then the index entry. If an image delete fails
+    // the entry survives, which is recoverable; the reverse would orphan files
+    // nothing points at.
+    var paths=(card.raw&&card.raw.paths)||[];
+    Promise.all(paths.map(function(p){
+      return fbStore.ref().child(p).delete().catch(function(){});
+    })).then(function(){
+      return cloudMutate(function(rows){
+        return rows.filter(function(x){return x.id!==id});
       });
-    }else{
-      del=libDel(id).then(function(){
-        card.pages.forEach(function(p){URL.revokeObjectURL(p.url)});
-      });
-    }
-
-    del.then(function(){
+    }).then(function(){
       cards=cards.filter(function(c){return c.id!==id});
       close();filter=null;people();render();
     }).catch(function(e){
@@ -799,17 +699,13 @@
       setTimeout(function(){URL.revokeObjectURL(u)},1500);
     };
 
-    if(c.blobs&&c.blobs.length){                 // library card: blobs in hand
-      c.blobs.forEach(function(bl,i){setTimeout(function(){push(bl,i)},i*350)});
-    }else{                                        // cloud card: fetch first
-      c.pages.forEach(function(pg,i){
-        setTimeout(function(){
-          fetch(pg.url).then(function(r){return r.blob()})
-            .then(function(bl){push(bl,i)})
-            .catch(function(){alert('Could not download that page.')});
-        },i*350);
-      });
-    }
+    c.pages.forEach(function(pg,i){
+      setTimeout(function(){
+        fetch(pg.url).then(function(r){return r.blob()})
+          .then(function(bl){push(bl,i)})
+          .catch(function(){alert('Could not download that page.')});
+      },i*350);
+    });
   };
 
   $('boxClose').onclick=close;
@@ -834,42 +730,30 @@
   $('wipe').onclick=function(){
     var n=cards.length;
     if(!n)return;
-    var where=fromCloud?'your archive — on every device using this code'
-                       :'this device’s library';
-    var typed=prompt('Delete all '+n+' card'+(n===1?'':'s')+' from '+where+'?\n\n'+
+    var typed=prompt('Delete all '+n+' card'+(n===1?'':'s')+' from your archive, on every device?\n\n'+
                      'This cannot be undone. Exported files are not affected.\n\n'+
                      'Type DELETE to confirm:');
     if(!typed||typed.trim().toUpperCase()!=='DELETE')return;
 
     $('wipe').disabled=true;$('wipe').textContent='Deleting…';
 
-    var job;
-    if(fromCloud){
-      var paths=[];
-      cards.forEach(function(c){
-        if(c.raw&&c.raw.paths)paths=paths.concat(c.raw.paths);
-      });
-      // Images first, then the index — a failure here leaves recoverable
-      // entries rather than files nothing points at.
-      job=Promise.all(paths.map(function(p){
-        return fbStore.ref().child(p).delete().catch(function(){});
-      })).then(function(){
-        return fbDb.collection('tinyCards').doc(cloudCode).delete();
-      });
-    }else{
-      job=libClear().then(function(){
-        urls.forEach(URL.revokeObjectURL);urls=[];
-      });
-    }
-
-    job.then(function(){
+    var paths=[];
+    cards.forEach(function(c){
+      if(c.raw&&c.raw.paths)paths=paths.concat(c.raw.paths);
+    });
+    // Images first, then the index — a failure here leaves recoverable entries
+    // rather than files nothing points at.
+    Promise.all(paths.map(function(p){
+      return fbStore.ref().child(p).delete().catch(function(){});
+    })).then(function(){
+      return fbDb.collection('tinyCards').doc(cloudCode).delete();
+    }).then(function(){
       cards=[];filter=null;
       $('wipe').disabled=false;$('wipe').textContent='Delete all…';
       people();render();
       $('view').classList.add('hidden');
       $('start').classList.remove('hidden');
-      $('cloudSub').textContent='Cards you sent to the cloud';
-      $('libOpen').classList.add('hidden');
+      paintCloudButton();
     }).catch(function(e){
       $('wipe').disabled=false;$('wipe').textContent='Delete all…';
       alert('Could not delete everything. Some cards may remain.');
