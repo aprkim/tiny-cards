@@ -313,8 +313,8 @@
                 aria-label="Send cards to your archive"></button>
       </div>
       <div id="codeRow" class="coderow hidden">
-        <code id="codeText">—</code>
-        <button type="button" class="tool" id="codeChange">Change</button>
+        <span id="codeText">—</span>
+        <button type="button" class="tool" id="codeChange">Sign out</button>
       </div>
     </div>
 
@@ -596,11 +596,15 @@
   });
 
   /* ==================== ARCHIVE (Firebase) ====================
-     Images go to Cloud Storage at cards/{syncCode}/{cardId}/{label}.jpg.
+     Images go to Cloud Storage at cards/{uid}/{cardId}/{label}.jpg, keyed to
+     the signed-in Google account. This replaced a sync-code scheme where the
+     code was a shared secret you had to carry between devices: losing it lost
+     the archive, and anyone holding it could read the cards. Signing in means
+     nothing to type or remember, and it survives the browser clearing storage.
+
      Storage rules deny `list`, so the archive can never walk the bucket to
-     find them — the per-card metadata written to Firestore is what records
-     which paths exist. The sync code is the shared secret and is reused
-     across the TinyWins suite, so one code covers every app. */
+     find files — the per-card metadata written to Firestore records which
+     paths exist. */
   var FB={
     apiKey:"AIzaSyBycFP3HfMF7tyshQixvwzoaAE3Df8Fz_8",
     authDomain:"tiny-wins25.firebaseapp.com",
@@ -609,22 +613,8 @@
     messagingSenderId:"497477643272",
     appId:"1:497477643272:web:9f8e43fbffd18003e5f5bd"
   };
-  var CODE_KEY='tinywins_sync_code';   // shared with the rest of the suite
   var CLOUD_KEY='tinyCards_useCloud';
-  var fbReady=false,fbDb=null,fbStore=null,authP=null;
-
-  function syncCode(){try{return localStorage.getItem(CODE_KEY)||''}catch(e){return''}}
-  function setSyncCode(c){try{localStorage.setItem(CODE_KEY,c)}catch(e){}}
-
-  var WORDS=['apple','banana','cherry','dragon','eagle','forest','garden','harbor',
-             'island','jungle','kitchen','lemon','mountain','novel','ocean','piano',
-             'quiet','river','sunset','thunder','umbrella','village','winter','yellow'];
-  function newCode(){
-    var a=[],r=new Uint32Array(6);
-    (window.crypto||window.msCrypto).getRandomValues(r);
-    for(var i=0;i<6;i++)a.push(WORDS[r[i]%WORDS.length]);
-    return a.join('-');
-  }
+  var fbReady=false,fbDb=null,fbStore=null,authUser=null;
 
   function fbInit(){
     if(fbReady)return true;
@@ -637,14 +627,42 @@
     }catch(e){if(window.console)console.warn('Firebase init failed',e);return false}
   }
 
-  function fbAuth(){
-    if(authP)return authP;
-    if(!fbInit())return Promise.reject(new Error('firebase unavailable'));
-    authP=new Promise(function(res,rej){
-      firebase.auth().onAuthStateChanged(function(u){if(u)res(u)});
-      firebase.auth().signInAnonymously().catch(rej);
+  // Resolves with the already-signed-in user, or null. Never prompts.
+  function currentUser(){
+    if(!fbInit())return Promise.resolve(null);
+    if(authUser)return Promise.resolve(authUser);
+    return new Promise(function(res){
+      var done=false;
+      var off=firebase.auth().onAuthStateChanged(function(u){
+        if(done)return;
+        done=true;off();
+        authUser=u||null;res(authUser);
+      });
     });
-    return authP;
+  }
+
+  // Popup first; Safari — especially as a Home Screen app — blocks popups and
+  // has historically broken them outright, so fall back to a full redirect.
+  function signIn(){
+    if(!fbInit())return Promise.reject(new Error('firebase unavailable'));
+    var provider=new firebase.auth.GoogleAuthProvider();
+    provider.setCustomParameters({prompt:'select_account'});
+    return firebase.auth().signInWithPopup(provider).then(function(r){
+      authUser=r.user;return authUser;
+    }).catch(function(e){
+      var code=e&&e.code||'';
+      if(/popup-blocked|popup-closed-by-user|operation-not-supported|cancelled-popup-request/.test(code)){
+        // Remember the intent so the toggle is on when we come back
+        try{localStorage.setItem(CLOUD_KEY,'1')}catch(e2){}
+        return firebase.auth().signInWithRedirect(provider);
+      }
+      throw e;
+    });
+  }
+
+  function signOutUser(){
+    if(!fbInit())return Promise.resolve();
+    return firebase.auth().signOut().then(function(){authUser=null});
   }
 
   var useCloud;
@@ -691,41 +709,53 @@
     };
   }
 
+  // Uploading requires a signed-in account, so the toggle can only be on when
+  // someone is actually signed in — otherwise a card would have nowhere to go.
   function paintCloud(){
+    var on=useCloud&&!!authUser;
     var t=$('cloudToggle');
-    if(t)t.setAttribute('aria-checked',useCloud?'true':'false');
-    var n=$('cloudNote'),row=$('codeRow');
-    if(row)row.classList.toggle('hidden',!useCloud);
-    if($('codeText'))$('codeText').textContent=syncCode()||'—';
-    if(n)n.textContent=useCloud
-      ? 'Cards upload to your archive. Open it anywhere with this code.'
+    if(t)t.setAttribute('aria-checked',on?'true':'false');
+    var row=$('codeRow');
+    if(row)row.classList.toggle('hidden',!on);
+    if($('codeText'))$('codeText').textContent=authUser
+      ? ('Signed in as '+(authUser.email||authUser.displayName||'your account'))
+      : '—';
+    var n=$('cloudNote');
+    if(n)n.textContent=on
+      ? 'Cards upload to your archive. Sign in on any device to see them.'
       : 'Not connected — cards leave only as the files you export.';
-    if(!exportExplicit)exportFiles=!useCloud;   // follow the sensible default
+    useCloud=on;
+    if(!exportExplicit)exportFiles=!on;   // follow the sensible default
     paintExport();
   }
 
   function connectCloud(){
-    var c=syncCode();
-    if(!c){
-      c=newCode();
-      setSyncCode(c);
-      alert('Your archive code is:\n\n'+c+'\n\nEnter this on your other devices to see the same cards. Write it down — it is the only key.');
-    }
-    useCloud=true;
-    try{localStorage.setItem(CLOUD_KEY,'1')}catch(e){}
-    fbAuth().catch(function(e){
+    var t=$('cloudToggle');
+    if(t)t.setAttribute('aria-busy','true');
+    signIn().then(function(u){
+      if(!u)return;                       // redirect flow: we come back later
+      useCloud=true;
+      try{localStorage.setItem(CLOUD_KEY,'1')}catch(e){}
+      paintCloud();
+    }).catch(function(e){
       useCloud=false;
       try{localStorage.setItem(CLOUD_KEY,'0')}catch(e2){}
       paintCloud();
-      alert('Could not reach the archive. Check your connection and try again.');
+      var code=e&&e.code||'';
+      if(/unauthorized-domain/.test(code)){
+        alert('This site is not authorised for sign-in yet. Add cards.tinywins.space to the Firebase console under Authentication → Settings → Authorized domains.');
+      }else if(!/popup-closed-by-user|cancelled-popup-request/.test(code)){
+        alert('Could not sign in. Check your connection and try again.');
+      }
       if(window.console)console.warn(e);
-    }).then(paintCloud);
-    paintCloud();
+    }).then(function(){
+      if(t)t.removeAttribute('aria-busy');
+    });
   }
 
   if($('cloudToggle')){
     $('cloudToggle').onclick=function(){
-      if(useCloud){
+      if(useCloud&&authUser){
         useCloud=false;
         try{localStorage.setItem(CLOUD_KEY,'0')}catch(e){}
         paintCloud();
@@ -734,14 +764,27 @@
   }
   if($('codeChange')){
     $('codeChange').onclick=function(){
-      var c=prompt('Enter an archive code to join, or leave blank for a new one:',syncCode()||'');
-      if(c===null)return;
-      c=c.trim().toLowerCase();
-      setSyncCode(c||newCode());
-      if(!c)alert('Your new archive code is:\n\n'+syncCode()+'\n\nWrite it down — it is the only key.');
-      paintCloud();
+      if(!authUser)return;
+      if(!confirm('Sign out? Cards already in your archive stay there.'))return;
+      signOutUser().then(function(){
+        useCloud=false;
+        try{localStorage.setItem(CLOUD_KEY,'0')}catch(e){}
+        paintCloud();
+      });
     };
   }
+
+  // Pick up an existing session, and any redirect coming back from Google
+  currentUser().then(function(u){
+    paintCloud();
+    if(!u&&fbReady){
+      firebase.auth().getRedirectResult().then(function(r){
+        if(r&&r.user){authUser=r.user;useCloud=true;
+          try{localStorage.setItem(CLOUD_KEY,'1')}catch(e){}
+          paintCloud();}
+      }).catch(function(){});
+    }
+  });
   paintCloud();
 
   function upProgress(txt,pct,isErr){
@@ -758,10 +801,10 @@
   // any failure so the caller can tell the user without losing the export.
   function cloudSave(card,blobs){
     if(!useCloud)return Promise.resolve(null);
-    var code=syncCode();
-    if(!code)return Promise.resolve(null);
 
-    return fbAuth().then(function(){
+    return currentUser().then(function(user){
+      if(!user)return null;              // signed out: nothing to upload to
+      var code=user.uid;
       var paths=[],done=0;
       upProgress('Uploading 1 of '+blobs.length+'…',4);
       return blobs.reduce(function(chain,bl,i){

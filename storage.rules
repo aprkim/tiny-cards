@@ -1,30 +1,32 @@
 rules_version = '2';
 
-// Cards are addressed by sync code, mirroring the Firestore pattern in tiny-do.
-// The sync code is the shared secret: knowing it grants access to that space.
+// Cards live under the signed-in user's own uid.
+//
+// This replaces an earlier sync-code scheme where the code was a shared
+// secret and any authenticated client that knew it could read the space.
+// Access is now tied to identity: the path segment must equal the caller's
+// uid, so one account cannot reach another's cards even by guessing.
 //
 // `get` and NOT `read`. In Storage rules `read` means `get` + `list`, and
-// granting `list` was enough to enumerate every sync code: a request for
-// prefix "cards/" with delimiter "/" came back with the full set of codes as
-// prefixes, even though the rule is nested a level below. Nesting the match
-// does not protect the parent prefix — only withholding `list` does.
-//
-// Consequence: no client can list anything here, so the archive cannot learn
-// what a space holds by walking Storage. Card metadata lives in Firestore
-// instead, and images are fetched by exact path.
+// granting `list` let a client enumerate the folders under /cards — with an
+// earlier revision that meant every sync code. Nesting the match does not
+// protect the parent prefix; only withholding `list` does. Nothing here can
+// be listed, so the archive learns which files exist from the Firestore
+// index instead and fetches them by exact path.
 service firebase.storage {
   match /b/{bucket}/o {
 
-    match /cards/{syncCode}/{allPaths=**} {
-      allow get: if request.auth != null;
+    match /cards/{uid}/{allPaths=**} {
+      allow get: if request.auth != null && request.auth.uid == uid;
 
-      // Writes must be images of a sane size, so a leaked code cannot be
-      // used to park arbitrary files in the bucket.
+      // Writes must be images of a sane size, so a compromised session
+      // cannot be used to park arbitrary files in the bucket.
       allow write: if request.auth != null
+                   && request.auth.uid == uid
                    && request.resource.size < 15 * 1024 * 1024
                    && request.resource.contentType.matches('image/.*');
 
-      allow delete: if request.auth != null;
+      allow delete: if request.auth != null && request.auth.uid == uid;
     }
 
     // Everything else is denied.

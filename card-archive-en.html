@@ -344,8 +344,7 @@
     messagingSenderId:"497477643272",
     appId:"1:497477643272:web:9f8e43fbffd18003e5f5bd"
   };
-  var CODE_KEY='tinywins_sync_code';
-  var fbDb=null,fbStore=null,authP=null,cloudCode='';
+  var fbReady=false,fbDb=null,fbStore=null,authUser=null,cloudCode='';
 
   /* The whole card list lives in one document, so changing a single card is a
      read-modify-write of that array. Fine for one person editing their own
@@ -359,38 +358,87 @@
     });
   }
 
-  function syncCode(){try{return localStorage.getItem(CODE_KEY)||''}catch(e){return''}}
-
-  function fbAuth(){
-    if(authP)return authP;
-    if(typeof firebase==='undefined')return Promise.reject(new Error('offline'));
-    if(!firebase.apps.length)firebase.initializeApp(FB);
-    fbDb=firebase.firestore();fbStore=firebase.storage();
-    authP=new Promise(function(res,rej){
-      firebase.auth().onAuthStateChanged(function(u){if(u)res(u)});
-      firebase.auth().signInAnonymously().catch(rej);
-    });
-    return authP;
+  function fbInit(){
+    if(fbReady)return true;
+    if(typeof firebase==='undefined')return false;
+    try{
+      if(!firebase.apps.length)firebase.initializeApp(FB);
+      fbDb=firebase.firestore();fbStore=firebase.storage();
+      fbReady=true;return true;
+    }catch(e){return false}
   }
+
+  // Resolves with the signed-in user or null. Never prompts.
+  function currentUser(){
+    if(!fbInit())return Promise.resolve(null);
+    if(authUser)return Promise.resolve(authUser);
+    return new Promise(function(res){
+      var done=false;
+      var off=firebase.auth().onAuthStateChanged(function(u){
+        if(done)return;
+        done=true;off();authUser=u||null;res(authUser);
+      });
+    });
+  }
+
+  // Popup first; Safari blocks popups in Home Screen apps, so fall back
+  function signIn(){
+    if(!fbInit())return Promise.reject(new Error('offline'));
+    var provider=new firebase.auth.GoogleAuthProvider();
+    provider.setCustomParameters({prompt:'select_account'});
+    return firebase.auth().signInWithPopup(provider).then(function(r){
+      authUser=r.user;return authUser;
+    }).catch(function(e){
+      var code=e&&e.code||'';
+      if(/popup-blocked|popup-closed-by-user|operation-not-supported|cancelled-popup-request/.test(code)){
+        return firebase.auth().signInWithRedirect(provider);
+      }
+      throw e;
+    });
+  }
+
+  // Reflect whether anyone is signed in, so the button never asks for a
+  // credential that does not exist — the old version prompted for a sync code
+  // even when one had never been created.
+  function paintCloudButton(){
+    var t=$('cloudTitle'),s=$('cloudSub');
+    if(!t)return;
+    if(authUser){
+      t.textContent='Open Your Archive';
+      s.textContent=(authUser.email||authUser.displayName||'Signed in')+' · tap to open';
+    }else{
+      t.textContent='Sign in to Your Archive';
+      s.textContent='Google sign-in — nothing to remember';
+    }
+  }
+
+  currentUser().then(function(u){
+    paintCloudButton();
+    if(!u&&fbReady){
+      firebase.auth().getRedirectResult().then(function(r){
+        if(r&&r.user){authUser=r.user;paintCloudButton();loadCloud()}
+      }).catch(function(){});
+    }
+  });
 
   $('cloudOpen').onclick=loadCloud;
   $('cloudOpen').onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();loadCloud()}};
 
   function loadCloud(){
-    var code=syncCode();
-    if(!code){
-      code=(prompt('Enter your archive code:')||'').trim().toLowerCase();
-      if(!code)return;
-      try{localStorage.setItem(CODE_KEY,code)}catch(e){}
-    }
     $('cloudSub').textContent='Opening…';
 
-    fbAuth().then(function(){
-      return fbDb.collection('tinyCards').doc(code).get();
+    currentUser().then(function(u){
+      return u || signIn();
+    }).then(function(u){
+      if(!u)return null;                 // redirect flow: we return later
+      authUser=u;cloudCode=u.uid;
+      paintCloudButton();
+      return fbDb.collection('tinyCards').doc(u.uid).get();
     }).then(function(doc){
+      if(!doc)return;
       var rows=(doc.exists&&doc.data().cards)||[];
       if(!rows.length){
-        $('cloudSub').textContent='No cards found for that code yet.';
+        $('cloudSub').textContent='No cards yet — turn on “Send cards to your archive” in the scanner.';
         return;
       }
       // Resolve every page path to a download URL before rendering
@@ -401,7 +449,7 @@
           return {row:row,urls:urlsFor.filter(Boolean)};
         });
       })).then(function(resolved){
-        cards=[];fromLibrary=false;fromCloud=true;cloudCode=code;
+        cards=[];fromLibrary=false;fromCloud=true;
         resolved.forEach(function(x){
           if(!x.urls.length)return;
           cards.push({
@@ -420,7 +468,14 @@
         people();render();
       });
     }).catch(function(e){
-      $('cloudSub').textContent='Could not reach the archive.';
+      var code=e&&e.code||'';
+      if(/unauthorized-domain/.test(code)){
+        $('cloudSub').textContent='This site is not authorised for sign-in yet.';
+      }else if(/popup-closed-by-user|cancelled-popup-request/.test(code)){
+        paintCloudButton();               // user backed out; say nothing
+      }else{
+        $('cloudSub').textContent='Could not reach the archive.';
+      }
       if(window.console)console.warn(e);
     });
   }
