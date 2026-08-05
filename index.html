@@ -86,6 +86,10 @@
   .gbtn[disabled]{opacity:.55;cursor:progress}
 
   .who{font-size:13.5px;color:var(--muted);margin-bottom:18px}
+  .discardrow{text-align:center;margin-top:12px}
+  .discardrow .linkbtn{padding:0;font-size:13px;color:var(--muted);text-decoration:none}
+  .discardrow .linkbtn:hover{color:#BF3143;text-decoration:underline}
+
   .backhome{margin-bottom:14px}
   .backhome .linkbtn{padding:0;font-size:13.5px;text-decoration:none;color:var(--muted)}
   .backhome .linkbtn:hover{color:var(--ink);text-decoration:underline}
@@ -116,11 +120,11 @@
   .setup > span em{font-style:normal;font-weight:500;opacity:.75}
   .seg{display:flex;gap:8px}
   .seg button{
-    flex:1;font:inherit;font-size:14px;padding:11px 8px;border-radius:10px;
+    flex:1;min-width:0;font:inherit;font-size:14px;padding:11px 4px;border-radius:10px;
     border:1px solid var(--rule);background:var(--field);color:var(--ink);
     cursor:pointer;line-height:1.35;
   }
-  .seg button small{display:block;font-size:11.5px;color:var(--muted)}
+  .seg button small{display:block;font-size:10.5px;color:var(--muted);white-space:nowrap}
   .seg button.on{background:var(--ink);border-color:var(--ink);color:#fff}
   .seg button.on small{color:rgba(255,255,255,.6)}
 
@@ -369,6 +373,7 @@
         <button type="button" data-n="1">1<small>front</small></button>
         <button type="button" data-n="2" class="on">2<small>front + inside</small></button>
         <button type="button" data-n="3">3<small>+ back</small></button>
+        <button type="button" data-n="4">4<small>+ extra</small></button>
       </div>
     </div>
 
@@ -520,8 +525,10 @@
 
     <div class="actions">
       <button class="go" id="save">Save &amp; Next</button>
-      <button class="skip" id="skipCard">Skip</button>
     </div>
+    <p class="discardrow">
+      <button type="button" class="linkbtn" id="skipCard">Discard this card</button>
+    </p>
   </section>
 
   <section id="finish" class="hidden">
@@ -1260,7 +1267,13 @@
   });
 
   $('skipCard').onclick=function(){
-    if(mode==='capture'){pages=[];pageIdx=0;return finish()}  // discard, offer the next card
+    if(!confirm('Discard this card without saving it?'))return;
+    pages=[];pageIdx=0;
+    if(mode==='capture'){
+      // Same continue-scanning behaviour as saving, minus the save
+      finish();pendingNewCard=true;openCamera();
+      return;
+    }
     startCard();
   };
   $('save').onclick=doSave;
@@ -1314,7 +1327,17 @@
     // the beforeunload guard kept firing after a finished batch, warning about
     // losing something that had already gone where it was meant to.
     pages=[];pageIdx=0;
-    if(mode==='capture')return finish();  // one card at a time; offer the next
+
+    if(mode==='capture'){
+      // Reopen the camera straight away rather than stopping at the tally
+      // after every card — a stack of twenty otherwise costs twenty extra
+      // taps. finish() still runs first, so backing out of the camera lands
+      // on the tally instead of on the card just saved.
+      finish();
+      pendingNewCard=true;
+      openCamera();
+      return;
+    }
     startCard();
   }
 
@@ -1333,7 +1356,7 @@
     var where=[];
     if(useCloud)where.push(cloudFailed?'the archive could not be reached':'sent to your archive');
     if(!where.length)where.push('nothing was kept on this device');
-    $('tally').textContent=savedCards+' card'+(savedCards===1?'':'s')+' saved'+
+    $('tally').textContent=savedCards+' card'+(savedCards===1?'':'s')+' saved so far'+
       (savedFiles?' ('+savedFiles+' files)':'')+' — '+where.join(', ')+'.'+
       (cloudFailed?' Your exported files are unaffected.':'');
     var f=$('finLink');
