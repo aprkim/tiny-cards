@@ -76,12 +76,24 @@
      illustration + count at the top, the action pair low in the thumb zone,
      the account row pinned to the very bottom. 100dvh tracks the real visible
      height as Safari's toolbars come and go. */
+  /* Three zones: the header sits above (its own element), the illustration +
+     count take the flexible middle and centre within it, and the actions sit
+     at the bottom. 100dvh tracks the real visible height as Safari toolbars
+     come and go. */
   #home{
     display:flex;flex-direction:column;
     min-height:calc(100dvh - 150px);
   }
-  .hero{text-align:center;padding:14px 0 0;flex:0 0 auto}
-  .heroart{position:relative;height:150px;margin:10px auto 18px;width:126px}
+  /* Middle zone. justify-content:center would land dead-centre, which reads as
+     low with this much whitespace, so the extra bottom padding nudges the block
+     to roughly 45%. The top/bottom padding also keeps a gap from the header and
+     buttons on short screens (iPhone SE). min-height:0 lets it shrink there. */
+  .hero{
+    flex:1 1 auto;min-height:0;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;padding:24px 0 3vh;
+  }
+  .heroart{position:relative;height:150px;margin:0 auto 18px;width:126px;flex:0 0 auto}
   .heroart span{position:absolute;border-radius:12px;background:#fff;border:2.5px solid var(--accent)}
   .heroart .c1{inset:12px 22px 12px 0;transform:rotate(-9deg);background:var(--accent-soft)}
   .heroart .c2{inset:0 0 0 24px;display:flex;align-items:center;justify-content:center}
@@ -91,12 +103,10 @@
   .cardcount{font-size:15px;color:var(--muted);min-height:22px}
   .cardcount b{color:var(--ink);font-weight:700;font-variant-numeric:tabular-nums}
 
-  /* Each state fills the remaining height and hangs its own content off top
-     and bottom edges. */
-  .homefill{flex:1 1 auto;display:flex;flex-direction:column}
-  #signedOut.homefill{justify-content:center}     /* sign-in sits calmly centred */
+  /* Bottom zone: natural height, so the actions rest against the buttons area
+     rather than filling the screen. */
+  .homefill{flex:0 0 auto;display:flex;flex-direction:column}
   .signinblock{width:100%}
-  #signedIn .homeacts{margin-top:auto}            /* actions drop to the lower third */
 
   .gbtn{
     display:inline-flex;align-items:center;justify-content:center;gap:10px;
