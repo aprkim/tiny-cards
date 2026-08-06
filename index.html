@@ -374,7 +374,7 @@
 
   <header>
     <h1 id="pageTitle">Tiny Cards</h1>
-    <p id="pageSub">Scan paper greeting cards and keep them in one shared archive.</p>
+    <p id="pageSub">Scan greeting cards into one shared archive.</p>
   </header>
 
   <!-- Landing screen. A tall flex column: the illustration and the running
@@ -864,7 +864,7 @@
     // a short tagline once you are in.
     $('pageSub').textContent=signedIn
       ? 'Scan greeting cards and keep them forever.'
-      : 'Scan paper greeting cards and keep them in one shared archive.';
+      : 'Scan greeting cards into one shared archive.';
     if(signedIn){
       $('whoText').textContent='Signed in as '+
         (authUser.email||authUser.displayName||'your account');
