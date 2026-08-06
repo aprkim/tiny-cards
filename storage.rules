@@ -1,32 +1,47 @@
 rules_version = '2';
 
-// Cards live under the signed-in user's own uid.
-//
-// This replaces an earlier sync-code scheme where the code was a shared
-// secret and any authenticated client that knew it could read the space.
-// Access is now tied to identity: the path segment must equal the caller's
-// uid, so one account cannot reach another's cards even by guessing.
+// One shared family space with an email allowlist: the owner can read and
+// write, named viewers can only read, and everyone must have a verified
+// email. This replaced uid-keyed paths, which made viewer access impossible
+// — a viewer's uid never matches the owner's path segment.
 //
 // `get` and NOT `read`. In Storage rules `read` means `get` + `list`, and
-// granting `list` let a client enumerate the folders under /cards — with an
-// earlier revision that meant every sync code. Nesting the match does not
-// protect the parent prefix; only withholding `list` does. Nothing here can
-// be listed, so the archive learns which files exist from the Firestore
-// index instead and fetches them by exact path.
+// granting `list` lets a client walk the tree (an earlier revision leaked
+// every sync code that way). Nothing here can be listed: the Firestore index
+// records which paths exist, and images are fetched by exact path.
+//
+// Thumbnails (*_thumb.jpg) are written by the Cloud Function through the
+// Admin SDK, which bypasses these rules — no extra write grant is needed.
+//
+// The viewer list must be kept in step with the one in
+// tiny-do/firestore.rules (Firestore rules are project-wide and deploy from
+// that repo).
 service firebase.storage {
   match /b/{bucket}/o {
 
-    match /cards/{uid}/{allPaths=**} {
-      allow get: if request.auth != null && request.auth.uid == uid;
+    function cardsVerified() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+    function cardsOwner() {
+      return cardsVerified() && request.auth.token.email == 'aprkim@gmail.com';
+    }
+    function cardsViewer() {
+      return cardsVerified() && request.auth.token.email in [
+        'viewer-one-not-yet-set@invalid.example',
+        'viewer-two-not-yet-set@invalid.example'
+      ];
+    }
+
+    match /cards/{space}/{allPaths=**} {
+      allow get: if cardsOwner() || cardsViewer();
 
       // Writes must be images of a sane size, so a compromised session
       // cannot be used to park arbitrary files in the bucket.
-      allow write: if request.auth != null
-                   && request.auth.uid == uid
+      allow write: if cardsOwner()
                    && request.resource.size < 15 * 1024 * 1024
                    && request.resource.contentType.matches('image/.*');
 
-      allow delete: if request.auth != null && request.auth.uid == uid;
+      allow delete: if cardsOwner();
     }
 
     // Everything else is denied.

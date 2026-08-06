@@ -285,6 +285,7 @@
     messagingSenderId:"497477643272",
     appId:"1:497477643272:web:9f8e43fbffd18003e5f5bd"
   };
+  var SPACE='family';   // shared space; the rules' email allowlist gates access
   var fbReady=false,fbDb=null,fbStore=null,authUser=null,cloudCode='';
 
   /* The whole card list lives in one document, so changing a single card is a
@@ -372,9 +373,9 @@
       return u || signIn();
     }).then(function(u){
       if(!u)return null;                 // redirect flow: we return later
-      authUser=u;cloudCode=u.uid;
+      authUser=u;cloudCode=SPACE;
       paintCloudButton();
-      return fbDb.collection('tinyCards').doc(u.uid).get();
+      return fbDb.collection('tinyCards').doc(SPACE).get();
     }).then(function(doc){
       if(!doc)return;
       var rows=(doc.exists&&doc.data().cards)||[];

@@ -23,6 +23,10 @@ admin.initializeApp();
 // us-east1 matches the Storage bucket, so reads are same-region
 setGlobalOptions({region: 'us-east1', maxInstances: 10});
 
+// Access model: one shared space, owner decided by email — mirrors the rules
+const SPACE = 'family';
+const OWNER_EMAIL = 'aprkim@gmail.com';
+
 const THUMB_MAX = 400;          // long edge; covers a 2x retina grid tile
 const THUMB_QUALITY = 78;
 const THUMB_SUFFIX = '_thumb.jpg';
@@ -30,10 +34,10 @@ const THUMB_SUFFIX = '_thumb.jpg';
 const isThumb = (p) => p.endsWith(THUMB_SUFFIX);
 const thumbPathFor = (p) => p.replace(/\.[^.]+$/, '') + THUMB_SUFFIX;
 
-/** cards/{uid}/{cardId}/{label}.jpg — anything else is ignored. */
+/** cards/{space}/{cardId}/{label}.jpg — anything else is ignored. */
 function parseCardPath(p) {
   const m = /^cards\/([^/]+)\/([^/]+)\/([^/]+)$/.exec(p);
-  return m ? {uid: m[1], cardId: m[2], name: m[3]} : null;
+  return m ? {space: m[1], cardId: m[2], name: m[3]} : null;
 }
 
 async function makeThumb(bucket, srcPath) {
@@ -87,11 +91,14 @@ exports.backfill = onCall({memory: '2GiB', timeoutSeconds: 540}, async (req) => 
   const auth = req.auth;
   if (!auth) throw new HttpsError('unauthenticated', 'Sign in first.');
   if (!auth.token.email_verified) throw new HttpsError('permission-denied', 'Verified email required.');
+  // Owner-only, judged by email like the rules — viewers cannot trigger work
+  if (auth.token.email !== OWNER_EMAIL) {
+    throw new HttpsError('permission-denied', 'Only the archive owner can run the backfill.');
+  }
 
-  const uid = auth.uid;
   const db = admin.firestore();
   const bucket = admin.storage().bucket();
-  const ref = db.collection('tinyCards').doc(uid);
+  const ref = db.collection('tinyCards').doc(SPACE);
   const snap = await ref.get();
   if (!snap.exists) return {cards: 0, thumbs: 0, sized: 0};
 

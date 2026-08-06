@@ -576,8 +576,8 @@
   $('date').value=new Date().toISOString().slice(0,10);
 
   /* ==================== ARCHIVE (Firebase) ====================
-     Images go to Cloud Storage at cards/{uid}/{cardId}/{label}.jpg, keyed to
-     the signed-in Google account. This replaced a sync-code scheme where the
+     Images go to Cloud Storage at cards/family/{cardId}/{label}.jpg — one
+     shared space; the rules' email allowlist decides who reads and writes. This replaced a sync-code scheme where the
      code was a shared secret you had to carry between devices: losing it lost
      the archive, and anyone holding it could read the cards. Signing in means
      nothing to type or remember, and it survives the browser clearing storage.
@@ -600,6 +600,10 @@
     appId:"1:497477643272:web:9f8e43fbffd18003e5f5bd"
   };
   var CLOUD_KEY='tinyCards_useCloud';
+  /* All cards live in one shared space rather than under each account's uid.
+     Access is decided by the email allowlist in the security rules — keying
+     data by uid made viewer accounts point at their own empty documents. */
+  var SPACE='family';
   var fbReady=false,fbDb=null,fbStore=null,authUser=null;
 
   function fbInit(){
@@ -853,7 +857,7 @@
 
     return currentUser().then(function(user){
       if(!user)return null;              // signed out: nothing to upload to
-      var code=user.uid;
+      var code=SPACE;
       var paths=[],bytes=[],done=0;
       upProgress('Uploading 1 of '+blobs.length+'…',4);
       return blobs.reduce(function(chain,bl,i){
