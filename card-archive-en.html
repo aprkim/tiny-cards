@@ -206,7 +206,7 @@
     <div class="chips" id="people"></div>
     <div class="metarow">
       <p class="meta" id="meta"></p>
-      <button type="button" class="dangerbtn hidden" id="wipe">Delete all…</button>
+      <button type="button" class="dangerbtn hidden" id="wipe">Delete All</button>
     </div>
     <div id="groups"></div>
   </section>
@@ -221,7 +221,7 @@
   </div>
   <div class="nav" id="boxNav"></div>
   <div class="rowbtns hidden" id="boxTools">
-    <button class="minibtn" id="boxEdit">Edit details</button>
+    <button class="minibtn" id="boxEdit">Edit</button>
     <button class="minibtn" id="boxDl">Download</button>
     <button class="minibtn danger" id="boxDel">Delete</button>
   </div>
@@ -646,13 +646,13 @@
       return fbDb.collection('tinyCards').doc(cloudCode).delete();
     }).then(function(){
       cards=[];filter=null;
-      $('wipe').disabled=false;$('wipe').textContent='Delete all…';
+      $('wipe').disabled=false;$('wipe').textContent='Delete All';
       people();render();
       $('view').classList.add('hidden');
       $('start').classList.remove('hidden');
       paintCloudButton();
     }).catch(function(e){
-      $('wipe').disabled=false;$('wipe').textContent='Delete all…';
+      $('wipe').disabled=false;$('wipe').textContent='Delete All';
       alert('Could not delete everything. Some cards may remain.');
       if(window.console)console.warn(e);
     });
