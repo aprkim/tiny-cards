@@ -1,0 +1,1485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!-- No user-scalable=no: this is a photo app, and checking whether a crop
+     caught the card edge is exactly when you want to pinch-zoom. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Scan greeting cards with your phone: straighten, name, and file them. Nothing is kept on your device unless you ask.">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<meta property="og:title" content="Scan Cards">
+<meta property="og:description" content="Scan greeting cards with your phone: straighten, name, and file them.">
+<meta property="og:image" content="https://cards.tinywins.space/og-image.png">
+<meta property="og:url" content="https://cards.tinywins.space/scan.html">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Scan Cards">
+<meta name="twitter:description" content="Scan greeting cards with your phone: straighten, name, and file them.">
+<meta name="twitter:image" content="https://cards.tinywins.space/og-image.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#FAF9F6">
+<title>Scan Cards</title>
+<style>
+  :root{
+    --ink:#16161D;--paper:#FAF9F6;--accent:#B0184F;--accent-soft:#FBEDF2;
+    --muted:#6E6E78;--rule:#E4E2DB;--field:#FFFFFF;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,system-ui,'Segoe UI',sans-serif;
+    background:var(--paper);color:var(--ink);line-height:1.6;
+    padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+    -webkit-font-smoothing:antialiased;touch-action:manipulation;
+  }
+  .wrap{max-width:460px;margin:0 auto;padding:24px 18px 44px}
+  header{margin-bottom:22px}
+  h1{font-size:19px;font-weight:700;letter-spacing:-.02em}
+  header p{font-size:13.5px;color:var(--muted);margin-top:3px}
+  /* On the home screen everything below is centred, so the title matches.
+     The scanner keeps its conventional left-aligned header. */
+  body.view-home header{text-align:center}
+
+  /* Both entry points are equal-weight choices, so they get identical boxes.
+     Flex centring plus a min-height keeps them matched even though the camera
+     option's caption wraps to two lines on a narrow screen. */
+  .drop{
+    border:1.5px dashed var(--rule);border-radius:14px;padding:22px 20px;
+    text-align:center;background:var(--field);cursor:pointer;
+    transition:border-color .15s,background .15s;
+    min-height:128px;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+  }
+  /* The secondary box must NOT borrow the primary's solid accent look on
+     hover — doing so made Choose Photos look exactly like Take Photos'
+     resting state, so the two actions became indistinguishable mid-hover.
+     It just firms up instead, staying dashed and neutral. */
+  .drop:hover,.drop:focus-visible{border-color:#BFBAAE;background:#F3F1EB}
+  .drop:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .drop strong{display:block;font-size:15.5px;font-weight:600;margin-bottom:6px}
+  .drop span{font-size:13px;color:var(--muted)}
+
+  .drop.cam{
+    border-style:solid;border-color:var(--accent);background:var(--accent-soft);
+  }
+  .drop.cam strong{color:var(--accent)}
+  /* Primary deepens rather than changing character */
+  .drop.cam:hover,.drop.cam:focus-visible{border-color:#8E1340;background:#F7DCE6}
+
+  .orline{
+    text-align:center;font-size:12px;color:var(--muted);
+    margin:16px 0 12px;text-transform:uppercase;letter-spacing:.06em;
+  }
+
+  /* ---- home screen ----
+     Fills the space under the header so the pieces can be distributed:
+     illustration + count at the top, the action pair low in the thumb zone,
+     the account row pinned to the very bottom. 100dvh tracks the real visible
+     height as Safari's toolbars come and go. */
+  /* Three zones: the header sits above (its own element), the illustration +
+     count take the flexible middle and centre within it, and the actions sit
+     at the bottom. 100dvh tracks the real visible height as Safari toolbars
+     come and go. */
+  #home{
+    display:flex;flex-direction:column;
+    min-height:calc(100dvh - 150px);
+  }
+  /* Middle zone. justify-content:center would land dead-centre, which reads as
+     low with this much whitespace, so the extra bottom padding nudges the block
+     to roughly 45%. The top/bottom padding also keeps a gap from the header and
+     buttons on short screens (iPhone SE). min-height:0 lets it shrink there. */
+  .hero{
+    flex:1 1 auto;min-height:0;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;padding:24px 0 3vh;
+  }
+  .heroart{position:relative;height:150px;margin:0 auto 18px;width:126px;flex:0 0 auto}
+  .heroart span{position:absolute;border-radius:12px;background:#fff;border:2.5px solid var(--accent)}
+  .heroart .c1{inset:12px 22px 12px 0;transform:rotate(-9deg);background:var(--accent-soft)}
+  .heroart .c2{inset:0 0 0 24px;display:flex;align-items:center;justify-content:center}
+  .heroart svg{width:44px;height:44px;fill:var(--accent)}
+
+  /* The running total. Big enough to feel like progress during a long session. */
+  .cardcount{font-size:15px;color:var(--muted);min-height:22px}
+  .cardcount b{color:var(--ink);font-weight:700;font-variant-numeric:tabular-nums}
+
+  /* Bottom zone: reserve the same height in both states and pin content to the
+     bottom, so the flexible hero above is identical and the illustration lands
+     in the same place logged out as logged in — otherwise the single sign-in
+     button leaves more room than the two buttons + account row, and the card
+     jumps on login. */
+  .homefill{flex:0 0 auto;display:flex;flex-direction:column;justify-content:flex-end;min-height:162px}
+  .signinblock{width:100%}
+
+  .gbtn{
+    display:inline-flex;align-items:center;justify-content:center;gap:10px;
+    width:100%;font:inherit;font-size:15.5px;font-weight:600;padding:14px 18px;
+    border:1px solid var(--rule);border-radius:12px;background:#fff;color:var(--ink);
+    cursor:pointer;transition:border-color .15s,box-shadow .15s;
+  }
+  .gbtn:hover,.gbtn:focus-visible{border-color:#BFBAAE;box-shadow:0 1px 4px rgba(0,0,0,.07)}
+  .gbtn[disabled]{opacity:.55;cursor:progress}
+
+  /* Pinned low and quiet, off the path to the primary button */
+  .who{font-size:12px;color:#9A9AA2;text-align:center;margin-top:20px;padding-top:4px}
+  .who .linkbtn{color:#9A9AA2;padding-left:6px}
+  .who .linkbtn:hover{color:var(--muted)}
+  .discardrow{text-align:center;margin-top:12px}
+  .discardrow .linkbtn{padding:0;font-size:13px;color:var(--muted);text-decoration:none}
+  .discardrow .linkbtn:hover{color:#BF3143;text-decoration:underline}
+
+  .backhome{margin-bottom:14px}
+  .backhome .linkbtn{padding:0;font-size:13.5px;text-decoration:none;color:var(--muted)}
+  .backhome .linkbtn:hover{color:var(--ink);text-decoration:underline}
+  .linkbtn{
+    font:inherit;font-size:13px;background:none;border:none;padding:0 0 0 8px;
+    color:var(--accent);cursor:pointer;text-decoration:underline;
+  }
+  /* The base rule is `button.go`, so the archive link matched none of it and
+     came out short and unstyled. Both actions are declared here in full, with
+     a transparent border on the primary so the secondary's outline does not
+     make it taller. */
+  .homeacts{display:flex;flex-direction:column;gap:10px}
+  .homeacts .go{
+    display:block;width:100%;text-align:center;text-decoration:none;
+    font:inherit;font-size:15.5px;font-weight:600;line-height:1.4;
+    padding:15px;border-radius:12px;cursor:pointer;
+    background:var(--accent);color:#fff;border:1.5px solid transparent;
+    transition:background .15s,border-color .15s;
+  }
+  .homeacts .go:hover,.homeacts .go:focus-visible{background:#8E1340}
+  .homeacts .go.alt{
+    background:var(--field);color:var(--accent);border-color:var(--accent);
+  }
+  .homeacts .go.alt:hover,.homeacts .go.alt:focus-visible{background:var(--accent-soft)}
+
+  .setup{margin-top:18px;margin-bottom:18px}
+  .setup > span{display:block;font-size:12.5px;font-weight:600;color:var(--muted);margin-bottom:8px}
+  .setup > span em{font-style:normal;font-weight:500;opacity:.75}
+  .seg{display:flex;gap:8px}
+  .seg button{
+    flex:1;min-width:0;font:inherit;font-size:14px;padding:11px 4px;border-radius:10px;
+    border:1px solid var(--rule);background:var(--field);color:var(--ink);
+    cursor:pointer;line-height:1.35;
+  }
+  .seg button small{display:block;font-size:10.5px;color:var(--muted);white-space:nowrap}
+  .seg button.on{background:var(--ink);border-color:var(--ink);color:#fff}
+  .seg button.on small{color:rgba(255,255,255,.6)}
+
+  .hint{
+    margin-top:18px;padding:13px 15px;background:var(--field);
+    border:1px solid var(--rule);border-radius:12px;
+    font-size:13px;color:var(--muted);line-height:1.7;
+  }
+  .hint b{color:var(--ink);font-weight:600}
+
+  .bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .count{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .count b{color:var(--ink);font-weight:700;font-size:15px}
+  .tag{
+    font-size:12px;font-weight:600;color:var(--accent);background:var(--accent-soft);
+    padding:3px 11px;border-radius:100px;text-transform:uppercase;letter-spacing:.04em;
+  }
+  .track{height:3px;background:var(--rule);border-radius:2px;overflow:hidden;margin-bottom:16px}
+  .track i{display:block;height:100%;background:var(--accent);width:0;transition:width .25s ease}
+
+  .stage{
+    position:relative;background:#26262E;border-radius:14px;
+    overflow:hidden;margin-bottom:14px;user-select:none;-webkit-user-select:none;
+  }
+  .stage canvas{display:block;width:100%;height:auto}
+  .stage svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+  .stage polygon{fill:rgba(176,24,79,.14);stroke:var(--accent);stroke-width:2}
+  .handle{position:absolute;width:44px;height:44px;margin:-22px 0 0 -22px;touch-action:none;cursor:grab}
+  .handle::after{
+    content:'';position:absolute;inset:11px;border-radius:50%;
+    background:#fff;border:3px solid var(--accent);box-shadow:0 1px 6px rgba(0,0,0,.35);
+  }
+  .handle.drag::after{background:var(--accent-soft)}
+  .handle:focus-visible{outline:none}
+  .handle:focus-visible::after{box-shadow:0 0 0 3px #fff,0 0 0 6px var(--accent)}
+  #h0::after{background:var(--accent);border-color:#fff}
+  #h0.drag::after{background:var(--accent-soft);border-color:var(--accent)}
+  .stagehint{font-size:12.5px;color:var(--muted);line-height:1.5}
+
+  .tools{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+  .tools .stagehint{flex:1}
+  .tool{
+    font:inherit;font-size:13px;padding:9px 14px;border-radius:100px;
+    border:1px solid var(--rule);background:var(--field);color:var(--ink);
+    cursor:pointer;white-space:nowrap;
+  }
+  .tool:hover{border-color:var(--accent);color:var(--accent)}
+
+  /* Rotate only re-labels which corner becomes top-left, so the quad on screen
+     does not move and the change was invisible until the file was saved. This
+     shows the actual result. */
+  .pvwrap{display:flex;flex-direction:column;align-items:center;gap:3px;flex-shrink:0}
+  .pvwrap canvas{
+    max-width:54px;max-height:54px;border-radius:4px;
+    border:1px solid var(--rule);background:#fff;display:block;
+  }
+  .pvwrap span{
+    font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;
+  }
+
+  .actions{display:flex;gap:10px}
+  button.go{
+    flex:1;font:inherit;font-size:15.5px;font-weight:600;padding:15px;
+    border:none;border-radius:12px;background:var(--accent);color:#fff;cursor:pointer;
+  }
+  button.go:disabled{background:var(--rule);color:var(--muted);cursor:not-allowed}
+  button.skip{
+    font:inherit;font-size:14px;padding:15px 16px;border:1px solid var(--rule);
+    border-radius:12px;background:var(--field);color:var(--muted);cursor:pointer;
+  }
+  button.skip:hover{border-color:var(--ink);color:var(--ink)}
+
+  .pages{display:flex;gap:10px;margin-bottom:18px}
+  .pg{flex:1;text-align:center}
+  .pg img{
+    width:100%;aspect-ratio:1/1;object-fit:contain;background:var(--field);
+    border:1px solid var(--rule);border-radius:10px;display:block;padding:4px;
+  }
+  .pg span{
+    display:block;font-size:11.5px;color:var(--muted);margin-top:5px;
+    text-transform:uppercase;letter-spacing:.04em;
+  }
+  /* The image doubles as the way back into the crop for that page. It is
+     its own button so the label select beside it stays independent. */
+  .pgredo{
+    display:block;width:100%;font:inherit;background:none;border:none;padding:0;
+    cursor:pointer;-webkit-appearance:none;appearance:none;
+  }
+  .pgredo img{transition:border-color .15s}
+  .pgredo:hover img,.pgredo:focus-visible img{border-color:var(--accent)}
+  .pgredo:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:12px}
+
+  .pglabel{
+    width:100%;margin-top:5px;font:inherit;font-size:11px;font-weight:600;
+    text-transform:uppercase;letter-spacing:.04em;
+    color:var(--accent);background:var(--accent-soft);
+    border:1px solid transparent;border-radius:6px;padding:4px 20px 4px 8px;cursor:pointer;
+    -webkit-appearance:none;appearance:none;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'><path d='M1 1l4 4 4-4' fill='none' stroke='%23B0184F' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+    background-repeat:no-repeat;background-position:right 7px center;
+  }
+  .pglabel:hover{border-color:var(--accent)}
+  .pglabel:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+
+  .thumbhint{
+    text-align:center;font-size:11.5px;color:var(--muted);
+    margin:-10px 0 14px;
+  }
+  .pg .bad{
+    width:100%;aspect-ratio:3/4;background:var(--field);
+    border:1px dashed var(--rule);border-radius:10px;
+    display:flex;align-items:center;justify-content:center;text-align:center;
+    font-size:11.5px;color:var(--muted);padding:10px;line-height:1.5;
+  }
+
+  .warn{
+    margin-bottom:16px;padding:12px 14px;border-radius:12px;
+    background:var(--accent-soft);border:1px solid rgba(176,24,79,.25);
+    font-size:12.5px;line-height:1.65;color:var(--ink);
+  }
+  .warn b{font-weight:600}
+
+  .name{
+    background:var(--ink);border-radius:12px;padding:14px 16px;
+    margin-bottom:20px;font-weight:500;letter-spacing:0;
+    font-variant-numeric:tabular-nums;overflow-wrap:anywhere;line-height:1.7;
+  }
+  .name i{display:block;font-style:normal;font-size:13.5px;color:#fff}
+  .name i+i{margin-top:3px}
+  .name em i{color:rgba(255,255,255,.72)}
+
+  label{display:block;font-size:12.5px;font-weight:600;color:var(--muted);margin-bottom:6px}
+  .field{margin-bottom:16px}
+  input[type=text],input[type=date],select{
+    width:100%;font:inherit;font-size:16px;padding:12px 14px;
+    border:1px solid var(--rule);border-radius:10px;background:var(--field);
+    color:var(--ink);-webkit-appearance:none;appearance:none;
+  }
+  select{
+    padding-right:34px;cursor:pointer;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' fill='none' stroke='%236E6E78' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+    background-repeat:no-repeat;background-position:right 12px center;
+  }
+  input:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .chip{
+    font:inherit;font-size:13px;padding:5px 12px;border-radius:100px;
+    border:1px solid var(--rule);background:var(--field);color:var(--ink);cursor:pointer;
+  }
+  .chip:hover{border-color:var(--accent);color:var(--accent)}
+
+  .done{text-align:center;padding:52px 20px}
+  .done h2{font-size:20px;font-weight:700;margin-bottom:8px}
+  .done p{font-size:14px;color:var(--muted);margin-bottom:24px}
+
+  .altlink{
+    display:inline-block;font-size:13.5px;color:var(--accent);
+    text-decoration:none;border-bottom:1px solid transparent;
+  }
+  .altlink:hover,.altlink:focus-visible{border-bottom-color:var(--accent)}
+  .footlink{margin-top:20px;text-align:center}
+  #signedOut .footlink{margin-top:16px}
+
+  .opt{
+    margin-top:18px;padding:14px 15px;background:var(--field);
+    border:1px solid var(--rule);border-radius:12px;
+  }
+  .opt .row{display:flex;align-items:flex-start;gap:12px}
+  .opt .txt{flex:1;min-width:0}
+  .opt b{display:block;font-size:13.5px;font-weight:600;margin-bottom:2px}
+  .opt small{display:block;font-size:12px;color:var(--muted);line-height:1.6}
+  .sw{
+    position:relative;flex-shrink:0;width:46px;height:28px;border-radius:100px;
+    background:var(--rule);border:none;cursor:pointer;transition:background .18s;padding:0;
+  }
+  .sw::after{
+    content:'';position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;
+    background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .18s;
+  }
+  .sw[aria-checked=true]{background:var(--accent)}
+  .sw[aria-checked=true]::after{transform:translateX(18px)}
+
+  .coderow{
+    display:flex;align-items:center;gap:10px;margin-top:12px;
+    padding-top:12px;border-top:1px solid var(--rule);
+  }
+  .coderow code{
+    flex:1;min-width:0;font-size:12.5px;color:var(--ink);
+    word-break:break-all;line-height:1.5;
+  }
+
+  .up{
+    margin-bottom:16px;padding:12px 14px;border-radius:12px;
+    background:var(--accent-soft);border:1px solid rgba(176,24,79,.25);
+    font-size:12.5px;color:var(--ink);
+  }
+  .up.err{background:#FEF2F2;border-color:#FCA5A5}
+  .upbar{height:3px;background:rgba(176,24,79,.18);border-radius:2px;overflow:hidden;margin-top:8px}
+  .upbar i{display:block;height:100%;background:var(--accent);width:0;transition:width .2s ease}
+
+  /* !important so it beats id-specificity display rules like #home{display:flex}
+     — without it, adding .hidden to #home did nothing and the home screen
+     stayed on top of the scanner. */
+  .gatemsg{text-align:center;color:var(--muted);font-size:14px;padding:60px 20px}
+  .hidden{display:none!important}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1 id="pageTitle">Card Scanner</h1>
+    <p id="pageSub">Crop, name, export.</p>
+  </header>
+
+  <!-- Landing screen. A tall flex column: the illustration and the running
+       card count sit up top, the action pair drops into the lower-third thumb
+       zone, and the account row is pinned quietly to the very bottom — out of
+       the path between the illustration and the primary button. -->
+  <!-- Shown only until auth resolves; the scanner requires an account, so an
+       unauthenticated visitor is bounced to the home page to sign in. -->
+  <section id="gate">
+    <p class="gatemsg" id="gateMsg">Loading…</p>
+  </section>
+
+  <section id="start" class="hidden">
+    <p class="backhome"><a class="linkbtn" href="./">&larr; Home</a></p>
+
+    <div class="drop cam" id="camzone" tabindex="0" role="button">
+      <strong>Take Photos</strong>
+      <span>Shoot each page in the app &middot; never saved to your camera roll</span>
+    </div>
+    <input type="file" id="camera" accept="image/*" capture="environment" class="hidden">
+
+    <p class="orline">or</p>
+
+    <div class="drop" id="dropzone" tabindex="0" role="button">
+      <strong>Choose Photos</strong>
+      <span>Use photos you already took</span>
+    </div>
+    <input type="file" id="picker" accept="image/*" multiple class="hidden">
+
+    <div class="setup">
+      <span>Photos per card <em>when choosing</em></span>
+      <div class="seg" id="seg">
+        <button type="button" data-n="1">1<small>front</small></button>
+        <button type="button" data-n="2" class="on">2<small>front + inside</small></button>
+        <button type="button" data-n="3">3<small>+ back</small></button>
+        <button type="button" data-n="4">4<small>+ extra</small></button>
+      </div>
+    </div>
+
+    <div class="hint">
+      <b>Taking photos:</b> shoot the front, then tap <b>Add a photo to this card</b> for the inside.
+      Nothing is written to your camera roll.
+      <br><b>Choosing photos:</b> they are grouped in order — front, inside, front, inside…
+      using the setting above.
+      <br><b>Tip:</b> a dark surface makes the corners easy to see.
+    </div>
+
+    <div class="opt">
+      <div class="row">
+        <div class="txt">
+          <b>Send cards to your archive</b>
+          <small id="cloudNote">Not connected — cards leave only as the files you export.</small>
+        </div>
+        <button type="button" class="sw" id="cloudToggle" role="switch" aria-checked="false"
+                aria-label="Send cards to your archive"></button>
+      </div>
+      <div id="codeRow" class="coderow hidden">
+        <span id="codeText">—</span>
+        <button type="button" class="tool" id="codeChange">Sign out</button>
+      </div>
+    </div>
+
+    <div class="opt">
+      <div class="row">
+        <div class="txt">
+          <b>Also export as files</b>
+          <small id="expNote">Opens the share sheet so you can file each card yourself.</small>
+        </div>
+        <button type="button" class="sw" id="expToggle" role="switch" aria-checked="true"
+                aria-label="Also export as files"></button>
+      </div>
+    </div>
+
+    <div class="footlink">
+      <a class="altlink" href="cards.html">Already have cards? Browse your archive &rarr;</a>
+    </div>
+  </section>
+
+  <section id="crop" class="hidden">
+    <div class="bar">
+      <span class="count">Card <b id="cardNo">1</b> / <span id="cardTot">1</span></span>
+      <span class="tag" id="pageTag">front</span>
+    </div>
+    <div class="track"><i id="fill"></i></div>
+
+    <div class="stage" id="stage">
+      <canvas id="cv"></canvas>
+      <svg><polygon id="poly" points=""/></svg>
+      <div class="handle" id="h0" tabindex="0" role="slider" aria-label="Top-left corner (arrow keys to move)"></div>
+      <div class="handle" id="h1" tabindex="0" role="slider" aria-label="Top-right corner (arrow keys to move)"></div>
+      <div class="handle" id="h2" tabindex="0" role="slider" aria-label="Bottom-right corner (arrow keys to move)"></div>
+      <div class="handle" id="h3" tabindex="0" role="slider" aria-label="Bottom-left corner (arrow keys to move)"></div>
+    </div>
+    <div class="tools">
+      <p class="stagehint">Drag the dots to the card&rsquo;s four corners.<br>
+        The <b>filled dot</b> becomes the top-left of the saved image.</p>
+      <div class="pvwrap">
+        <canvas id="pv" aria-label="Preview of the straightened card"></canvas>
+        <span>result</span>
+      </div>
+      <button type="button" class="tool" id="rot">&#8635; Rotate</button>
+    </div>
+
+    <div class="actions">
+      <button class="go" id="applyCrop">Straighten &amp; Next</button>
+      <button class="skip" id="noCrop">Keep As-Is</button>
+    </div>
+  </section>
+
+  <section id="meta" class="hidden">
+    <div class="warn hidden" id="warn">
+      <b>This browser can&rsquo;t open some of these photos</b> &mdash; usually iPhone
+      HEIC files. They&rsquo;re still saved unchanged, but can&rsquo;t be previewed or
+      straightened here. Use JPG/PNG on a computer, or run this on your iPhone where
+      HEIC works natively.
+    </div>
+    <div class="up hidden" id="upBox">
+      <span id="upText">Uploading…</span>
+      <div class="upbar"><i id="upFill"></i></div>
+    </div>
+    <div class="pages" id="thumbs"></div>
+    <p class="thumbhint hidden" id="thumbHint">Tap a photo to redo its crop &middot; use the label to mark front / inside</p>
+    <div class="footlink hidden" id="addPageWrap" style="margin-top:0;margin-bottom:16px">
+      <button type="button" class="tool" id="addPage">+ Add a photo to this card</button>
+    </div>
+    <div class="name" id="preview"></div>
+
+    <div class="field">
+      <label for="sender">From</label>
+      <input type="text" id="sender" placeholder="Grandma Kim" autocomplete="off" enterkeyhint="next">
+      <div class="chips" id="chips"></div>
+    </div>
+
+    <div class="field">
+      <label for="recipient">To</label>
+      <input type="text" id="recipient" placeholder="Hazel" autocomplete="off" enterkeyhint="done">
+      <div class="chips" id="toChips"></div>
+    </div>
+
+    <div class="row">
+      <div class="field">
+        <label for="event">Occasion</label>
+        <select id="event">
+          <option value="Birthday">Birthday</option>
+          <option value="Anniversary">Anniversary</option>
+          <optgroup label="Holidays">
+            <option value="Christmas">Christmas</option>
+            <option value="Mothers Day">Mother&rsquo;s Day</option>
+            <option value="Fathers Day">Father&rsquo;s Day</option>
+            <option value="Valentines Day">Valentine&rsquo;s Day</option>
+            <option value="Easter">Easter</option>
+            <option value="Thanksgiving">Thanksgiving</option>
+            <option value="New Year">New Year</option>
+            <option value="Lunar New Year">Lunar New Year</option>
+            <option value="Hanukkah">Hanukkah</option>
+          </optgroup>
+          <optgroup label="Milestones">
+            <option value="Graduation">Graduation</option>
+            <option value="Wedding">Wedding</option>
+            <option value="New Baby">New Baby</option>
+            <option value="Housewarming">Housewarming</option>
+            <option value="Retirement">Retirement</option>
+            <option value="First Day of School">First Day of School</option>
+          </optgroup>
+          <optgroup label="Notes">
+            <option value="Thank You">Thank You</option>
+            <option value="Congratulations">Congratulations</option>
+            <option value="Get Well">Get Well</option>
+            <option value="Good Luck">Good Luck</option>
+            <option value="Sympathy">Sympathy</option>
+            <option value="Just Because">Just Because</option>
+          </optgroup>
+          <option value="__other">Other&hellip;</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="date">Date</label>
+        <input type="date" id="date">
+      </div>
+    </div>
+
+    <div class="field hidden" id="otherWrap">
+      <label for="eventOther">Occasion name</label>
+      <input type="text" id="eventOther" placeholder="Baptism" autocomplete="off">
+    </div>
+
+    <div class="actions">
+      <button class="go" id="save">Save &amp; Next</button>
+    </div>
+    <p class="discardrow">
+      <button type="button" class="linkbtn" id="skipCard">Discard this card</button>
+    </p>
+  </section>
+
+  <section id="finish" class="hidden">
+    <div class="done">
+      <h2>All done</h2>
+      <p id="tally"></p>
+      <button class="go" id="again" style="max-width:210px;margin:0 auto">Choose More Photos</button>
+      <div class="footlink">
+        <a class="altlink" id="finLink" href="cards.html">Open your library &rarr;</a>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
+<script>
+(function(){
+  var LABELS=['front','inside','back','p4','p5'];
+
+  /* Labels are explicit per page, defaulting to shooting order but editable
+     on the naming screen. The next shot takes the first UNUSED label, so
+     relabelling page one as "inside" makes the next default "front" rather
+     than a duplicate. */
+  var pageLabels=[];
+  function nextLabel(){
+    for(var i=0;i<LABELS.length;i++){
+      if(pageLabels.indexOf(LABELS[i])===-1)return LABELS[i];
+    }
+    return 'p'+(pages.length+1);
+  }
+
+  var files=[],perCard=2,cursor=0,cardNo=0;
+  var pages=[],pageIdx=0,pageCount=0;
+  /* The warped output alone is not enough to fix a bad crop later, so the
+     source photo and the corners used are kept per page. redoIndex is the page
+     being re-cropped, or -1 when adding a new one. */
+  var sources=[],cornerSets=[],curSource=null,redoIndex=-1;
+  var img=null,corners=[],scale=1,thumbURLs=[];
+  var savedCards=0,savedFiles=0,seen=[],seenTo=[];
+  var savedToCloud=0,cloudFailed=false;
+
+  var $=function(id){return document.getElementById(id)};
+  var picker=$('picker');
+  $('date').value=new Date().toISOString().slice(0,10);
+
+  /* ==================== ARCHIVE (Firebase) ====================
+     Images go to Cloud Storage at cards/family/{cardId}/{label}.jpg — one
+     shared space; the rules' email allowlist decides who reads and writes. This replaced a sync-code scheme where the
+     code was a shared secret you had to carry between devices: losing it lost
+     the archive, and anyone holding it could read the cards. Signing in means
+     nothing to type or remember, and it survives the browser clearing storage.
+
+     Storage rules deny `list`, so the archive can never walk the bucket to
+     find files — the per-card metadata written to Firestore records which
+     paths exist. */
+  /* authDomain is auth.tinywins.space, not the default firebaseapp.com one.
+     Sign-in hops through that domain, and Safari partitions storage per site:
+     with the handler on firebaseapp.com it could not read the sessionStorage
+     it had just written, and every iPhone sign-in died with "missing initial
+     state". auth.tinywins.space shares a registrable domain with this page,
+     so the browser treats them as one site and the hop works. */
+  var FB={
+    apiKey:"AIzaSyBycFP3HfMF7tyshQixvwzoaAE3Df8Fz_8",
+    authDomain:"auth.tinywins.space",
+    projectId:"tiny-wins25",
+    storageBucket:"tiny-wins25.firebasestorage.app",
+    messagingSenderId:"497477643272",
+    appId:"1:497477643272:web:9f8e43fbffd18003e5f5bd"
+  };
+  var CLOUD_KEY='tinyCards_useCloud';
+  /* All cards live in one shared space rather than under each account's uid.
+     Access is decided by the email allowlist in the security rules — keying
+     data by uid made viewer accounts point at their own empty documents. */
+  var SPACE='family';
+  var fbReady=false,fbDb=null,fbStore=null,authUser=null;
+
+  function fbInit(){
+    if(fbReady)return true;
+    if(typeof firebase==='undefined')return false;
+    try{
+      if(!firebase.apps.length)firebase.initializeApp(FB);
+      fbDb=firebase.firestore();fbStore=firebase.storage();
+      fbReady=true;
+      return true;
+    }catch(e){if(window.console)console.warn('Firebase init failed',e);return false}
+  }
+
+  // Resolves with the already-signed-in user, or null. Never prompts.
+  function currentUser(){
+    if(!fbInit())return Promise.resolve(null);
+    if(authUser)return Promise.resolve(authUser);
+    return new Promise(function(res){
+      var done=false;
+      var off=firebase.auth().onAuthStateChanged(function(u){
+        if(done)return;
+        done=true;off();
+        authUser=u||null;res(authUser);
+      });
+    });
+  }
+
+  // Popup first; Safari — especially as a Home Screen app — blocks popups and
+  // has historically broken them outright, so fall back to a full redirect.
+  function signIn(){
+    if(!fbInit())return Promise.reject(new Error('firebase unavailable'));
+    var provider=new firebase.auth.GoogleAuthProvider();
+    provider.setCustomParameters({prompt:'select_account'});
+    return firebase.auth().signInWithPopup(provider).then(function(r){
+      authUser=r.user;return authUser;
+    }).catch(function(e){
+      var code=e&&e.code||'';
+      if(/popup-blocked|popup-closed-by-user|operation-not-supported|cancelled-popup-request/.test(code)){
+        // Remember the intent so the toggle is on when we come back
+        try{localStorage.setItem(CLOUD_KEY,'1')}catch(e2){}
+        return firebase.auth().signInWithRedirect(provider);
+      }
+      throw e;
+    });
+  }
+
+  function signOutUser(){
+    if(!fbInit())return Promise.resolve();
+    return firebase.auth().signOut().then(function(){authUser=null});
+  }
+
+  var useCloud;
+  try{useCloud=localStorage.getItem(CLOUD_KEY)==='1'}catch(e){useCloud=false}
+
+  /* Exporting files is what the share sheet is for. Once cards upload to the
+     archive it is just an extra tap per card, and on a phone it puts back the
+     very files you were trying not to keep — so it defaults off when the
+     archive is on. An explicit choice always wins over that default. */
+  var EXPORT_KEY='tinyCards_exportFiles',exportExplicit=false,exportFiles;
+  try{
+    var ev=localStorage.getItem(EXPORT_KEY);
+    exportExplicit=ev!==null;
+    exportFiles=exportExplicit?ev==='1':!useCloud;
+  }catch(e){exportFiles=!useCloud}
+
+  function paintExport(){
+    // Can be reached before the export state is set up, so bail rather than
+    // acting on undefined.
+    if(typeof exportFiles==='undefined')return;
+    // Never leave every destination off — that would make Save do nothing.
+    if(!useCloud&&!exportFiles)exportFiles=true;
+    var t=$('expToggle');
+    if(t)t.setAttribute('aria-checked',exportFiles?'true':'false');
+    var n=$('expNote');
+    if(n)n.textContent=exportFiles
+      ? (useCloud?'Also opens the share sheet after each upload.'
+                 :'Opens the share sheet so you can file each card yourself.')
+      : 'Off — cards go straight to your archive, no share sheet.';
+  }
+
+  if($('expToggle')){
+    $('expToggle').onclick=function(){
+      if(exportFiles&&!useCloud){
+        alert('Turn on “Send cards to your archive” first, otherwise saving a card would do nothing.');
+        return;
+      }
+      exportFiles=!exportFiles;exportExplicit=true;
+      try{localStorage.setItem(EXPORT_KEY,exportFiles?'1':'0')}catch(e){}
+      paintExport();
+    };
+  }
+
+  // Uploading requires a signed-in account, so the toggle can only be on when
+  // someone is actually signed in — otherwise a card would have nowhere to go.
+  function paintCloud(){
+    var on=useCloud&&!!authUser;
+    var t=$('cloudToggle');
+    if(t)t.setAttribute('aria-checked',on?'true':'false');
+    var row=$('codeRow');
+    if(row)row.classList.toggle('hidden',!on);
+    if($('codeText'))$('codeText').textContent=authUser
+      ? ('Signed in as '+(authUser.email||authUser.displayName||'your account'))
+      : '—';
+    var n=$('cloudNote');
+    if(n)n.textContent=on
+      ? 'Cards upload to your archive. Sign in on any device to see them.'
+      : 'Not connected — cards leave only as the files you export.';
+    useCloud=on;
+    if(!exportExplicit)exportFiles=!on;   // follow the sensible default
+    paintExport();
+  }
+
+  function connectCloud(){
+    var t=$('cloudToggle');
+    if(t)t.setAttribute('aria-busy','true');
+    signIn().then(function(u){
+      if(!u)return;                       // redirect flow: we come back later
+      useCloud=true;
+      try{localStorage.setItem(CLOUD_KEY,'1')}catch(e){}
+      paintCloud();
+    }).catch(function(e){
+      useCloud=false;
+      try{localStorage.setItem(CLOUD_KEY,'0')}catch(e2){}
+      paintCloud();
+      var code=e&&e.code||'';
+      if(/unauthorized-domain/.test(code)){
+        alert('This site is not authorised for sign-in yet. Add cards.tinywins.space to the Firebase console under Authentication → Settings → Authorized domains.');
+      }else if(!/popup-closed-by-user|cancelled-popup-request/.test(code)){
+        alert('Could not sign in. Check your connection and try again.');
+      }
+      if(window.console)console.warn(e);
+    }).then(function(){
+      if(t)t.removeAttribute('aria-busy');
+    });
+  }
+
+  if($('cloudToggle')){
+    $('cloudToggle').onclick=function(){
+      if(useCloud&&authUser){
+        useCloud=false;
+        try{localStorage.setItem(CLOUD_KEY,'0')}catch(e){}
+        paintCloud();
+      }else connectCloud();
+    };
+  }
+  if($('codeChange')){
+    $('codeChange').onclick=function(){
+      if(!authUser)return;
+      if(!confirm('Sign out? Cards already in your archive stay there.'))return;
+      signOutUser().then(function(){
+        useCloud=false;
+        try{localStorage.setItem(CLOUD_KEY,'0')}catch(e){}
+        paintCloud();
+      });
+    };
+  }
+
+  /* ---- auth gate ----
+     This is a page of its own now; the home screen and sign-in live on '/'.
+     The scanner needs an account, since every card uploads to the shared
+     archive, so an unauthenticated visitor is sent home to sign in rather
+     than shown a scanner that could not save. */
+  function enterScanner(){
+    authUser=authUser||null;
+    useCloud=true;                       // signed in → upload on by default
+    try{localStorage.setItem(CLOUD_KEY,'1')}catch(e){}
+    $('gate').classList.add('hidden');
+    $('start').classList.remove('hidden');
+    paintCloud();
+    window.scrollTo(0,0);
+  }
+  function goHomeToSignIn(){
+    $('gateMsg').textContent='Please sign in to scan. Taking you home…';
+    location.replace('./');
+  }
+
+  currentUser().then(function(u){
+    if(u){authUser=u;enterScanner();return}
+    // Not obviously signed in — a redirect coming back from Google resolves here
+    if(fbReady){
+      firebase.auth().getRedirectResult().then(function(r){
+        if(r&&r.user){authUser=r.user;enterScanner()}
+        else goHomeToSignIn();
+      }).catch(goHomeToSignIn);
+    }else{
+      goHomeToSignIn();
+    }
+  });
+
+  function upProgress(txt,pct,isErr){
+    var b=$('upBox');
+    if(!b)return;
+    b.classList.remove('hidden');
+    b.classList.toggle('err',!!isErr);
+    $('upText').textContent=txt;
+    $('upFill').style.width=(pct||0)+'%';
+  }
+  function upHide(){var b=$('upBox');if(b)b.classList.add('hidden')}
+
+  // Upload every page, then record the card in Firestore. Resolves false on
+  // any failure so the caller can tell the user without losing the export.
+  function cloudSave(card,blobs){
+    if(!useCloud)return Promise.resolve(null);
+
+    return currentUser().then(function(user){
+      if(!user)return null;              // signed out: nothing to upload to
+      var code=SPACE;
+      var paths=[],bytes=[],done=0;
+      upProgress('Uploading 1 of '+blobs.length+'…',4);
+      return blobs.reduce(function(chain,bl,i){
+        return chain.then(function(){
+          var ext=(bl.type==='image/png')?'png':'jpg';
+          var path='cards/'+code+'/'+card.id+'/'+(card.labels[i]||('p'+(i+1)))+'.'+ext;
+          var ref=fbStore.ref().child(path);
+          return new Promise(function(res,rej){
+            var task=ref.put(bl,{contentType:bl.type||'image/jpeg'});
+            task.on('state_changed',function(s){
+              var frac=(done+(s.bytesTransferred/(s.totalBytes||1)))/blobs.length;
+              upProgress('Uploading '+(i+1)+' of '+blobs.length+'…',Math.round(frac*92)+4);
+            },rej,function(){paths.push(path);bytes.push(bl.size);done++;res()});
+          });
+        });
+      },Promise.resolve()).then(function(){
+        upProgress('Saving details…',97);
+        var rec={
+          id:card.id,date:card.date,occasion:card.occasion,
+          sender:card.sender,recipient:card.recipient,
+          labels:card.labels,paths:paths,savedAt:card.savedAt,
+          // Byte sizes are recorded here because nothing else knows them
+          // without listing Storage, which the rules forbid. The export needs
+          // a total before it starts, and growth is impossible to see later
+          // if it is not captured at write time.
+          bytes:bytes,
+          totalBytes:bytes.reduce(function(a,b){return a+b},0)
+        };
+        return fbDb.collection('tinyCards').doc(code).set({
+          cards:firebase.firestore.FieldValue.arrayUnion(rec),
+          updatedAt:firebase.firestore.FieldValue.serverTimestamp()
+        },{merge:true});
+      }).then(function(){upProgress('Saved to your archive',100);setTimeout(upHide,900);return true});
+    }).catch(function(e){
+      upProgress('Could not reach the archive — your exported files are fine.',100,true);
+      if(window.console)console.warn('cloudSave failed',e);
+      return false;
+    });
+  }
+
+  /* ---- capture mode ----
+     'batch'   : pick many photos at once, grouped by the per-card setting
+     'capture' : shoot one page at a time. iOS hands each photo straight to
+                 the page, so nothing lands in the camera roll — which is the
+                 whole point of shooting from inside the app. */
+  var mode='batch';
+  var camera=$('camera');
+
+  function openCamera(){
+    camera.value='';        // otherwise re-taking an identical file fires nothing
+    camera.click();
+  }
+
+  $('camzone').onclick=function(){mode='capture';startCapture()};
+  $('camzone').onkeydown=function(e){
+    if(e.key==='Enter'||e.key===' '){e.preventDefault();mode='capture';startCapture()}
+  };
+
+  // Backing out of the camera fires no event at all, so nothing here may change
+  // what is on screen until a photo actually arrives — otherwise cancelling
+  // leaves the user staring at an empty page with no way back.
+  var pendingNewCard=false;
+
+  function startCapture(){
+    pages=[];pageLabels=[];sources=[];cornerSets=[];redoIndex=-1;pageIdx=0;pendingNewCard=true;
+    $('warn').classList.add('hidden');
+    openCamera();
+  }
+
+  camera.onchange=function(){
+    var f=camera.files&&camera.files[0];
+    if(!f)return;                      // cancelled: leave the screen as it was
+    if(pendingNewCard){cardNo++;pendingNewCard=false}
+    $('start').classList.add('hidden');
+    $('finish').classList.add('hidden');
+    $('meta').classList.add('hidden');
+    $('crop').classList.remove('hidden');
+    $('cardNo').textContent=cardNo;
+    $('cardTot').textContent=cardNo;
+    $('pageTag').textContent=nextLabel();
+    $('fill').style.width='0%';
+
+    curSource=f;
+    var u=URL.createObjectURL(f);
+    img=new Image();
+    img.onload=function(){URL.revokeObjectURL(u);drawStage();initCorners();paintOverlay();paintPreview()};
+    img.onerror=function(){URL.revokeObjectURL(u);noteBad();acceptPage(f)};
+    img.src=u;
+  };
+
+  $('addPage').onclick=function(){openCamera()};
+
+  $('dropzone').onclick=function(){mode='batch';picker.value='';picker.click()};
+  $('dropzone').onkeydown=function(e){
+    if(e.key==='Enter'||e.key===' '){e.preventDefault();mode='batch';picker.value='';picker.click()}
+  };
+  $('again').onclick=function(){
+    if(mode==='capture')return startCapture();
+    picker.value='';picker.click();
+  };
+
+  picker.onchange=function(){
+    if(!picker.files.length)return;
+    files=Array.prototype.slice.call(picker.files).filter(function(f){
+      return /^image\//.test(f.type)||/\.(heic|heif)$/i.test(f.name);
+    });
+    if(!files.length)return;
+    cursor=0;cardNo=0;savedCards=0;savedFiles=0;
+    $('cardTot').textContent=Math.ceil(files.length/perCard);
+    $('start').classList.add('hidden');
+    $('finish').classList.add('hidden');
+    startCard();
+  };
+
+  function noteBad(){$('warn').classList.remove('hidden')}
+
+  function startCard(){
+    if(cursor>=files.length)return finish();
+    cardNo++;
+    $('warn').classList.add('hidden');
+    pages=[];pageLabels=[];sources=[];cornerSets=[];redoIndex=-1;pageIdx=0;
+    pageCount=Math.min(perCard,files.length-cursor);
+    $('cardNo').textContent=cardNo;
+    loadPage();
+  }
+
+  function loadPage(){
+    if(pageIdx>=pageCount)return toMeta();
+    $('meta').classList.add('hidden');
+    $('crop').classList.remove('hidden');
+    $('pageTag').textContent=nextLabel();
+    $('fill').style.width=(cursor/files.length*100)+'%';
+
+    curSource=files[cursor];
+    var u=URL.createObjectURL(files[cursor]);
+    img=new Image();
+    img.onload=function(){URL.revokeObjectURL(u);drawStage();initCorners();paintOverlay();paintPreview()};
+    img.onerror=function(){URL.revokeObjectURL(u);noteBad();acceptPage(files[cursor])};
+    img.src=u;
+  }
+
+  function drawStage(){
+    var cv=$('cv');
+    var maxW=$('stage').clientWidth||360;
+    scale=Math.min(1,maxW/img.naturalWidth);
+    cv.width=Math.round(img.naturalWidth*scale);
+    cv.height=Math.round(img.naturalHeight*scale);
+    cv.getContext('2d').drawImage(img,0,0,cv.width,cv.height);
+    var svg=$('stage').querySelector('svg');
+    svg.setAttribute('viewBox','0 0 '+img.naturalWidth+' '+img.naturalHeight);
+    svg.setAttribute('preserveAspectRatio','none');
+  }
+
+  function initCorners(){
+    var W=img.naturalWidth,H=img.naturalHeight,ix=W*0.12,iy=H*0.12;
+    corners=[{x:ix,y:iy},{x:W-ix,y:iy},{x:W-ix,y:H-iy},{x:ix,y:H-iy}];
+  }
+
+  function paintOverlay(){
+    $('poly').setAttribute('points',corners.map(function(p){return p.x+','+p.y}).join(' '));
+    corners.forEach(function(p,i){
+      var h=$('h'+i);
+      h.style.left=(p.x/img.naturalWidth*100)+'%';
+      h.style.top=(p.y/img.naturalHeight*100)+'%';
+    });
+  }
+
+  [0,1,2,3].forEach(function(i){
+    var h=$('h'+i);
+    h.addEventListener('pointerdown',function(e){
+      e.preventDefault();h.setPointerCapture(e.pointerId);h.classList.add('drag');
+      var move=function(ev){
+        var r=$('stage').getBoundingClientRect();
+        var x=(ev.clientX-r.left)/r.width*img.naturalWidth;
+        var y=(ev.clientY-r.top)/r.height*img.naturalHeight;
+        corners[i].x=Math.max(0,Math.min(img.naturalWidth,x));
+        corners[i].y=Math.max(0,Math.min(img.naturalHeight,y));
+        paintOverlay();
+      };
+      var up=function(){
+        h.classList.remove('drag');
+        paintPreview();
+        h.removeEventListener('pointermove',move);
+        h.removeEventListener('pointerup',up);
+        h.removeEventListener('pointercancel',up);
+      };
+      h.addEventListener('pointermove',move);
+      h.addEventListener('pointerup',up);
+      h.addEventListener('pointercancel',up);
+    });
+
+    // Dragging was pointer-only, leaving no way to place a corner without a
+    // mouse or touch. Arrow keys nudge; Shift moves in bigger steps.
+    h.addEventListener('keydown',function(e){
+      var step=e.shiftKey?20:4,dx=0,dy=0;
+      if(e.key==='ArrowLeft')dx=-step;
+      else if(e.key==='ArrowRight')dx=step;
+      else if(e.key==='ArrowUp')dy=-step;
+      else if(e.key==='ArrowDown')dy=step;
+      else return;
+      e.preventDefault();
+      if(!img)return;
+      corners[i].x=Math.max(0,Math.min(img.naturalWidth,corners[i].x+dx));
+      corners[i].y=Math.max(0,Math.min(img.naturalHeight,corners[i].y+dy));
+      paintOverlay();paintPreview();
+    });
+  });
+
+  /* ---- perspective warp: do not modify ---- */
+  function solveH(src,W,H){
+    var d=[[0,0],[W,0],[W,H],[0,H]],A=[],b=[];
+    for(var i=0;i<4;i++){
+      var X=d[i][0],Y=d[i][1],x=src[i].x,y=src[i].y;
+      A.push([X,Y,1,0,0,0,-x*X,-x*Y]);b.push(x);
+      A.push([0,0,0,X,Y,1,-y*X,-y*Y]);b.push(y);
+    }
+    for(var c=0;c<8;c++){
+      var piv=c;
+      for(var r=c+1;r<8;r++)if(Math.abs(A[r][c])>Math.abs(A[piv][c]))piv=r;
+      var t=A[c];A[c]=A[piv];A[piv]=t;
+      var tb=b[c];b[c]=b[piv];b[piv]=tb;
+      if(Math.abs(A[c][c])<1e-10)return null;
+      for(var r2=c+1;r2<8;r2++){
+        var f=A[r2][c]/A[c][c];
+        for(var k=c;k<8;k++)A[r2][k]-=f*A[c][k];
+        b[r2]-=f*b[c];
+      }
+    }
+    var h=new Array(8);
+    for(var r3=7;r3>=0;r3--){
+      var s=b[r3];
+      for(var k2=r3+1;k2<8;k2++)s-=A[r3][k2]*h[k2];
+      h[r3]=s/A[r3][r3];
+    }
+    return h;
+  }
+  function dist(a,b){var dx=a.x-b.x,dy=a.y-b.y;return Math.sqrt(dx*dx+dy*dy)}
+  function warp(){
+    var W=Math.round((dist(corners[0],corners[1])+dist(corners[3],corners[2]))/2);
+    var H=Math.round((dist(corners[0],corners[3])+dist(corners[1],corners[2]))/2);
+    var cap=1600,m=Math.max(W,H);
+    if(m>cap){W=Math.round(W*cap/m);H=Math.round(H*cap/m)}
+    if(W<20||H<20)return null;
+    var h=solveH(corners,W,H);
+    if(!h)return null;
+    var sW=img.naturalWidth,sH=img.naturalHeight,sCap=2400,sm=Math.max(sW,sH),sf=1;
+    if(sm>sCap){sf=sCap/sm;sW=Math.round(sW*sf);sH=Math.round(sH*sf)}
+    var sc=document.createElement('canvas');sc.width=sW;sc.height=sH;
+    var sctx=sc.getContext('2d');sctx.drawImage(img,0,0,sW,sH);
+    var sd=sctx.getImageData(0,0,sW,sH).data;
+    var dc=document.createElement('canvas');dc.width=W;dc.height=H;
+    var dctx=dc.getContext('2d'),out=dctx.createImageData(W,H),od=out.data;
+    for(var Y=0;Y<H;Y++){
+      for(var X=0;X<W;X++){
+        var den=h[6]*X+h[7]*Y+1;
+        var sx=(h[0]*X+h[1]*Y+h[2])/den*sf, sy=(h[3]*X+h[4]*Y+h[5])/den*sf;
+        var o=(Y*W+X)*4;
+        if(sx<0||sy<0||sx>=sW-1||sy>=sH-1){od[o]=od[o+1]=od[o+2]=250;od[o+3]=255;continue}
+        var x0=sx|0,y0=sy|0,fx=sx-x0,fy=sy-y0;
+        var i00=(y0*sW+x0)*4,i10=i00+4,i01=i00+sW*4,i11=i01+4;
+        for(var ch=0;ch<3;ch++){
+          od[o+ch]=sd[i00+ch]*(1-fx)*(1-fy)+sd[i10+ch]*fx*(1-fy)+
+                   sd[i01+ch]*(1-fx)*fy+sd[i11+ch]*fx*fy;
+        }
+        od[o+3]=255;
+      }
+    }
+    dctx.putImageData(out,0,0);
+    return dc;
+  }
+  /* ---- end warp ---- */
+
+  $('applyCrop').onclick=function(){
+    var btn=$('applyCrop');btn.disabled=true;btn.textContent='Straightening\u2026';
+    setTimeout(function(){
+      var dc=warp();
+      btn.disabled=false;btn.textContent='Straighten & Next';
+      if(!dc){alert('Selected area is too small. Adjust the dots and try again.');return}
+      dc.toBlob(function(bl){acceptPage(bl)},'image/jpeg',0.92);
+    },30);
+  };
+
+  /* Rotate 90° CW by re-labelling which corner maps to the output's top-left.
+     The quad on screen is unchanged — only the destination mapping shifts, so
+     warp() recomputes W/H swapped and the saved image comes out rotated. */
+  $('rot').onclick=function(){
+    if(corners.length!==4)return;
+    corners.unshift(corners.pop());
+    paintOverlay();
+    paintPreview();
+  };
+
+  /* Small live preview of what warp() will produce. It samples the already
+     drawn display canvas rather than the full-size image, so it costs almost
+     nothing; nearest-neighbour is fine at this size. */
+  function paintPreview(){
+    var pv=$('pv'),src=$('cv');
+    if(!pv||!src)return;
+    var clear=function(){pv.width=1;pv.height=1};
+    if(!img||!src.width||corners.length!==4)return clear();
+
+    var c=corners.map(function(p){return {x:p.x*scale,y:p.y*scale}});
+    var W=(dist(c[0],c[1])+dist(c[3],c[2]))/2;
+    var H=(dist(c[0],c[3])+dist(c[1],c[2]))/2;
+    if(W<4||H<4)return clear();
+
+    var k=54/Math.max(W,H);
+    var oW=Math.max(2,Math.round(W*k)),oH=Math.max(2,Math.round(H*k));
+    var h=solveH(c,oW,oH);
+    if(!h)return clear();
+
+    var sd;
+    try{sd=src.getContext('2d').getImageData(0,0,src.width,src.height).data}
+    catch(e){return clear()}   // tainted canvas: skip rather than break
+
+    var sW=src.width,sH=src.height;
+    pv.width=oW;pv.height=oH;
+    var dctx=pv.getContext('2d'),out=dctx.createImageData(oW,oH),od=out.data;
+    for(var Y=0;Y<oH;Y++){
+      for(var X=0;X<oW;X++){
+        var den=h[6]*X+h[7]*Y+1;
+        var sx=(h[0]*X+h[1]*Y+h[2])/den, sy=(h[3]*X+h[4]*Y+h[5])/den;
+        var o=(Y*oW+X)*4;
+        if(sx<0||sy<0||sx>=sW||sy>=sH){od[o]=od[o+1]=od[o+2]=250;od[o+3]=255;continue}
+        var i0=(((sy|0)*sW)+(sx|0))*4;
+        od[o]=sd[i0];od[o+1]=sd[i0+1];od[o+2]=sd[i0+2];od[o+3]=255;
+      }
+    }
+    dctx.putImageData(out,0,0);
+  }
+
+  $('noCrop').onclick=function(){acceptPage(curSource||files[cursor])};
+
+  function acceptPage(blob){
+    if(redoIndex>-1){                       // re-cropping an existing page
+      pages[redoIndex]=blob;
+      cornerSets[redoIndex]=corners.slice();
+      redoIndex=-1;
+      $('applyCrop').textContent='Straighten & Next';
+      return toMeta();
+    }
+    pages.push(blob);
+    pageLabels.push(nextLabel());
+    sources.push(curSource);
+    cornerSets.push(corners.slice());
+    pageIdx++;
+    // In capture mode there is no queue to walk — go straight to naming,
+    // where "Add a photo to this card" reopens the camera for it.
+    if(mode==='capture')return toMeta();
+    cursor++;
+    loadPage();
+  }
+
+  /* Re-crop a page already taken. Restores the source and the corners last
+     used, so a corner that was slightly off can be nudged rather than placed
+     from scratch. */
+  function redoPage(i){
+    var src=sources[i];
+    if(!src)return;
+    redoIndex=i;
+    curSource=src;
+    $('meta').classList.add('hidden');
+    $('crop').classList.remove('hidden');
+    $('pageTag').textContent=(pageLabels[i]||('p'+(i+1)))+' · redo';
+    $('applyCrop').textContent='Straighten & Replace';
+
+    var u=URL.createObjectURL(src);
+    img=new Image();
+    img.onload=function(){
+      URL.revokeObjectURL(u);
+      drawStage();
+      var saved=cornerSets[i];
+      corners=(saved&&saved.length===4)
+        ? saved.map(function(p){return {x:p.x,y:p.y}})
+        : (initCorners(),corners);
+      paintOverlay();paintPreview();
+    };
+    img.onerror=function(){URL.revokeObjectURL(u);redoIndex=-1;toMeta()};
+    img.src=u;
+  }
+
+  function toMeta(){
+    $('crop').classList.add('hidden');
+    $('meta').classList.remove('hidden');
+    thumbURLs.forEach(URL.revokeObjectURL);thumbURLs=[];
+    var t=$('thumbs');t.innerHTML='';
+    pages.forEach(function(bl,i){
+      var u=URL.createObjectURL(bl);thumbURLs.push(u);
+      var lbl=pageLabels[i]||('p'+(i+1));
+      var canRedo=!!sources[i];
+      var d=document.createElement('div');d.className='pg';
+
+      // The image is the way back into the crop. It must be its own button:
+      // nesting the label <select> inside a button would send every label
+      // tap through to redoPage as well.
+      var holder=d;
+      if(canRedo){
+        holder=document.createElement('button');
+        holder.type='button';holder.className='pgredo';
+        holder.title='Redo this crop';
+        holder.setAttribute('aria-label','Redo the crop for '+lbl);
+        holder.onclick=function(){redoPage(i)};
+        d.appendChild(holder);
+      }
+      var im=document.createElement('img');im.src=u;im.alt=lbl;
+      im.onerror=function(){
+        var ph=document.createElement('div');
+        ph.className='bad';ph.textContent='No preview';
+        if(im.parentNode)holder.replaceChild(ph,im);
+        noteBad();
+      };
+      holder.appendChild(im);
+
+      if(pages.length>1){
+        // Label is a choice, not just a consequence of shooting order
+        var sel=document.createElement('select');
+        sel.className='pglabel';
+        sel.setAttribute('aria-label','Label for this photo');
+        var opts=LABELS.slice();
+        if(opts.indexOf(lbl)===-1)opts.push(lbl);
+        opts.forEach(function(o){
+          var op=document.createElement('option');
+          op.value=o;op.textContent=o;
+          if(o===lbl)op.selected=true;
+          sel.appendChild(op);
+        });
+        sel.onchange=function(){setLabel(i,sel.value)};
+        d.appendChild(sel);
+      }else{
+        var sp=document.createElement('span');
+        sp.textContent=lbl;
+        d.appendChild(sp);
+      }
+      t.appendChild(d);
+    });
+    var th=$('thumbHint');
+    if(th)th.classList.toggle('hidden',!sources.some(function(x){return !!x}));
+    upHide();
+    $('addPageWrap').classList.toggle('hidden',mode!=='capture');
+    // Keep the sender when adding pages to the card already being named
+    if(!pages.length||pages.length===1)$('sender').value='';
+    paintName();chips();
+    if(mode!=='capture')$('sender').focus();
+  }
+
+  /* Duplicate labels would collide in the Storage path (front.jpg twice on
+     one card overwrites), so choosing a taken label swaps with the page that
+     had it — which is also the natural fix when two photos came out in the
+     wrong order. */
+  function setLabel(i,v){
+    var j=pageLabels.indexOf(v);
+    if(j!==-1&&j!==i)pageLabels[j]=pageLabels[i];
+    pageLabels[i]=v;
+    toMeta();
+  }
+
+  function clean(s){return (s||'').replace(/[\/\\:*?"<>|]/g,'').replace(/\s+/g,' ').trim()}
+
+  function occasion(){
+    var v=$('event').value;
+    return clean(v==='__other'?$('eventOther').value:v);
+  }
+
+  function base(){
+    var d=$('date').value||'Date';
+    var e=occasion()||'Occasion';
+    var r=clean($('recipient').value);
+    var s=clean($('sender').value)||'Sender';
+    return d+' '+e+(r?' - '+r:'')+' from '+s;
+  }
+
+  function nameFor(i){
+    var ext=(pages[i]&&pages[i].type==='image/png')?'png':'jpg';
+    if(pages.length===1)return base()+'.'+ext;
+    return base()+' - '+(pageLabels[i]||('p'+(i+1)))+'.'+ext;
+  }
+
+  function esc(t){var d=document.createElement('div');d.textContent=t;return d.innerHTML}
+
+  function paintName(){
+    var s=clean($('sender').value);
+    var html=pages.map(function(_,i){return '<i>'+esc(nameFor(i))+'</i>'}).join('');
+    $('preview').innerHTML=s?html:'<em>'+html+'</em>';
+    $('save').disabled=!s;
+  }
+
+  function chipRow(box,list,input){
+    box.innerHTML='';
+    list.slice(-6).reverse().forEach(function(n){
+      var b=document.createElement('button');
+      b.className='chip';b.type='button';b.textContent=n;
+      b.onclick=function(){input.value=n;paintName()};
+      box.appendChild(b);
+    });
+  }
+
+  function chips(){
+    chipRow($('chips'),seen,$('sender'));
+    chipRow($('toChips'),seenTo,$('recipient'));
+  }
+
+  ['sender','recipient','event','eventOther','date'].forEach(function(id){
+    $(id).addEventListener('input',paintName);
+  });
+
+  $('event').addEventListener('change',function(){
+    var other=$('event').value==='__other';
+    $('otherWrap').classList.toggle('hidden',!other);
+    if(other)$('eventOther').focus();
+    paintName();
+  });
+
+  $('sender').addEventListener('keydown',function(e){
+    if(e.key==='Enter'){e.preventDefault();$('recipient').focus()}
+  });
+  $('recipient').addEventListener('keydown',function(e){
+    if(e.key==='Enter'&&!$('save').disabled){e.preventDefault();doSave()}
+  });
+
+  $('skipCard').onclick=function(){
+    if(!confirm('Discard this card without saving it?'))return;
+    pages=[];pageLabels=[];sources=[];cornerSets=[];redoIndex=-1;pageIdx=0;
+    if(mode==='capture')return finish();   // tally; continue from there
+    startCard();
+  };
+  $('save').onclick=doSave;
+
+  function doSave(){
+    var s=clean($('sender').value);
+    if(!s)return;
+    var out=pages.map(function(bl,i){
+      return new File([bl],nameFor(i),{type:bl.type||'image/jpeg'});
+    });
+    if(seen.indexOf(s)===-1)seen.push(s);
+    var r=clean($('recipient').value);
+    if(r&&seenTo.indexOf(r)===-1)seenTo.push(r);
+
+    var card={
+      id:String(Date.now())+'-'+Math.round(Math.random()*1e6),
+      date:$('date').value||'',
+      occasion:occasion(),
+      recipient:r,
+      sender:s,
+      labels:pageLabels.slice(),
+      savedAt:Date.now()
+    };
+
+    // Upload to the archive. Also fire-and-forget — the export is the copy
+    // that must never depend on the network.
+    cloudSave(card,pages.slice()).then(function(ok){
+      if(ok===true)savedToCloud++;
+      else if(ok===false)cloudFailed=true;
+    });
+
+    if(!exportFiles)return finishCard(0);   // archive only — no share sheet
+
+    if(navigator.canShare&&navigator.canShare({files:out})){
+      navigator.share({files:out}).then(function(){finishCard(out.length)},function(err){
+        // Dismissing the share sheet used to strand the user on this screen
+        // even though the card was already saved, and tapping Save again
+        // uploaded a duplicate. Cancelling now just skips the export.
+        if(err&&err.name==='AbortError')return finishCard(0);
+        out.forEach(download);finishCard(out.length);
+      });
+    }else{
+      out.forEach(function(f,i){setTimeout(function(){download(f)},i*350)});
+      finishCard(out.length);
+    }
+  }
+
+  function finishCard(n){
+    savedCards++;savedFiles+=n;
+    // The card is saved, so its pages are no longer unsaved work. Without this
+    // the beforeunload guard kept firing after a finished batch, warning about
+    // losing something that had already gone where it was meant to.
+    pages=[];pageLabels=[];sources=[];cornerSets=[];redoIndex=-1;pageIdx=0;
+
+    if(mode==='capture'){
+      // Land on the tally; "Take Another Card" continues with one tap.
+      // Auto-reopening the camera here was tried and reverted: it fired
+      // outside a click gesture (which browsers may block), surprised the
+      // user, and on desktop popped an uninvited file-picker dialog.
+      return finish();
+    }
+    startCard();
+  }
+
+  function download(f){
+    var u=URL.createObjectURL(f);
+    var a=document.createElement('a');
+    a.href=u;a.download=f.name;
+    document.body.appendChild(a);a.click();a.remove();
+    setTimeout(function(){URL.revokeObjectURL(u)},1500);
+  }
+
+  function finish(){
+    $('crop').classList.add('hidden');
+    $('meta').classList.add('hidden');
+    $('finish').classList.remove('hidden');
+    var where=[];
+    if(useCloud)where.push(cloudFailed?'the archive could not be reached':'sent to your archive');
+    if(!where.length)where.push('nothing was kept on this device');
+    $('tally').textContent=savedCards+' card'+(savedCards===1?'':'s')+' saved so far'+
+      (savedFiles?' ('+savedFiles+' files)':'')+' — '+where.join(', ')+'.'+
+      (cloudFailed?' Your exported files are unaffected.':'');
+    var f=$('finLink');
+    if(f)f.textContent='Open the archive →';
+    $('again').textContent=mode==='capture'?'Take Another Card':'Choose More Photos';
+  }
+
+  window.addEventListener('resize',function(){
+    if(img&&!$('crop').classList.contains('hidden')){drawStage();paintOverlay();paintPreview()}
+  });
+
+  /* Everything lives in this tab until a card is saved, so a stray refresh or
+     swipe-back silently destroys the batch. Warn only when work would be lost:
+     pages captured but not yet named, or photos still queued. */
+  window.addEventListener('beforeunload',function(e){
+    var unsaved=pages.length>0||(mode==='batch'&&files.length&&cursor<files.length);
+    if(!unsaved)return;
+    e.preventDefault();
+    e.returnValue='';   // required by older browsers to trigger the prompt
+    return '';
+  });
+})();
+</script>
+</body>
+</html>
