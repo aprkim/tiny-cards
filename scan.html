@@ -542,10 +542,6 @@
     <div class="tools">
       <p class="stagehint">Drag the dots to the card&rsquo;s corners.<br>
         The <b>filled dot</b> is the top-left.</p>
-      <div class="pvwrap">
-        <canvas id="pv" aria-label="Preview of the straightened card"></canvas>
-        <span>result</span>
-      </div>
       <button type="button" class="tool" id="rot">&#8635; Rotate</button>
     </div>
 
@@ -679,7 +675,7 @@
       <div class="set-sep"></div>
       <button type="button" class="signout" id="setSignOut">Sign out</button>
     </div>
-    <p class="setver">v2026.08.06.4</p>
+    <p class="setver">v2026.08.06.5</p>
   </div>
 </div>
 
@@ -1319,29 +1315,29 @@
     },30);
   };
 
-  /* Rotate 90° CW by re-labelling which corner maps to the output's top-left.
-     The quad on screen is unchanged — only the destination mapping shifts, so
-     warp() recomputes W/H swapped and the saved image comes out rotated. */
+  /* Rotate the whole photo 90° CW: turn the actual pixels, move the corner dots
+     to match, and relabel so the corner now at the visual top-left stays the
+     output's top-left. The main view rotates on screen and the saved crop
+     follows it (WYSIWYG), so no separate result preview is needed. Keep Original
+     also picks up the rotated photo via curSource. */
   $('rot').onclick=function(){
-    if(corners.length!==4)return;
-    corners.unshift(corners.pop());
-    paintOverlay();
-    // Spin the result preview 90° CW so the rotation is visible on screen, then
-    // settle onto the freshly rendered (correctly oriented) result. A portrait
-    // preview turned 90° already matches the new landscape aspect, so the swap
-    // to the re-rendered canvas is seamless.
-    var pv=$('pv');
-    if(pv&&pv.width>1){
-      pv.style.transition='transform .2s ease';
-      pv.style.transform='rotate(90deg)';
-      setTimeout(function(){
-        pv.style.transition='none';
-        pv.style.transform='';
-        paintPreview();
-      },200);
-    }else{
-      paintPreview();
-    }
+    if(!img||corners.length!==4)return;
+    var W=img.naturalWidth,H=img.naturalHeight;
+    var rc=document.createElement('canvas');rc.width=H;rc.height=W;
+    var rx=rc.getContext('2d');
+    rx.translate(H,0);rx.rotate(Math.PI/2);rx.drawImage(img,0,0);
+    // corner coords 90° CW: (x,y) -> (H - y, x); then shift so index 0 is the
+    // corner now sitting at the visual top-left.
+    var nc=corners.map(function(p){return {x:H-p.y,y:p.x}});
+    nc.unshift(nc.pop());
+    rc.toBlob(function(bl){
+      if(!bl)return;
+      curSource=bl;
+      var u=URL.createObjectURL(bl);
+      var rotated=new Image();
+      rotated.onload=function(){URL.revokeObjectURL(u);img=rotated;corners=nc;drawStage();paintOverlay()};
+      rotated.src=u;
+    },'image/jpeg',0.95);
   };
 
   /* Small live preview of what warp() will produce. It samples the already
