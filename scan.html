@@ -540,8 +540,8 @@
       <div class="handle" id="h3" tabindex="0" role="slider" aria-label="Bottom-left corner (arrow keys to move)"></div>
     </div>
     <div class="tools">
-      <p class="stagehint">Drag the dots to the card&rsquo;s four corners.<br>
-        The <b>filled dot</b> becomes the top-left of the saved image.</p>
+      <p class="stagehint">Drag the dots to the card&rsquo;s corners.<br>
+        The <b>filled dot</b> is the top-left.</p>
       <div class="pvwrap">
         <canvas id="pv" aria-label="Preview of the straightened card"></canvas>
         <span>result</span>
@@ -679,7 +679,7 @@
       <div class="set-sep"></div>
       <button type="button" class="signout" id="setSignOut">Sign out</button>
     </div>
-    <p class="setver">v2026.08.06.3</p>
+    <p class="setver">v2026.08.06.4</p>
   </div>
 </div>
 
@@ -1326,7 +1326,22 @@
     if(corners.length!==4)return;
     corners.unshift(corners.pop());
     paintOverlay();
-    paintPreview();
+    // Spin the result preview 90° CW so the rotation is visible on screen, then
+    // settle onto the freshly rendered (correctly oriented) result. A portrait
+    // preview turned 90° already matches the new landscape aspect, so the swap
+    // to the re-rendered canvas is seamless.
+    var pv=$('pv');
+    if(pv&&pv.width>1){
+      pv.style.transition='transform .2s ease';
+      pv.style.transform='rotate(90deg)';
+      setTimeout(function(){
+        pv.style.transition='none';
+        pv.style.transform='';
+        paintPreview();
+      },200);
+    }else{
+      paintPreview();
+    }
   };
 
   /* Small live preview of what warp() will produce. It samples the already
