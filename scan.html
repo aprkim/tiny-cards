@@ -52,6 +52,11 @@
   .tabbar a svg{width:23px;height:23px;display:block}
   .tabbar a.on{color:var(--accent)}
   .tabbar a:active{background:rgba(0,0,0,.035)}
+  /* While cropping or naming, hide the tab bar and reclaim its reserved space,
+     so the working screen gets the full height (and you can't accidentally
+     navigate away mid-card). It returns on the landing and finish screens. */
+  body.scanning .tabbar{display:none}
+  body.scanning .wrap{padding-bottom:16px}
   h1{font-size:19px;font-weight:700;letter-spacing:-.02em}
   header p{font-size:13.5px;color:var(--muted);margin-top:3px}
   /* On the home screen everything below is centred, so the title matches.
@@ -680,7 +685,7 @@
       <div class="set-sep"></div>
       <button type="button" class="signout" id="setSignOut">Sign out</button>
     </div>
-    <p class="setver">v2026.08.06.13</p>
+    <p class="setver">v2026.08.06.14</p>
   </div>
 </div>
 
@@ -944,6 +949,7 @@
     try{localStorage.setItem(CLOUD_KEY,'1')}catch(e){}
     $('gate').classList.add('hidden');
     $('start').classList.remove('hidden');
+    document.body.classList.remove('scanning');   // tab bar visible on the landing
     $('gearBtn').classList.remove('hidden');   // signed in → settings reachable
     paintCloud();
     window.scrollTo(0,0);
@@ -1123,7 +1129,7 @@
     $('start').classList.add('hidden');
     $('finish').classList.add('hidden');
     $('meta').classList.add('hidden');
-    $('crop').classList.remove('hidden');
+    $('crop').classList.remove('hidden');document.body.classList.add('scanning');
     $('cardNo').textContent=cardNo;
     $('cardTot').textContent=cardNo;
     $('pageTag').textContent=nextLabel();
@@ -1182,7 +1188,7 @@
   function loadPage(){
     if(pageIdx>=pageCount)return toMeta();
     $('meta').classList.add('hidden');
-    $('crop').classList.remove('hidden');
+    $('crop').classList.remove('hidden');document.body.classList.add('scanning');
     $('pageTag').textContent=nextLabel();
     $('fill').style.width=(cursor/files.length*100)+'%';
 
@@ -1437,7 +1443,7 @@
     redoIndex=i;
     curSource=src;
     $('meta').classList.add('hidden');
-    $('crop').classList.remove('hidden');
+    $('crop').classList.remove('hidden');document.body.classList.add('scanning');
     $('pageTag').textContent=(pageLabels[i]||('p'+(i+1)))+' · redo';
     $('applyCrop').textContent='Recrop';
 
@@ -1458,7 +1464,7 @@
 
   function toMeta(){
     $('crop').classList.add('hidden');
-    $('meta').classList.remove('hidden');
+    $('meta').classList.remove('hidden');document.body.classList.add('scanning');
     thumbURLs.forEach(URL.revokeObjectURL);thumbURLs=[];
     var t=$('thumbs');t.innerHTML='';
     pages.forEach(function(bl,i){
@@ -1666,7 +1672,7 @@
   function finish(){
     $('crop').classList.add('hidden');
     $('meta').classList.add('hidden');
-    $('finish').classList.remove('hidden');
+    $('finish').classList.remove('hidden');document.body.classList.remove('scanning');
     var where=[];
     if(useCloud)where.push(cloudFailed?'the archive could not be reached':'sent to your archive');
     if(!where.length)where.push('nothing was kept on this device');
