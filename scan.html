@@ -458,6 +458,12 @@
   }
   .signout:hover,.signout:focus-visible{border-color:#BF3143;color:#BF3143;background:#FEF2F2}
   .signout:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  /* Toast shown while a HEIC photo is being converted to JPEG. */
+  .convtoast{
+    position:fixed;left:50%;bottom:calc(var(--barh) + 16px);transform:translateX(-50%);
+    z-index:70;background:var(--ink);color:#fff;font-size:13px;font-weight:600;
+    padding:9px 18px;border-radius:100px;box-shadow:0 6px 22px rgba(0,0,0,.28);
+  }
 
   /* Gear, top-right of the scanner header — shown once signed in. */
   header.viewhead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
@@ -673,7 +679,7 @@
       <div class="set-sep"></div>
       <button type="button" class="signout" id="setSignOut">Sign out</button>
     </div>
-    <p class="setver">v2026.08.06.1</p>
+    <p class="setver">v2026.08.06.2</p>
   </div>
 </div>
 
@@ -1044,6 +1050,52 @@
     openCamera();
   }
 
+  /* ---- HEIC support ----
+     Outside Safari (desktop Chrome/Firefox), the browser can't decode HEIC/HEIF,
+     so <img> fails and the crop stage comes up blank. Detect those files and
+     convert them to JPEG in the browser first, via heic2any (libheif/WASM),
+     self-hosted under vendor/ and loaded lazily so the common JPEG path never
+     pays for the ~1.4MB library. Everything after (crop -> canvas -> JPEG
+     upload) is unchanged, since the warp re-encodes the canvas anyway. */
+  var heicLibPromise=null;
+  function loadHeicLib(){
+    if(window.heic2any)return Promise.resolve(window.heic2any);
+    if(heicLibPromise)return heicLibPromise;
+    heicLibPromise=new Promise(function(res,rej){
+      var s=document.createElement('script');
+      s.src='vendor/heic2any.min.js';
+      s.onload=function(){window.heic2any?res(window.heic2any):rej(new Error('heic2any missing'))};
+      s.onerror=function(){heicLibPromise=null;rej(new Error('heic2any failed to load'))};
+      document.head.appendChild(s);
+    });
+    return heicLibPromise;
+  }
+  function isHeic(file){
+    var t=(file.type||'').toLowerCase();
+    return t==='image/heic'||t==='image/heif'||/\.(heic|heif)$/i.test(file.name||'');
+  }
+  function showConverting(on){
+    var el=$('convToast');
+    if(!el){ if(!on)return;
+      el=document.createElement('div');el.id='convToast';el.className='convtoast';
+      el.textContent='Converting photo…';document.body.appendChild(el);
+    }
+    el.classList.toggle('hidden',!on);
+  }
+  // HEIC -> JPEG File (name/type kept sane); anything else passes straight through.
+  function decodable(file){
+    if(!isHeic(file))return Promise.resolve(file);
+    showConverting(true);
+    return loadHeicLib().then(function(h2a){
+      return h2a({blob:file,toType:'image/jpeg',quality:0.92});
+    }).then(function(out){
+      var blob=Array.isArray(out)?out[0]:out;
+      var name=(file.name||'photo').replace(/\.(heic|heif)$/i,'')+'.jpg';
+      var jpg; try{jpg=new File([blob],name,{type:'image/jpeg'})}catch(e){jpg=blob}
+      showConverting(false);return jpg;
+    }).catch(function(e){showConverting(false);throw e});
+  }
+
   camera.onchange=function(){
     var f=camera.files&&camera.files[0];
     if(!f)return;                      // cancelled: leave the screen as it was
@@ -1057,12 +1109,17 @@
     $('pageTag').textContent=nextLabel();
     $('fill').style.width='0%';
 
-    curSource=f;
-    var u=URL.createObjectURL(f);
-    img=new Image();
-    img.onload=function(){URL.revokeObjectURL(u);drawStage();initCorners();paintOverlay();paintPreview()};
-    img.onerror=function(){URL.revokeObjectURL(u);noteBad();acceptPage(f)};
-    img.src=u;
+    decodable(f).then(function(file){
+      curSource=file;
+      var u=URL.createObjectURL(file);
+      img=new Image();
+      img.onload=function(){URL.revokeObjectURL(u);drawStage();initCorners();paintOverlay();paintPreview()};
+      img.onerror=function(){URL.revokeObjectURL(u);noteBad();acceptPage(file)};
+      img.src=u;
+    }).catch(function(e){
+      if(window.console)console.warn('HEIC convert failed',e);
+      curSource=f;noteBad();acceptPage(f);
+    });
   };
 
   $('addPage').onclick=function(){openCamera()};
@@ -1108,12 +1165,17 @@
     $('pageTag').textContent=nextLabel();
     $('fill').style.width=(cursor/files.length*100)+'%';
 
-    curSource=files[cursor];
-    var u=URL.createObjectURL(files[cursor]);
-    img=new Image();
-    img.onload=function(){URL.revokeObjectURL(u);drawStage();initCorners();paintOverlay();paintPreview()};
-    img.onerror=function(){URL.revokeObjectURL(u);noteBad();acceptPage(files[cursor])};
-    img.src=u;
+    decodable(files[cursor]).then(function(file){
+      files[cursor]=file;curSource=file;   // keep the JPEG for redo/fallback too
+      var u=URL.createObjectURL(file);
+      img=new Image();
+      img.onload=function(){URL.revokeObjectURL(u);drawStage();initCorners();paintOverlay();paintPreview()};
+      img.onerror=function(){URL.revokeObjectURL(u);noteBad();acceptPage(file)};
+      img.src=u;
+    }).catch(function(e){
+      if(window.console)console.warn('HEIC convert failed',e);
+      curSource=files[cursor];noteBad();acceptPage(files[cursor]);
+    });
   }
 
   function drawStage(){
