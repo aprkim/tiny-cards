@@ -648,9 +648,6 @@
       <img id="finThumb" class="finthumb hidden" alt="Front of the card you just saved">
       <p id="tally"></p>
       <button class="go" id="again" style="max-width:210px;margin:0 auto">Choose More Photos</button>
-      <div class="footlink">
-        <a class="altlink" id="finLink" href="cards.html">Open your library &rarr;</a>
-      </div>
     </div>
   </section>
 
@@ -682,7 +679,7 @@
       <div class="set-sep"></div>
       <button type="button" class="signout" id="setSignOut">Sign out</button>
     </div>
-    <p class="setver">v2026.08.06.9</p>
+    <p class="setver">v2026.08.06.10</p>
   </div>
 </div>
 
@@ -1679,8 +1676,6 @@
     $('tally').textContent=savedCards+' card'+(savedCards===1?'':'s')+' saved so far'+
       (savedFiles?' ('+savedFiles+' files)':'')+' — '+where.join(', ')+'.'+
       (cloudFailed?' Your exported files are unaffected.':'');
-    var f=$('finLink');
-    if(f)f.textContent='Open the archive →';
     $('again').textContent=mode==='capture'?'Take Another Card':'Choose More Photos';
   }
 
