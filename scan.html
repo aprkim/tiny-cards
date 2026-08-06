@@ -337,6 +337,12 @@
   .done{text-align:center;padding:52px 20px}
   .done h2{font-size:20px;font-weight:700;margin-bottom:8px}
   .done p{font-size:14px;color:var(--muted);margin-bottom:24px}
+  /* A thumbnail of the saved front, so the finish screen confirms visually. */
+  .finthumb{
+    display:block;max-width:150px;max-height:190px;margin:14px auto 20px;
+    border-radius:12px;border:1px solid var(--rule);background:var(--field);
+    object-fit:contain;box-shadow:0 6px 20px rgba(22,22,29,.14);
+  }
 
   .altlink{
     display:inline-block;font-size:13.5px;color:var(--accent);
@@ -639,6 +645,7 @@
   <section id="finish" class="hidden">
     <div class="done">
       <h2>All done</h2>
+      <img id="finThumb" class="finthumb hidden" alt="Front of the card you just saved">
       <p id="tally"></p>
       <button class="go" id="again" style="max-width:210px;margin:0 auto">Choose More Photos</button>
       <div class="footlink">
@@ -675,7 +682,7 @@
       <div class="set-sep"></div>
       <button type="button" class="signout" id="setSignOut">Sign out</button>
     </div>
-    <p class="setver">v2026.08.06.8</p>
+    <p class="setver">v2026.08.06.9</p>
   </div>
 </div>
 
@@ -1621,8 +1628,24 @@
     }
   }
 
+  // Shows a thumbnail of the saved front on the finish screen. Keeps one object
+  // URL alive at a time (revokes the previous), so a batch doesn't leak.
+  var finThumbURL=null;
+  function setFinishThumb(blob){
+    var el=$('finThumb');
+    if(finThumbURL){URL.revokeObjectURL(finThumbURL);finThumbURL=null}
+    if(!el)return;
+    if(!blob){el.classList.add('hidden');el.removeAttribute('src');return}
+    finThumbURL=URL.createObjectURL(blob);
+    el.src=finThumbURL;
+    el.classList.remove('hidden');
+  }
+
   function finishCard(n){
     savedCards++;savedFiles+=n;
+    // Remember the front of the card just saved, so the finish screen can show
+    // it as a visual confirmation. Grab it before pages is cleared below.
+    setFinishThumb(pages[0]||null);
     // The card is saved, so its pages are no longer unsaved work. Without this
     // the beforeunload guard kept firing after a finished batch, warning about
     // losing something that had already gone where it was meant to.
