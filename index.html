@@ -854,7 +854,7 @@
     return currentUser().then(function(user){
       if(!user)return null;              // signed out: nothing to upload to
       var code=user.uid;
-      var paths=[],done=0;
+      var paths=[],bytes=[],done=0;
       upProgress('Uploading 1 of '+blobs.length+'…',4);
       return blobs.reduce(function(chain,bl,i){
         return chain.then(function(){
@@ -866,7 +866,7 @@
             task.on('state_changed',function(s){
               var frac=(done+(s.bytesTransferred/(s.totalBytes||1)))/blobs.length;
               upProgress('Uploading '+(i+1)+' of '+blobs.length+'…',Math.round(frac*92)+4);
-            },rej,function(){paths.push(path);done++;res()});
+            },rej,function(){paths.push(path);bytes.push(bl.size);done++;res()});
           });
         });
       },Promise.resolve()).then(function(){
@@ -874,7 +874,13 @@
         var rec={
           id:card.id,date:card.date,occasion:card.occasion,
           sender:card.sender,recipient:card.recipient,
-          labels:card.labels,paths:paths,savedAt:card.savedAt
+          labels:card.labels,paths:paths,savedAt:card.savedAt,
+          // Byte sizes are recorded here because nothing else knows them
+          // without listing Storage, which the rules forbid. The export needs
+          // a total before it starts, and growth is impossible to see later
+          // if it is not captured at write time.
+          bytes:bytes,
+          totalBytes:bytes.reduce(function(a,b){return a+b},0)
         };
         return fbDb.collection('tinyCards').doc(code).set({
           cards:firebase.firestore.FieldValue.arrayUnion(rec),
