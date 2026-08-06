@@ -386,6 +386,79 @@
      — without it, adding .hidden to #home did nothing and the home screen
      stayed on top of the scanner. */
   .gatemsg{text-align:center;color:var(--muted);font-size:14px;padding:60px 20px}
+  .tip{text-align:center;font-size:12.5px;color:var(--muted);margin-top:18px}
+
+  /* ---- confirm dialog (shared, matches the View page) ----
+     Cream surface, same type scale; centred on desktop, a bottom sheet on
+     mobile. Cancel is the safe default. Driven by openConfirm(). */
+  .scrim{
+    position:fixed;inset:0;z-index:60;background:rgba(22,22,29,.45);
+    display:flex;justify-content:center;align-items:center;padding:20px;
+  }
+  .sheet{
+    background:var(--paper);border-radius:18px;width:100%;max-width:400px;
+    padding:26px 22px 20px;box-shadow:0 16px 48px rgba(22,22,29,.28);
+  }
+  .sheet h2{font-size:18px;font-weight:700;letter-spacing:-.01em;margin-bottom:8px}
+  .sheet p{font-size:14px;color:var(--muted);line-height:1.55;margin-bottom:22px}
+  .sheet-acts{display:flex;flex-direction:column;gap:10px}
+  .sheet-acts button{
+    font:inherit;font-size:15.5px;font-weight:600;padding:14px;border-radius:12px;
+    border:1.5px solid transparent;cursor:pointer;transition:background .15s,border-color .15s;
+  }
+  #modalCancel{background:var(--ink);color:#fff}
+  #modalCancel:hover,#modalCancel:focus-visible{background:#000}
+  #modalCancel:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  #modalConfirm{background:var(--field);color:var(--ink);border-color:var(--rule)}
+  #modalConfirm.danger{background:var(--field);color:#C62828;border-color:#C62828}
+  #modalConfirm.danger:hover,#modalConfirm.danger:focus-visible{background:#FBEBEA}
+  @media (max-width:560px){
+    .scrim{align-items:flex-end;padding:0}
+    .sheet{
+      max-width:none;border-radius:20px 20px 0 0;
+      padding:24px 20px calc(24px + env(safe-area-inset-bottom));
+      animation:sheetup .22s ease;
+    }
+    @keyframes sheetup{from{transform:translateY(100%)}to{transform:translateY(0)}}
+  }
+  @media (prefers-reduced-motion:reduce){.sheet{animation:none}}
+
+  /* ---- settings sheet ----
+     Reuses the .sheet surface. A real list — Account, the export preference,
+     and Sign out today; the ZIP export lands here later as another row. */
+  .set-list{margin-top:2px}
+  .set-row{
+    display:flex;align-items:center;justify-content:space-between;gap:16px;
+    width:100%;padding:13px 2px;font-size:15px;
+  }
+  .set-row .set-k{color:var(--muted);font-weight:500;flex-shrink:0}
+  .set-row .set-v{color:var(--ink);font-weight:500;text-align:right;overflow-wrap:anywhere}
+  .set-sep{height:1px;background:var(--rule);margin:2px 0}
+  /* A row carrying a toggle: label + note left, the .sw switch right. */
+  .set-toggle{align-items:flex-start}
+  .set-toggle .tt{flex:1;min-width:0}
+  .set-toggle .tt b{display:block;font-size:15px;font-weight:600;color:var(--ink)}
+  .set-toggle .tt small{display:block;font-size:12.5px;color:var(--muted);line-height:1.5;margin-top:2px}
+  /* Action rows are buttons; the static Account row is plain text. */
+  button.set-row{
+    font:inherit;background:none;border:none;cursor:pointer;text-align:left;
+    color:var(--ink);font-weight:600;border-radius:8px;-webkit-tap-highlight-color:transparent;
+  }
+  button.set-row:hover,button.set-row:focus-visible{color:var(--accent)}
+  button.set-row:focus-visible{outline:none}
+
+  /* Gear, top-right of the scanner header — shown once signed in. */
+  header.viewhead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+  .gear{
+    flex-shrink:0;width:40px;height:40px;margin:-6px -8px 0 0;
+    display:inline-flex;align-items:center;justify-content:center;
+    background:none;border:none;cursor:pointer;color:var(--muted);border-radius:10px;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .gear:hover,.gear:focus-visible{color:var(--ink);background:rgba(0,0,0,.05)}
+  .gear:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .gear svg{width:22px;height:22px;display:block}
+
   .hidden{display:none!important}
   @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -393,9 +466,14 @@
 <body>
 <div class="wrap">
 
-  <header>
-    <h1 id="pageTitle">Card Scanner</h1>
-    <p id="pageSub">Crop, name, export.</p>
+  <header class="viewhead">
+    <div>
+      <h1 id="pageTitle">Card Scanner</h1>
+      <p id="pageSub">Crop, name, export.</p>
+    </div>
+    <button type="button" class="gear hidden" id="gearBtn" aria-label="Settings" aria-haspopup="dialog">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 13a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
   </header>
 
   <!-- Landing screen. A tall flex column: the illustration and the running
@@ -425,49 +503,8 @@
     </div>
     <input type="file" id="picker" accept="image/*" multiple class="hidden">
 
-    <div class="setup">
-      <span>Photos per card <em>when choosing</em></span>
-      <div class="seg" id="seg">
-        <button type="button" data-n="1">1<small>front</small></button>
-        <button type="button" data-n="2" class="on">2<small>front + inside</small></button>
-        <button type="button" data-n="3">3<small>+ back</small></button>
-        <button type="button" data-n="4">4<small>+ extra</small></button>
-      </div>
-    </div>
 
-    <div class="hint">
-      <b>Taking photos:</b> shoot the front, then tap <b>Add a photo to this card</b> for the inside.
-      Nothing is written to your camera roll.
-      <br><b>Choosing photos:</b> they are grouped in order — front, inside, front, inside…
-      using the setting above.
-      <br><b>Tip:</b> a dark surface makes the corners easy to see.
-    </div>
-
-    <div class="opt">
-      <div class="row">
-        <div class="txt">
-          <b>Send cards to your archive</b>
-          <small id="cloudNote">Not connected — cards leave only as the files you export.</small>
-        </div>
-        <button type="button" class="sw" id="cloudToggle" role="switch" aria-checked="false"
-                aria-label="Send cards to your archive"></button>
-      </div>
-      <div id="codeRow" class="coderow hidden">
-        <span id="codeText">—</span>
-        <button type="button" class="tool" id="codeChange">Sign out</button>
-      </div>
-    </div>
-
-    <div class="opt">
-      <div class="row">
-        <div class="txt">
-          <b>Also export as files</b>
-          <small id="expNote">Opens the share sheet so you can file each card yourself.</small>
-        </div>
-        <button type="button" class="sw" id="expToggle" role="switch" aria-checked="true"
-                aria-label="Also export as files"></button>
-      </div>
-    </div>
+    <p class="tip">Tip: a dark surface makes the card edges easy to detect.</p>
 
   </section>
 
@@ -598,6 +635,43 @@
     </div>
   </section>
 
+</div>
+
+<!-- Reusable confirm dialog (matches the View page). Cancel is the safe
+     default, focused on open; click-outside and Escape cancel. -->
+<div class="scrim hidden" id="modal">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="modalTitle" aria-describedby="modalBody">
+    <h2 id="modalTitle">Confirm</h2>
+    <p id="modalBody"></p>
+    <div class="sheet-acts">
+      <button type="button" id="modalCancel">Cancel</button>
+      <button type="button" id="modalConfirm">OK</button>
+    </div>
+  </div>
+</div>
+
+<!-- Settings — opened by the gear. Account, the export preference, and Sign
+     out; sign-out routes through the confirm dialog above. -->
+<div class="scrim hidden" id="settings">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="setTitle">
+    <h2 id="setTitle">Settings</h2>
+    <div class="set-list">
+      <div class="set-row">
+        <span class="set-k">Account</span>
+        <span class="set-v" id="setEmail">Signed in</span>
+      </div>
+      <div class="set-sep"></div>
+      <div class="set-row set-toggle">
+        <div class="tt">
+          <b>Also export as files</b>
+          <small id="expNote">Opens the share sheet so you can file each card yourself.</small>
+        </div>
+        <button type="button" class="sw" id="expToggle" role="switch" aria-checked="true" aria-label="Also export as files"></button>
+      </div>
+      <div class="set-sep"></div>
+      <button type="button" class="set-row" id="setSignOut">Sign out</button>
+    </div>
+  </div>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
@@ -808,16 +882,52 @@
       }else connectCloud();
     };
   }
-  if($('codeChange')){
-    $('codeChange').onclick=function(){
-      if(!authUser)return;
-      if(!confirm('Sign out? Cards already in your archive stay there.'))return;
-      signOutUser().then(function(){
-        useCloud=false;
-        try{localStorage.setItem(CLOUD_KEY,'0')}catch(e){}
-        paintCloud();
-      });
-    };
+  /* ---- confirm dialog + settings sheet (matches the View page) ----
+     The gear opens Settings (Account, the export preference, Sign out). Sign-out
+     routes through openConfirm and then returns to the home page, since the
+     scanner needs an account and cannot run signed out. Cancel is the safe
+     default; click-outside and Escape cancel. */
+  var onConfirm=null;
+  function openConfirm(opts){
+    $('modalTitle').textContent=opts.title||'Confirm';
+    $('modalBody').textContent=opts.body||'';
+    var c=$('modalConfirm');
+    c.textContent=opts.confirmText||'OK';
+    c.classList.toggle('danger',!!opts.danger);
+    onConfirm=opts.onConfirm||null;
+    $('modal').classList.remove('hidden');
+    $('modalCancel').focus();
+  }
+  function closeConfirm(){$('modal').classList.add('hidden');onConfirm=null}
+  $('modalCancel').onclick=closeConfirm;
+  $('modalConfirm').onclick=function(){var fn=onConfirm;closeConfirm();if(fn)fn()};
+  $('modal').onclick=function(e){if(e.target===$('modal'))closeConfirm()};
+
+  function openSettings(){
+    $('setEmail').textContent=(authUser&&authUser.email)||'Signed in';
+    $('settings').classList.remove('hidden');
+  }
+  function closeSettings(){$('settings').classList.add('hidden')}
+  $('gearBtn').onclick=openSettings;
+  $('settings').onclick=function(e){if(e.target===$('settings'))closeSettings()};
+  document.addEventListener('keydown',function(e){
+    if(e.key!=='Escape')return;
+    if(!$('modal').classList.contains('hidden')){e.stopPropagation();closeConfirm();return}
+    if(!$('settings').classList.contains('hidden')){e.stopPropagation();closeSettings();return}
+  },true);
+  $('setSignOut').onclick=function(){
+    closeSettings();
+    // Not danger-styled: signing out is inconvenient, not destructive.
+    openConfirm({
+      title:'Sign out?',
+      body:"You'll need to sign in again to reach your cards.",
+      confirmText:'Sign out',
+      onConfirm:doSignOut
+    });
+  };
+  function doSignOut(){
+    var go=function(){try{localStorage.setItem(CLOUD_KEY,'0')}catch(e){}location.replace('./')};
+    signOutUser().then(go).catch(go);
   }
 
   /* ---- auth gate ----
@@ -831,6 +941,7 @@
     try{localStorage.setItem(CLOUD_KEY,'1')}catch(e){}
     $('gate').classList.add('hidden');
     $('start').classList.remove('hidden');
+    $('gearBtn').classList.remove('hidden');   // signed in → settings reachable
     paintCloud();
     window.scrollTo(0,0);
   }
