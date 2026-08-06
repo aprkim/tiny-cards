@@ -36,6 +36,9 @@
   header{margin-bottom:22px}
   h1{font-size:19px;font-weight:700;letter-spacing:-.02em}
   header p{font-size:13.5px;color:var(--muted);margin-top:3px}
+  /* On the home screen everything below is centred, so the title matches.
+     The scanner keeps its conventional left-aligned header. */
+  body.view-home header{text-align:center}
 
   /* Both entry points are equal-weight choices, so they get identical boxes.
      Flex centring plus a min-height keeps them matched even though the camera
@@ -68,13 +71,32 @@
     margin:16px 0 12px;text-transform:uppercase;letter-spacing:.06em;
   }
 
-  /* ---- home screen ---- */
-  .hero{text-align:center;padding:8px 0 0}
-  .heroart{position:relative;height:132px;margin:6px auto 26px;width:112px}
+  /* ---- home screen ----
+     Fills the space under the header so the pieces can be distributed:
+     illustration + count at the top, the action pair low in the thumb zone,
+     the account row pinned to the very bottom. 100dvh tracks the real visible
+     height as Safari's toolbars come and go. */
+  #home{
+    display:flex;flex-direction:column;
+    min-height:calc(100dvh - 150px);
+  }
+  .hero{text-align:center;padding:14px 0 0;flex:0 0 auto}
+  .heroart{position:relative;height:150px;margin:10px auto 18px;width:126px}
   .heroart span{position:absolute;border-radius:12px;background:#fff;border:2.5px solid var(--accent)}
   .heroart .c1{inset:12px 22px 12px 0;transform:rotate(-9deg);background:var(--accent-soft)}
   .heroart .c2{inset:0 0 0 24px;display:flex;align-items:center;justify-content:center}
-  .heroart svg{width:38px;height:38px;fill:var(--accent)}
+  .heroart svg{width:44px;height:44px;fill:var(--accent)}
+
+  /* The running total. Big enough to feel like progress during a long session. */
+  .cardcount{font-size:15px;color:var(--muted);min-height:22px}
+  .cardcount b{color:var(--ink);font-weight:700;font-variant-numeric:tabular-nums}
+
+  /* Each state fills the remaining height and hangs its own content off top
+     and bottom edges. */
+  .homefill{flex:1 1 auto;display:flex;flex-direction:column}
+  #signedOut.homefill{justify-content:center}     /* sign-in sits calmly centred */
+  .signinblock{width:100%}
+  #signedIn .homeacts{margin-top:auto}            /* actions drop to the lower third */
 
   .gbtn{
     display:inline-flex;align-items:center;justify-content:center;gap:10px;
@@ -85,7 +107,10 @@
   .gbtn:hover,.gbtn:focus-visible{border-color:#BFBAAE;box-shadow:0 1px 4px rgba(0,0,0,.07)}
   .gbtn[disabled]{opacity:.55;cursor:progress}
 
-  .who{font-size:13.5px;color:var(--muted);margin-bottom:18px}
+  /* Pinned low and quiet, off the path to the primary button */
+  .who{font-size:12px;color:#9A9AA2;text-align:center;margin-top:20px;padding-top:4px}
+  .who .linkbtn{color:#9A9AA2;padding-left:6px}
+  .who .linkbtn:hover{color:var(--muted)}
   .discardrow{text-align:center;margin-top:12px}
   .discardrow .linkbtn{padding:0;font-size:13px;color:var(--muted);text-decoration:none}
   .discardrow .linkbtn:hover{color:#BF3143;text-decoration:underline}
@@ -330,17 +355,18 @@
   @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
-<body>
+<body class="view-home">
 <div class="wrap">
 
   <header>
     <h1 id="pageTitle">Tiny Cards</h1>
-    <p id="pageSub">Scan greeting cards and keep them for good.</p>
+    <p id="pageSub">Scan greeting cards and keep them forever.</p>
   </header>
 
-  <!-- Landing screen. Sign-in used to be a toggle buried in the scanner's
-       settings, which put the archive — the reason to sign in at all — behind
-       the scanning flow. -->
+  <!-- Landing screen. A tall flex column: the illustration and the running
+       card count sit up top, the action pair drops into the lower-third thumb
+       zone, and the account row is pinned quietly to the very bottom — out of
+       the path between the illustration and the primary button. -->
   <section id="home">
     <div class="hero">
       <div class="heroart" aria-hidden="true">
@@ -349,8 +375,12 @@
           <svg viewBox="0 0 24 24"><path d="M12 20.5l-6.9-6.6C2.6 11.5 3.4 7.6 6.6 6.4c1.9-.7 4 .1 5.4 1.8 1.4-1.7 3.5-2.5 5.4-1.8 3.2 1.2 4 5.1 1.5 7.5L12 20.5z"/></svg>
         </span>
       </div>
+      <!-- Carries state: the number climbing is the point during a 200-card session -->
+      <p class="cardcount" id="cardCount" aria-live="polite"></p>
+    </div>
 
-      <div id="signedOut">
+    <div id="signedOut" class="homefill">
+      <div class="signinblock">
         <button type="button" class="gbtn" id="googleBtn">
           <svg viewBox="0 0 18 18" width="18" height="18" aria-hidden="true">
             <path fill="#4285F4" d="M17.6 9.2c0-.6-.1-1.3-.2-1.9H9v3.5h4.8a4.1 4.1 0 01-1.8 2.7v2.2h2.9c1.7-1.6 2.7-3.9 2.7-6.5z"/>
@@ -364,15 +394,15 @@
           <a class="altlink" href="#" id="skipSignIn">Scan without an account &rarr;</a>
         </div>
       </div>
+    </div>
 
-      <div id="signedIn" class="hidden">
-        <p class="who"><span id="whoText">Signed in</span>
-          <button type="button" class="linkbtn" id="signOutBtn">Sign out</button></p>
-        <div class="homeacts">
-          <button type="button" class="go" id="goScan">Scan Cards</button>
-          <a class="go alt" href="card-archive-en.html" id="goArchive">View Cards</a>
-        </div>
+    <div id="signedIn" class="homefill hidden">
+      <div class="homeacts">
+        <button type="button" class="go" id="goScan">Scan Cards</button>
+        <a class="go alt" href="card-archive-en.html" id="goArchive">View Cards</a>
       </div>
+      <p class="who"><span id="whoText">Signed in</span>
+        <button type="button" class="linkbtn" id="signOutBtn">Sign out</button></p>
     </div>
   </section>
 
@@ -800,7 +830,8 @@
     $('home').classList.remove('hidden');
     ['start','crop','meta','finish'].forEach(function(id){$(id).classList.add('hidden')});
     $('pageTitle').textContent='Tiny Cards';
-    $('pageSub').textContent='Scan greeting cards and keep them for good.';
+    $('pageSub').textContent='Scan greeting cards and keep them forever.';
+    document.body.classList.add('view-home');   // centre the title on home only
     paintHome();
   }
   function showScanner(){
@@ -808,14 +839,35 @@
     $('start').classList.remove('hidden');
     $('pageTitle').textContent='Card Scanner';
     $('pageSub').textContent='Crop, name, export. You choose where cards go.';
+    document.body.classList.remove('view-home');
   }
   function paintHome(){
     var inEl=$('signedIn'),outEl=$('signedOut');
     if(!inEl)return;
     inEl.classList.toggle('hidden',!authUser);
     outEl.classList.toggle('hidden',!!authUser);
-    if(authUser)$('whoText').textContent='Signed in as '+
-      (authUser.email||authUser.displayName||'your account');
+    if(authUser){
+      $('whoText').textContent='Signed in as '+
+        (authUser.email||authUser.displayName||'your account');
+      paintCount();
+    }
+  }
+
+  /* The saved-card total, read once from the shared archive doc. Keeps the
+     home screen from looking identical at 0 cards and 500 — the climbing
+     number is the motivation during a long scanning session. */
+  function paintCount(){
+    var el=$('cardCount');
+    if(!el||!authUser)return;
+    currentUser().then(function(u){
+      if(!u)return null;
+      return fbDb.collection('tinyCards').doc(SPACE).get();
+    }).then(function(doc){
+      var n=(doc&&doc.exists&&(doc.data().cards||[]).length)||0;
+      el.innerHTML=n
+        ? '<b>'+n+'</b> card'+(n===1?'':'s')+' saved'
+        : 'No cards yet — scan your first';
+    }).catch(function(){el.textContent=''});
   }
 
   if($('googleBtn')){
