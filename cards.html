@@ -207,7 +207,16 @@
   button.set-row:focus-visible{outline:none}
   /* Build stamp — bumped every deploy so it's obvious whether the live page is
      the current version. */
-  .setver{margin-top:16px;text-align:center;font-size:11.5px;color:#9A9AA2;letter-spacing:.02em}
+  .setver{margin-top:16px;text-align:center;font-size:10px;color:#9A9AA2;letter-spacing:.02em}
+  /* Sign out reads as a real button and acts on the first tap (no confirm). */
+  .signout{
+    display:block;width:100%;font:inherit;font-size:15px;font-weight:600;
+    margin-top:6px;padding:13px;border-radius:12px;cursor:pointer;
+    background:var(--field);color:var(--ink);border:1.5px solid var(--rule);
+    transition:border-color .15s,background .15s,color .15s;-webkit-tap-highlight-color:transparent;
+  }
+  .signout:hover,.signout:focus-visible{border-color:#BF3143;color:#BF3143;background:#FEF2F2}
+  .signout:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
   /* Gear, top-right of the View header — a deliberate reach, the opposite end
      from the bottom bar so sign-out can't be fat-fingered mid-upload. Only
@@ -371,7 +380,7 @@
         <span class="set-v" id="setEmail">Signed in</span>
       </div>
       <div class="set-sep"></div>
-      <button type="button" class="set-row" id="setSignOut">Sign out</button>
+      <button type="button" class="signout" id="setSignOut">Sign out</button>
     </div>
     <p class="setver">v2026.08.06.1</p>
   </div>
@@ -441,16 +450,8 @@
   function closeSettings(){$('settings').classList.add('hidden')}
   $('gearBtn').onclick=openSettings;
   $('settings').onclick=function(e){if(e.target===$('settings'))closeSettings()};
-  $('setSignOut').onclick=function(){
-    closeSettings();
-    // Not danger-styled: signing out isn't destructive, just inconvenient.
-    openConfirm({
-      title:'Sign out?',
-      body:'You’ll need to sign in again to reach your cards.',
-      confirmText:'Sign out',
-      onConfirm:doSignOut
-    });
-  };
+  // Signs out on the first tap — no confirm step.
+  $('setSignOut').onclick=function(){closeSettings();doSignOut()};
   function doSignOut(){
     var reset=function(){
       authUser=null;cards=[];filter=null;
