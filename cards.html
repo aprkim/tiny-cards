@@ -262,10 +262,15 @@
   }
   .edit label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:0 0 5px}
   .edit .f{margin-bottom:11px}
-  .edit input{
+  .edit input,.edit select{
     width:100%;font:inherit;font-size:16px;padding:10px 12px;
     border:1px solid var(--rule);border-radius:9px;background:#fff;color:var(--ink);
     -webkit-appearance:none;appearance:none;
+  }
+  .edit select{
+    padding-right:32px;cursor:pointer;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' fill='none' stroke='%236E6E78' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+    background-repeat:no-repeat;background-position:right 10px center;
   }
   .edit .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
   .edit .act{display:flex;gap:8px;margin-top:14px}
@@ -355,9 +360,44 @@
     <div class="f"><label for="eSender">From</label><input type="text" id="eSender" autocomplete="off"></div>
     <div class="f"><label for="eRecipient">To</label><input type="text" id="eRecipient" autocomplete="off"></div>
     <div class="two">
-      <div class="f"><label for="eEvent">Occasion</label><input type="text" id="eEvent" autocomplete="off"></div>
+      <div class="f"><label for="eEvent">Occasion</label>
+        <select id="eEvent">
+          <option value="">Occasion&hellip;</option>
+          <option value="Birthday">Birthday</option>
+          <option value="Anniversary">Anniversary</option>
+          <optgroup label="Holidays">
+            <option value="Christmas">Christmas</option>
+            <option value="Mothers Day">Mother&rsquo;s Day</option>
+            <option value="Fathers Day">Father&rsquo;s Day</option>
+            <option value="Valentines Day">Valentine&rsquo;s Day</option>
+            <option value="Easter">Easter</option>
+            <option value="Thanksgiving">Thanksgiving</option>
+            <option value="New Year">New Year</option>
+            <option value="Lunar New Year">Lunar New Year</option>
+            <option value="Hanukkah">Hanukkah</option>
+          </optgroup>
+          <optgroup label="Milestones">
+            <option value="Graduation">Graduation</option>
+            <option value="Wedding">Wedding</option>
+            <option value="New Baby">New Baby</option>
+            <option value="Housewarming">Housewarming</option>
+            <option value="Retirement">Retirement</option>
+            <option value="First Day of School">First Day of School</option>
+          </optgroup>
+          <optgroup label="Notes">
+            <option value="Thank You">Thank You</option>
+            <option value="Congratulations">Congratulations</option>
+            <option value="Get Well">Get Well</option>
+            <option value="Good Luck">Good Luck</option>
+            <option value="Sympathy">Sympathy</option>
+            <option value="Just Because">Just Because</option>
+          </optgroup>
+          <option value="__other">Other&hellip;</option>
+        </select>
+      </div>
       <div class="f"><label for="eDate">Date</label><input type="date" id="eDate"></div>
     </div>
+    <div class="f hidden" id="eOtherWrap"><label for="eEventOther">Occasion name</label><input type="text" id="eEventOther" autocomplete="off" placeholder="Baptism"></div>
     <div class="act">
       <button type="button" id="eSave">Save</button>
       <button type="button" class="sec" id="eCancel">Cancel</button>
@@ -393,7 +433,7 @@
       <div class="set-sep"></div>
       <button type="button" class="signout" id="setSignOut">Sign out</button>
     </div>
-    <p class="setver">v2026.08.06.12</p>
+    <p class="setver">v2026.08.06.13</p>
   </div>
 </div>
 
@@ -746,12 +786,36 @@
   }
 
   /* ---- library editing ---- */
+  // Point the Occasion dropdown at the card's current value. If that value isn't
+  // one of the presets (an old free-text occasion), add it as its own option so
+  // it still shows and isn't silently lost.
+  function setEventSelect(ev){
+    var sel=$('eEvent');
+    Array.prototype.slice.call(sel.querySelectorAll('option[data-custom]')).forEach(function(o){o.remove()});
+    $('eOtherWrap').classList.add('hidden');$('eEventOther').value='';
+    var known=Array.prototype.some.call(sel.options,function(o){return o.value===ev});
+    if(ev&&!known){
+      var op=document.createElement('option');
+      op.value=ev;op.textContent=ev;op.setAttribute('data-custom','1');
+      sel.insertBefore(op,sel.querySelector('option[value="__other"]'));
+    }
+    sel.value=ev||'';
+  }
+  function readEventValue(){
+    return $('eEvent').value==='__other'?$('eEventOther').value.trim():$('eEvent').value.trim();
+  }
+  $('eEvent').onchange=function(){
+    var other=$('eEvent').value==='__other';
+    $('eOtherWrap').classList.toggle('hidden',!other);
+    if(other)$('eEventOther').focus();
+  };
+
   $('boxEdit').onclick=function(e){
     e.stopPropagation();
     if(!openCard)return;
     $('eSender').value=openCard.person==='Unknown'?'':openCard.person;
     $('eRecipient').value=openCard.recipient||'';
-    $('eEvent').value=openCard.event==='Unsorted'?'':openCard.event;
+    setEventSelect(openCard.event==='Unsorted'?'':openCard.event);
     $('eDate').value=openCard.date||'';
     var hidden=$('boxForm').classList.toggle('hidden');
     $('box').classList.toggle('editing',!hidden);
@@ -767,7 +831,7 @@
     var row=openCard.raw;
     row.sender=$('eSender').value.trim()||'Unknown';
     row.recipient=$('eRecipient').value.trim();
-    row.occasion=$('eEvent').value.trim()||'Unsorted';
+    row.occasion=readEventValue()||'Unsorted';
     row.date=$('eDate').value||'';
 
     cloudMutate(function(rows){
