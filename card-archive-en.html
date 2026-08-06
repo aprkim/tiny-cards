@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#FAF9F6">
-<title>Card Archive</title>
+<title>View Cards</title>
 <meta name="description" content="Browse your scanned greeting cards by sender, occasion, and year.">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <meta property="og:title" content="Tiny Cards — Archive">
@@ -124,6 +124,49 @@
   .box button:hover{background:rgba(255,255,255,.12)}
   .box button.on{background:#fff;color:var(--ink);border-color:#fff}
 
+  /* ---- confirm dialog ----
+     Reusable across delete, sign-out, bulk actions and export. Cream surface
+     and the same type scale as the rest of the app; no browser chrome. */
+  .scrim{
+    position:fixed;inset:0;z-index:60;background:rgba(22,22,29,.45);
+    display:flex;justify-content:center;align-items:center;
+    padding:20px;
+  }
+  .sheet{
+    background:var(--paper);border-radius:18px;
+    width:100%;max-width:400px;padding:26px 22px 20px;
+    box-shadow:0 16px 48px rgba(22,22,29,.28);
+  }
+  .sheet h2{font-size:18px;font-weight:700;letter-spacing:-.01em;margin-bottom:8px}
+  .sheet p{font-size:14px;color:var(--muted);line-height:1.55;margin-bottom:22px}
+  .sheet-acts{display:flex;flex-direction:column;gap:10px}
+  /* Same geometry as the home Scan/View buttons. */
+  .sheet-acts button{
+    font:inherit;font-size:15.5px;font-weight:600;padding:14px;border-radius:12px;
+    border:1.5px solid transparent;cursor:pointer;transition:background .15s,border-color .15s;
+  }
+  /* Cancel is the safe default: solid and prominent. */
+  #modalCancel{background:var(--ink);color:#fff}
+  #modalCancel:hover,#modalCancel:focus-visible{background:#000}
+  #modalCancel:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  /* Confirm is neutral by default; destructive is a truer red than the brand
+     crimson, outlined so it never reads as the primary crimson CTA. */
+  #modalConfirm{background:var(--field);color:var(--ink);border-color:var(--rule)}
+  #modalConfirm.danger{background:var(--field);color:#C62828;border-color:#C62828}
+  #modalConfirm.danger:hover,#modalConfirm.danger:focus-visible{background:#FBEBEA}
+
+  /* Mobile: slide up from the bottom edge, within thumb reach. */
+  @media (max-width:560px){
+    .scrim{align-items:flex-end;padding:0}
+    .sheet{
+      max-width:none;border-radius:20px 20px 0 0;
+      padding:24px 20px calc(24px + env(safe-area-inset-bottom));
+      animation:sheetup .22s ease;
+    }
+    @keyframes sheetup{from{transform:translateY(100%)}to{transform:translateY(0)}}
+  }
+  @media (prefers-reduced-motion:reduce){.sheet{animation:none}}
+
   .drop.primary{
     border-style:solid;border-color:var(--accent);background:var(--accent-soft);margin-bottom:14px;
   }
@@ -184,14 +227,16 @@
       <a href="./" class="scanlink">Scan new cards &rarr;</a>
     </div>
   <header>
-    <h1>Card Archive</h1>
+    <h1>View Cards</h1>
     <p>Your greeting cards, kept for good.</p>
   </header>
 
-  <section id="start">
+  <!-- Signed-in visitors skip this and load straight into #view. It only shows
+       when signed out, as a sign-in prompt. -->
+  <section id="start" class="hidden">
     <div class="drop primary" id="cloudOpen" tabindex="0" role="button">
-      <strong id="cloudTitle">Open Your Archive</strong>
-      <span id="cloudSub">Cards you sent to the cloud</span>
+      <strong id="cloudTitle">Sign in to Your Archive</strong>
+      <span id="cloudSub">Google sign-in — nothing to remember</span>
     </div>
 
     <!-- Folder mode is now the export's reader, not a front-door feature.
@@ -242,6 +287,20 @@
   <button id="boxClose">Close</button>
 </div>
 
+<!-- Reusable confirm dialog. Centred on desktop, a bottom sheet on mobile.
+     Cancel is the safe default (focused on open); click-outside and Escape
+     cancel, never confirm. Driven by openConfirm() below. -->
+<div class="scrim hidden" id="modal">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="modalTitle" aria-describedby="modalBody">
+    <h2 id="modalTitle">Confirm</h2>
+    <p id="modalBody"></p>
+    <div class="sheet-acts">
+      <button type="button" id="modalCancel">Cancel</button>
+      <button type="button" id="modalConfirm">OK</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
@@ -264,7 +323,35 @@
     appId:"1:497477643272:web:9f8e43fbffd18003e5f5bd"
   };
   var SPACE='family';   // shared space; the rules' email allowlist gates access
+  var OWNER_EMAIL='aprkim@gmail.com';   // mirrors the owner in the security rules
+  function isOwner(){return !!(authUser&&authUser.email===OWNER_EMAIL)}
   var fbReady=false,fbDb=null,fbStore=null,authUser=null,cloudCode='';
+
+  /* ---- reusable confirm dialog ----
+     One component for delete now, sign-out / bulk / export later. Cancel is the
+     safe default: focused on open, so Enter activates it, and click-outside and
+     Escape cancel — the destructive action only fires from its own button. */
+  var onConfirm=null;
+  function openConfirm(opts){
+    $('modalTitle').textContent=opts.title||'Confirm';
+    $('modalBody').textContent=opts.body||'';
+    var c=$('modalConfirm');
+    c.textContent=opts.confirmText||'OK';
+    c.classList.toggle('danger',!!opts.danger);
+    onConfirm=opts.onConfirm||null;
+    $('modal').classList.remove('hidden');
+    $('modalCancel').focus();
+  }
+  function closeConfirm(){$('modal').classList.add('hidden');onConfirm=null}
+  $('modalCancel').onclick=closeConfirm;
+  $('modalConfirm').onclick=function(){var fn=onConfirm;closeConfirm();if(fn)fn()};
+  // Click-outside cancels; it must never trigger the destructive action
+  $('modal').onclick=function(e){if(e.target===$('modal'))closeConfirm()};
+  document.addEventListener('keydown',function(e){
+    if(e.key==='Escape'&&!$('modal').classList.contains('hidden')){
+      e.stopPropagation();closeConfirm();
+    }
+  },true);   // capture: take Escape before the lightbox handler
 
   /* The whole card list lives in one document, so changing a single card is a
      read-modify-write of that array. Fine for one person editing their own
@@ -332,14 +419,32 @@
     }
   }
 
+  // Already signed in → straight into the cards, no intermediate "open" tap.
+  // Signed out → show the sign-in prompt (signing in needs a click anyway).
   currentUser().then(function(u){
-    paintCloudButton();
-    if(!u&&fbReady){
-      firebase.auth().getRedirectResult().then(function(r){
-        if(r&&r.user){authUser=r.user;paintCloudButton();loadCloud()}
-      }).catch(function(){});
+    if(u){
+      authUser=u;
+      openArchive();
+    }else{
+      paintCloudButton();
+      $('start').classList.remove('hidden');
+      if(fbReady){
+        firebase.auth().getRedirectResult().then(function(r){
+          if(r&&r.user){authUser=r.user;openArchive()}
+        }).catch(function(){});
+      }
     }
   });
+
+  // Show the card view immediately with a loading line, then fetch. Keeps the
+  // entry card from flashing when we already know who the user is.
+  function openArchive(){
+    $('start').classList.add('hidden');
+    $('view').classList.remove('hidden');
+    $('meta').textContent='Loading your cards…';
+    $('groups').innerHTML='';
+    loadCloud();
+  }
 
   $('cloudOpen').onclick=loadCloud;
   $('cloudOpen').onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();loadCloud()}};
@@ -358,7 +463,13 @@
       if(!doc)return;
       var rows=(doc.exists&&doc.data().cards)||[];
       if(!rows.length){
-        $('cloudSub').textContent='No cards yet — turn on “Send cards to your archive” in the scanner.';
+        // Auto-open hides #start, so the empty message must live in #view
+        cards=[];fromCloud=true;
+        $('start').classList.add('hidden');
+        $('view').classList.remove('hidden');
+        $('people').innerHTML='';$('meta').textContent='';
+        $('wipe').classList.add('hidden');
+        $('groups').innerHTML='<p class="empty">No cards yet — scan your first from the home screen.</p>';
         return;
       }
       // Resolve every page path to a download URL before rendering
@@ -447,7 +558,8 @@
     list.forEach(function(x){who[x.person]=1;shots+=x.pages.length});
     $('meta').textContent=list.length+' cards \u00b7 '+shots+' photos \u00b7 '+Object.keys(who).length+' people';
     // Only offer a bulk delete for stores we own; folder files are read-only
-    $('wipe').classList.toggle('hidden',!(fromCloud&&cards.length));
+    // Delete All is owner-only too, for the same reason as the per-card delete
+    $('wipe').classList.toggle('hidden',!(fromCloud&&cards.length&&isOwner()));
 
     var buckets={},order=[];
     list.forEach(function(x){
@@ -494,9 +606,13 @@
         nav.appendChild(b);
       });
     }
-    // Folder-loaded cards are files on disk we cannot write, so editing and
-    // deleting are offered only for cards in the cloud archive.
+    // Editing and deleting are the owner's alone — viewers (Nathan, Hazel) are
+    // read-only, so those controls must not even render for them. Download
+    // stays available to anyone who can see the card.
+    var owner=fromCloud&&isOwner();
     $('boxTools').classList.toggle('hidden',!fromCloud);
+    $('boxEdit').classList.toggle('hidden',!owner);
+    $('boxDel').classList.toggle('hidden',!owner);
     $('boxForm').classList.add('hidden');$('box').classList.remove('editing');
     $('box').classList.remove('hidden');
   }
@@ -554,10 +670,19 @@
 
   $('boxDel').onclick=function(e){
     e.stopPropagation();
-    if(!openCard)return;
-    if(!confirm('Delete this card from your archive (on every device)? Exported files are not affected.'))return;
-    var id=openCard.id,card=openCard;
+    if(!openCard||!isOwner())return;
+    var card=openCard;
+    openConfirm({
+      title:'Delete this card?',
+      body:'It disappears from your archive on every device.',
+      confirmText:'Delete',
+      danger:true,
+      onConfirm:function(){deleteCard(card)}
+    });
+  };
 
+  function deleteCard(card){
+    var id=card.id;
     // Remove the images first, then the index entry. If an image delete fails
     // the entry survives, which is recoverable; the reverse would orphan files
     // nothing points at.
@@ -575,7 +700,7 @@
       alert('Could not delete that card.');
       if(window.console)console.warn(e);
     });
-  };
+  }
 
   $('boxDl').onclick=function(e){
     e.stopPropagation();
