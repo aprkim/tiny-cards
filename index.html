@@ -93,6 +93,10 @@
     display:flex;flex-direction:column;align-items:center;justify-content:center;
     text-align:center;padding:24px 0 3vh;
   }
+  /* Logged out there is no count to fill the space, so centring left the
+     illustration floating far below the header and reading as disconnected.
+     Anchor it just under the header instead; the sign-in stays pinned low. */
+  body.home-out .hero{justify-content:flex-start;padding-top:8px}
   .heroart{position:relative;height:150px;margin:0 auto 18px;width:126px;flex:0 0 auto}
   .heroart span{position:absolute;border-radius:12px;background:#fff;border:2.5px solid var(--accent)}
   .heroart .c1{inset:12px 22px 12px 0;transform:rotate(-9deg);background:var(--accent-soft)}
@@ -365,12 +369,12 @@
   @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
-<body class="view-home">
+<body class="view-home home-out">
 <div class="wrap">
 
   <header>
     <h1 id="pageTitle">Tiny Cards</h1>
-    <p id="pageSub">Scan greeting cards and keep them forever.</p>
+    <p id="pageSub">Scan paper greeting cards and keep them in one shared archive.</p>
   </header>
 
   <!-- Landing screen. A tall flex column: the illustration and the running
@@ -400,9 +404,6 @@
           </svg>
           <span>Sign in with Google</span>
         </button>
-        <div class="footlink">
-          <a class="altlink" href="#" id="skipSignIn">Scan without an account &rarr;</a>
-        </div>
       </div>
     </div>
 
@@ -840,9 +841,8 @@
     $('home').classList.remove('hidden');
     ['start','crop','meta','finish'].forEach(function(id){$(id).classList.add('hidden')});
     $('pageTitle').textContent='Tiny Cards';
-    $('pageSub').textContent='Scan greeting cards and keep them forever.';
     document.body.classList.add('view-home');   // centre the title on home only
-    paintHome();
+    paintHome();                                 // paintHome owns the subtitle
   }
   function showScanner(){
     $('home').classList.add('hidden');
@@ -854,9 +854,18 @@
   function paintHome(){
     var inEl=$('signedIn'),outEl=$('signedOut');
     if(!inEl)return;
-    inEl.classList.toggle('hidden',!authUser);
-    outEl.classList.toggle('hidden',!!authUser);
-    if(authUser){
+    var signedIn=!!authUser;
+    inEl.classList.toggle('hidden',!signedIn);
+    outEl.classList.toggle('hidden',signedIn);
+    // Logged out pulls the illustration up under the header (no count to fill
+    // the gap); signed in centres it with the count.
+    document.body.classList.toggle('home-out',!signedIn);
+    // Explain the app before login — the first thing Nathan and Hazel see;
+    // a short tagline once you are in.
+    $('pageSub').textContent=signedIn
+      ? 'Scan greeting cards and keep them forever.'
+      : 'Scan paper greeting cards and keep them in one shared archive.';
+    if(signedIn){
       $('whoText').textContent='Signed in as '+
         (authUser.email||authUser.displayName||'your account');
       paintCount();
@@ -902,9 +911,6 @@
         btn.disabled=false;btn.querySelector('span').textContent='Sign in with Google';
       });
     };
-  }
-  if($('skipSignIn')){
-    $('skipSignIn').onclick=function(e){e.preventDefault();showScanner()};
   }
   if($('goScan'))$('goScan').onclick=showScanner;
   if($('backHome'))$('backHome').onclick=showHome;
