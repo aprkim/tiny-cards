@@ -142,6 +142,16 @@
   }
   .box button:hover{background:rgba(255,255,255,.12)}
   .box button.on{background:#fff;color:var(--ink);border-color:#fff}
+  /* Close is an X pinned to the top-right of the lightbox. Fixed, so it stays
+     put while a tall card scrolls; overrides the pill button styles above. */
+  .box button.boxx{
+    position:fixed;top:calc(env(safe-area-inset-top) + 12px);right:14px;z-index:51;
+    width:40px;height:40px;padding:0;border-radius:50%;text-transform:none;
+    display:flex;align-items:center;justify-content:center;
+    border:1px solid rgba(255,255,255,.28);background:rgba(0,0,0,.28);
+  }
+  .box button.boxx:hover{background:rgba(255,255,255,.16)}
+  .box button.boxx svg{width:20px;height:20px;display:block}
 
   /* ---- confirm dialog ----
      Reusable across delete, sign-out, bulk actions and export. Cream surface
@@ -326,6 +336,9 @@
 </div>
 
 <div class="box hidden" id="box">
+  <button id="boxClose" class="boxx" type="button" aria-label="Close">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+  </button>
   <img id="boxImg" alt="">
   <div class="cap">
     <strong id="boxName"></strong>
@@ -350,8 +363,6 @@
       <button type="button" class="sec" id="eCancel">Cancel</button>
     </div>
   </div>
-
-  <button id="boxClose">Close</button>
 </div>
 
 <!-- Reusable confirm dialog. Centred on desktop, a bottom sheet on mobile.
@@ -382,7 +393,7 @@
       <div class="set-sep"></div>
       <button type="button" class="signout" id="setSignOut">Sign out</button>
     </div>
-    <p class="setver">v2026.08.06.11</p>
+    <p class="setver">v2026.08.06.12</p>
   </div>
 </div>
 
