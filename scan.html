@@ -675,7 +675,7 @@
       <div class="set-sep"></div>
       <button type="button" class="signout" id="setSignOut">Sign out</button>
     </div>
-    <p class="setver">v2026.08.06.6</p>
+    <p class="setver">v2026.08.06.7</p>
   </div>
 </div>
 
@@ -685,7 +685,9 @@
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
 <script>
 (function(){
-  var LABELS=['front','inside','back','p4','p5'];
+  // A card holds up to 4 photos: front, inside, back, extra.
+  var LABELS=['front','inside','back','extra'];
+  var MAX_PAGES=LABELS.length;
 
   /* Labels are explicit per page, defaulting to shooting order but editable
      on the naming screen. The next shot takes the first UNUSED label, so
@@ -1118,7 +1120,7 @@
     });
   };
 
-  $('addPage').onclick=function(){openCamera()};
+  $('addPage').onclick=function(){if(pages.length>=MAX_PAGES)return;openCamera()};
 
   $('dropzone').onclick=function(){mode='batch';picker.value='';picker.click()};
   $('dropzone').onkeydown=function(e){
@@ -1486,7 +1488,8 @@
     var th=$('thumbHint');
     if(th)th.classList.toggle('hidden',!sources.some(function(x){return !!x}));
     upHide();
-    $('addPageWrap').classList.toggle('hidden',mode!=='capture');
+    // Cap a card at 4 photos (front/inside/back/extra): hide "Add a photo" at 4.
+    $('addPageWrap').classList.toggle('hidden',mode!=='capture'||pages.length>=MAX_PAGES);
     // Keep the sender when adding pages to the card already being named
     if(!pages.length||pages.length===1)$('sender').value='';
     paintName();chips();
