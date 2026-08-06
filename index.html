@@ -23,6 +23,7 @@
   :root{
     --ink:#16161D;--paper:#FAF9F6;--accent:#B0184F;--accent-soft:#FBEDF2;
     --muted:#6E6E78;--rule:#E4E2DB;--field:#FFFFFF;
+    --barh:calc(54px + env(safe-area-inset-bottom));
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html{-webkit-text-size-adjust:100%}
@@ -34,6 +35,23 @@
   }
   .wrap{max-width:460px;margin:0 auto;padding:24px 18px 44px}
   header{margin-bottom:22px}
+
+  /* Fixed bottom nav — Scan and View, on every page. Its own safe-area padding
+     clears the iPhone home indicator; --barh reserves matching space above so
+     page content never hides behind it. */
+  .tabbar{
+    position:fixed;left:0;right:0;bottom:0;z-index:40;
+    display:flex;background:var(--paper);border-top:1px solid var(--rule);
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  .tabbar a{
+    flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:2px;padding:8px 0 7px;text-decoration:none;color:var(--muted);
+    font-size:11px;font-weight:600;letter-spacing:.01em;-webkit-tap-highlight-color:transparent;
+  }
+  .tabbar a svg{width:23px;height:23px;display:block}
+  .tabbar a.on{color:var(--accent)}
+  .tabbar a:active{background:rgba(0,0,0,.035)}
   h1{font-size:19px;font-weight:700;letter-spacing:-.02em}
   header p{font-size:13.5px;color:var(--muted);margin-top:3px}
   /* On the home screen everything below is centred, so the title matches.
@@ -82,7 +100,7 @@
      come and go. */
   #home{
     display:flex;flex-direction:column;
-    min-height:calc(100dvh - 150px);
+    min-height:calc(100dvh - 150px - var(--barh));
   }
   /* Middle zone. justify-content:center would land dead-centre, which reads as
      low with this much whitespace, so the extra bottom padding nudges the block
@@ -103,12 +121,11 @@
   .cardcount{font-size:15px;color:var(--muted);min-height:22px}
   .cardcount b{color:var(--ink);font-weight:700;font-variant-numeric:tabular-nums}
 
-  /* Bottom zone: reserve the same height in both states and pin content to the
-     bottom, so the flexible hero above is identical and the illustration lands
-     in the same place logged out as logged in — otherwise the single sign-in
-     button leaves more room than the two buttons + account row, and the card
-     jumps on login. */
-  .homefill{flex:0 0 auto;display:flex;flex-direction:column;justify-content:flex-end;min-height:162px}
+  /* Bottom zone: Scan/View now live in the fixed bar, so this holds only the
+     sign-in button (logged out) or the account row (logged in). Both states
+     reserve the same height and pin to the bottom so the hero above is identical
+     and the illustration doesn't jump on login. */
+  .homefill{flex:0 0 auto;display:flex;flex-direction:column;justify-content:flex-end;min-height:76px}
   .signinblock{width:100%}
 
   .gbtn{
@@ -410,10 +427,6 @@
     </div>
 
     <div id="signedIn" class="homefill hidden">
-      <div class="homeacts">
-        <a class="go" href="scan.html" id="goScan">Scan Cards</a>
-        <a class="go alt" href="cards.html" id="goArchive">View Cards</a>
-      </div>
       <p class="who"><span id="whoText">Signed in</span>
         <button type="button" class="linkbtn" id="signOutBtn">Sign out</button></p>
     </div>
@@ -539,5 +552,16 @@
   paintHome();
 })();
 </script>
+
+<nav class="tabbar" aria-label="Primary">
+  <a href="scan.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 8.5h2.7l1.3-2h6.8l1.3 2h2.9a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H4.5a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1Z"/><circle cx="12" cy="13" r="3.1"/></svg>
+    <span>Scan</span>
+  </a>
+  <a href="cards.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="6.4" height="6.4" rx="1.6"/><rect x="13.6" y="4" width="6.4" height="6.4" rx="1.6"/><rect x="4" y="13.6" width="6.4" height="6.4" rx="1.6"/><rect x="13.6" y="13.6" width="6.4" height="6.4" rx="1.6"/></svg>
+    <span>View</span>
+  </a>
+</nav>
 </body>
 </html>
