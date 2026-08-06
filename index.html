@@ -364,7 +364,10 @@
   .upbar{height:3px;background:rgba(176,24,79,.18);border-radius:2px;overflow:hidden;margin-top:8px}
   .upbar i{display:block;height:100%;background:var(--accent);width:0;transition:width .2s ease}
 
-  .hidden{display:none}
+  /* !important so it beats id-specificity display rules like #home{display:flex}
+     — without it, adding .hidden to #home did nothing and the home screen
+     stayed on top of the scanner. */
+  .hidden{display:none!important}
   @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
@@ -841,6 +844,7 @@
     ['start','crop','meta','finish'].forEach(function(id){$(id).classList.add('hidden')});
     $('pageTitle').textContent='Tiny Cards';
     document.body.classList.add('view-home');   // centre the title on home only
+    window.scrollTo(0,0);
     paintHome();                                 // paintHome owns the subtitle
   }
   function showScanner(){
@@ -849,6 +853,7 @@
     $('pageTitle').textContent='Card Scanner';
     $('pageSub').textContent='Crop, name, export. You choose where cards go.';
     document.body.classList.remove('view-home');
+    window.scrollTo(0,0);   // land at the top, like a page change
   }
   function paintHome(){
     var inEl=$('signedIn'),outEl=$('signedOut');
