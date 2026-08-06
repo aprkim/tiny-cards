@@ -550,8 +550,8 @@
     </div>
 
     <div class="actions">
-      <button class="go" id="applyCrop">Straighten &amp; Next</button>
-      <button class="skip" id="noCrop">Keep As-Is</button>
+      <button class="go" id="applyCrop">Crop</button>
+      <button class="skip" id="noCrop">Keep Original</button>
     </div>
   </section>
 
@@ -679,7 +679,7 @@
       <div class="set-sep"></div>
       <button type="button" class="signout" id="setSignOut">Sign out</button>
     </div>
-    <p class="setver">v2026.08.06.2</p>
+    <p class="setver">v2026.08.06.3</p>
   </div>
 </div>
 
@@ -1310,10 +1310,10 @@
   /* ---- end warp ---- */
 
   $('applyCrop').onclick=function(){
-    var btn=$('applyCrop');btn.disabled=true;btn.textContent='Straightening\u2026';
+    var btn=$('applyCrop');btn.disabled=true;btn.textContent='Cropping\u2026';
     setTimeout(function(){
       var dc=warp();
-      btn.disabled=false;btn.textContent='Straighten & Next';
+      btn.disabled=false;btn.textContent='Crop';
       if(!dc){alert('Selected area is too small. Adjust the dots and try again.');return}
       dc.toBlob(function(bl){acceptPage(bl)},'image/jpeg',0.92);
     },30);
@@ -1375,7 +1375,7 @@
       pages[redoIndex]=blob;
       cornerSets[redoIndex]=corners.slice();
       redoIndex=-1;
-      $('applyCrop').textContent='Straighten & Next';
+      $('applyCrop').textContent='Crop';
       return toMeta();
     }
     pages.push(blob);
@@ -1401,7 +1401,7 @@
     $('meta').classList.add('hidden');
     $('crop').classList.remove('hidden');
     $('pageTag').textContent=(pageLabels[i]||('p'+(i+1)))+' · redo';
-    $('applyCrop').textContent='Straighten & Replace';
+    $('applyCrop').textContent='Recrop';
 
     var u=URL.createObjectURL(src);
     img=new Image();
