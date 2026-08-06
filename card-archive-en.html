@@ -50,13 +50,6 @@
   .drop:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   .drop strong{display:block;font-size:15.5px;font-weight:600;margin-bottom:6px}
   .drop span{font-size:13px;color:var(--muted)}
-  .hint{
-    margin-top:18px;padding:13px 15px;background:var(--field);
-    border:1px solid var(--rule);border-radius:12px;
-    font-size:13px;color:var(--muted);line-height:1.75;
-  }
-  .hint b{color:var(--ink);font-weight:600}
-  .hint code{font-size:12.5px;background:var(--paper);padding:2px 6px;border-radius:5px;color:var(--ink)}
 
   input[type=search]{
     width:100%;font:inherit;font-size:16px;padding:12px 14px;
@@ -192,7 +185,7 @@
     </div>
   <header>
     <h1>Card Archive</h1>
-    <p>Open your cloud archive, this device&rsquo;s library, or a folder of files.</p>
+    <p>Your greeting cards, kept for good.</p>
   </header>
 
   <section id="start">
@@ -201,21 +194,10 @@
       <span id="cloudSub">Cards you sent to the cloud</span>
     </div>
 
-    <div class="drop" id="drop" tabindex="0" role="button">
-      <strong>Open Card Photos From a Folder</strong>
-      <span>Select exported files instead</span>
-    </div>
-    <input type="file" id="picker" accept="image/*" multiple class="hidden">
-    <div class="hint">
-      The filename is the data. <code>2026-08-03 Mothers Day - Hazel from Grandma Kim - front.jpg</code>
-      is read as date, occasion, recipient, sender, and page. Older names like
-      <code>2026-08-02 HazelBirthday Grandma Kim.jpg</code> still work.
-      Multi-page cards are grouped automatically, and anything that doesn't match
-      lands in <b>Unsorted</b>, so nothing disappears.
-    </div>
-
+    <!-- Folder mode is now the export's reader, not a front-door feature.
+         It lives on /viewer, reached by a quiet link. -->
     <div class="footlink">
-      <a class="altlink" href="./">&larr; Scan new cards</a>
+      <a class="altlink" href="viewer.html">Have exported files? Open the file viewer &rarr;</a>
     </div>
   </section>
 
@@ -268,10 +250,6 @@
 (function(){
   var cards=[],urls=[],filter=null,openCard=null,openPage=0,fromCloud=false;
   var $=function(id){return document.getElementById(id)};
-  var picker=$('picker'),drop=$('drop');
-
-  drop.onclick=function(){picker.click()};
-  drop.onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();picker.click()}};
 
   /* ==================== ARCHIVE (Firebase) ====================
      Storage rules deny `list`, so the bucket cannot be walked. The Firestore
@@ -422,91 +400,9 @@
     });
   }
 
-  var DATE=/^(\d{4})-(\d{2})-(\d{2})\s+(.+)$/;
-  var PAGE=/^(.*?)\s+-\s+(front|inside|back|p\d+)$/i;
-  var FROM=/^(.*?)\s+from\s+(.+)$/i;
-  var ORDER={front:0,inside:1,back:2};
-
-  /* Two filename shapes are supported:
-       new  2026-08-03 Mothers Day - Hazel from Grandma Kim - front
-       old  2026-08-03 HazelBirthday Grandma Kim - front
-     The old shape has no "from", so the occasion is the first word only —
-     that is why it was always written as one run-together token. The new
-     shape delimits on " from ", which lets the occasion contain spaces. */
-  function parse(stem){
-    var m=stem.match(DATE);
-    if(!m)return null;
-
-    var rest=m[4].trim(),label='';
-    var pm=rest.match(PAGE);
-    if(pm){rest=pm[1].trim();label=pm[2].toLowerCase()}
-
-    var event,person,recipient='';
-    var fm=rest.match(FROM);
-    if(fm){
-      // new: "Occasion[ - Recipient] from Sender". Non-greedy, so a sender
-      // containing "from" stays intact.
-      var left=fm[1].trim();
-      person=fm[2].trim();
-      var cut=left.lastIndexOf(' - ');
-      if(cut>-1){event=left.slice(0,cut).trim();recipient=left.slice(cut+3).trim()}
-      else event=left;
-    }else{
-      // old: "Occasion Sender", occasion is a single token
-      var sp=rest.indexOf(' ');
-      if(sp<0){event=rest;person=''}
-      else{event=rest.slice(0,sp);person=rest.slice(sp+1).trim()}
-    }
-
-    if(!event)return null;
-    return {date:m[1]+'-'+m[2]+'-'+m[3],year:m[1],event:event,
-            person:person||'Unknown',recipient:recipient,label:label};
-  }
-
-  picker.onchange=function(){
-    if(!picker.files.length)return;
-    urls.forEach(URL.revokeObjectURL);
-    cards=[];urls=[];fromCloud=false;
-    var byKey={};
-
-    Array.prototype.slice.call(picker.files).forEach(function(f){
-      if(!/^image\//.test(f.type))return;
-      var stem=f.name.replace(/\.[^.]+$/,'');
-      var u=URL.createObjectURL(f);urls.push(u);
-
-      var p=parse(stem);
-      if(!p){
-        cards.push({key:stem,date:'',year:'',event:'Unsorted',person:stem,recipient:'',
-                    ok:false,pages:[{url:u,label:''}]});
-        return;
-      }
-
-      var key=p.date+'|'+p.event+'|'+p.recipient+'|'+p.person;
-      if(!byKey[key]){
-        byKey[key]={key:key,date:p.date,year:p.year,event:p.event,
-                    person:p.person,recipient:p.recipient,ok:true,pages:[]};
-        cards.push(byKey[key]);
-      }
-      byKey[key].pages.push({url:u,label:p.label});
-    });
-
-    cards.forEach(function(c){
-      c.pages.sort(function(a,b){
-        var x=ORDER[a.label],y=ORDER[b.label];
-        if(x===undefined)x=9;if(y===undefined)y=9;
-        return x-y||a.label.localeCompare(b.label);
-      });
-    });
-
-    cards.sort(function(a,b){
-      if(a.date===b.date)return a.person.localeCompare(b.person);
-      return b.date.localeCompare(a.date);
-    });
-
-    $('start').classList.add('hidden');
-    $('view').classList.remove('hidden');
-    people();render();
-  };
+  /* Folder mode — reading exported files off disk — moved to viewer.html,
+     a self-contained page with no Firebase. The parser and regexes it used
+     live there now. This page only reads the cloud archive. */
 
   function esc(t){var d=document.createElement('div');d.textContent=t;return d.innerHTML}
 

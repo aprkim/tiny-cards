@@ -207,15 +207,32 @@
     display:block;font-size:11.5px;color:var(--muted);margin-top:5px;
     text-transform:uppercase;letter-spacing:.04em;
   }
-  /* Thumbnails double as a way back into the crop for that page */
-  button.pg{
-    font:inherit;background:none;border:none;padding:0;cursor:pointer;
-    -webkit-appearance:none;appearance:none;
+  /* The image doubles as the way back into the crop for that page. It is
+     its own button so the label select beside it stays independent. */
+  .pgredo{
+    display:block;width:100%;font:inherit;background:none;border:none;padding:0;
+    cursor:pointer;-webkit-appearance:none;appearance:none;
   }
-  button.pg img{transition:border-color .15s}
-  button.pg:hover img,button.pg:focus-visible img{border-color:var(--accent)}
-  button.pg:hover span,button.pg:focus-visible span{color:var(--accent)}
-  button.pg:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:12px}
+  .pgredo img{transition:border-color .15s}
+  .pgredo:hover img,.pgredo:focus-visible img{border-color:var(--accent)}
+  .pgredo:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:12px}
+
+  .pglabel{
+    width:100%;margin-top:5px;font:inherit;font-size:11px;font-weight:600;
+    text-transform:uppercase;letter-spacing:.04em;
+    color:var(--accent);background:var(--accent-soft);
+    border:1px solid transparent;border-radius:6px;padding:4px 20px 4px 8px;cursor:pointer;
+    -webkit-appearance:none;appearance:none;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'><path d='M1 1l4 4 4-4' fill='none' stroke='%23B0184F' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+    background-repeat:no-repeat;background-position:right 7px center;
+  }
+  .pglabel:hover{border-color:var(--accent)}
+  .pglabel:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+
+  .thumbhint{
+    text-align:center;font-size:11.5px;color:var(--muted);
+    margin:-10px 0 14px;
+  }
   .pg .bad{
     width:100%;aspect-ratio:3/4;background:var(--field);
     border:1px dashed var(--rule);border-radius:10px;
@@ -387,7 +404,7 @@
     </div>
 
     <div class="hint">
-      <b>Taking photos:</b> shoot the front, then tap <b>Add another page</b> for the inside.
+      <b>Taking photos:</b> shoot the front, then tap <b>Add a photo to this card</b> for the inside.
       Nothing is written to your camera roll.
       <br><b>Choosing photos:</b> they are grouped in order — front, inside, front, inside…
       using the setting above.
@@ -468,8 +485,9 @@
       <div class="upbar"><i id="upFill"></i></div>
     </div>
     <div class="pages" id="thumbs"></div>
+    <p class="thumbhint hidden" id="thumbHint">Tap a photo to redo its crop &middot; use the label to mark front / inside</p>
     <div class="footlink hidden" id="addPageWrap" style="margin-top:0;margin-bottom:16px">
-      <button type="button" class="tool" id="addPage">+ Add another page</button>
+      <button type="button" class="tool" id="addPage">+ Add a photo to this card</button>
     </div>
     <div class="name" id="preview"></div>
 
@@ -560,6 +578,18 @@
 <script>
 (function(){
   var LABELS=['front','inside','back','p4','p5'];
+
+  /* Labels are explicit per page, defaulting to shooting order but editable
+     on the naming screen. The next shot takes the first UNUSED label, so
+     relabelling page one as "inside" makes the next default "front" rather
+     than a duplicate. */
+  var pageLabels=[];
+  function nextLabel(){
+    for(var i=0;i<LABELS.length;i++){
+      if(pageLabels.indexOf(LABELS[i])===-1)return LABELS[i];
+    }
+    return 'p'+(pages.length+1);
+  }
 
   var files=[],perCard=2,cursor=0,cardNo=0;
   var pages=[],pageIdx=0,pageCount=0;
@@ -922,7 +952,7 @@
   var pendingNewCard=false;
 
   function startCapture(){
-    pages=[];sources=[];cornerSets=[];redoIndex=-1;pageIdx=0;pendingNewCard=true;
+    pages=[];pageLabels=[];sources=[];cornerSets=[];redoIndex=-1;pageIdx=0;pendingNewCard=true;
     $('warn').classList.add('hidden');
     openCamera();
   }
@@ -937,7 +967,7 @@
     $('crop').classList.remove('hidden');
     $('cardNo').textContent=cardNo;
     $('cardTot').textContent=cardNo;
-    $('pageTag').textContent=LABELS[pageIdx]||('p'+(pageIdx+1));
+    $('pageTag').textContent=nextLabel();
     $('fill').style.width='0%';
 
     curSource=f;
@@ -978,7 +1008,7 @@
     if(cursor>=files.length)return finish();
     cardNo++;
     $('warn').classList.add('hidden');
-    pages=[];sources=[];cornerSets=[];redoIndex=-1;pageIdx=0;
+    pages=[];pageLabels=[];sources=[];cornerSets=[];redoIndex=-1;pageIdx=0;
     pageCount=Math.min(perCard,files.length-cursor);
     $('cardNo').textContent=cardNo;
     loadPage();
@@ -988,7 +1018,7 @@
     if(pageIdx>=pageCount)return toMeta();
     $('meta').classList.add('hidden');
     $('crop').classList.remove('hidden');
-    $('pageTag').textContent=LABELS[pageIdx]||('p'+(pageIdx+1));
+    $('pageTag').textContent=nextLabel();
     $('fill').style.width=(cursor/files.length*100)+'%';
 
     curSource=files[cursor];
@@ -1200,11 +1230,12 @@
       return toMeta();
     }
     pages.push(blob);
+    pageLabels.push(nextLabel());
     sources.push(curSource);
     cornerSets.push(corners.slice());
     pageIdx++;
     // In capture mode there is no queue to walk — go straight to naming,
-    // where "Add another page" reopens the camera for this same card.
+    // where "Add a photo to this card" reopens the camera for it.
     if(mode==='capture')return toMeta();
     cursor++;
     loadPage();
@@ -1220,7 +1251,7 @@
     curSource=src;
     $('meta').classList.add('hidden');
     $('crop').classList.remove('hidden');
-    $('pageTag').textContent=(LABELS[i]||('p'+(i+1)))+' · redo';
+    $('pageTag').textContent=(pageLabels[i]||('p'+(i+1)))+' · redo';
     $('applyCrop').textContent='Straighten & Replace';
 
     var u=URL.createObjectURL(src);
@@ -1245,35 +1276,72 @@
     var t=$('thumbs');t.innerHTML='';
     pages.forEach(function(bl,i){
       var u=URL.createObjectURL(bl);thumbURLs.push(u);
-      var lbl=LABELS[i]||('p'+(i+1));
-      // A page could not be re-cropped once accepted, and a misplaced corner
-      // is only obvious here, next to the other pages. Tapping reopens it.
+      var lbl=pageLabels[i]||('p'+(i+1));
       var canRedo=!!sources[i];
-      var d=document.createElement(canRedo?'button':'div');
-      d.className='pg'+(canRedo?' redoable':'');
+      var d=document.createElement('div');d.className='pg';
+
+      // The image is the way back into the crop. It must be its own button:
+      // nesting the label <select> inside a button would send every label
+      // tap through to redoPage as well.
+      var holder=d;
       if(canRedo){
-        d.type='button';
-        d.title='Redo this crop';
-        d.setAttribute('aria-label','Redo the crop for '+lbl);
-        d.onclick=function(){redoPage(i)};
+        holder=document.createElement('button');
+        holder.type='button';holder.className='pgredo';
+        holder.title='Redo this crop';
+        holder.setAttribute('aria-label','Redo the crop for '+lbl);
+        holder.onclick=function(){redoPage(i)};
+        d.appendChild(holder);
       }
       var im=document.createElement('img');im.src=u;im.alt=lbl;
       im.onerror=function(){
         var ph=document.createElement('div');
         ph.className='bad';ph.textContent='No preview';
-        if(im.parentNode)d.replaceChild(ph,im);
+        if(im.parentNode)holder.replaceChild(ph,im);
         noteBad();
       };
-      var sp=document.createElement('span');
-      sp.textContent=canRedo?(lbl+' · redo'):lbl;
-      d.appendChild(im);d.appendChild(sp);t.appendChild(d);
+      holder.appendChild(im);
+
+      if(pages.length>1){
+        // Label is a choice, not just a consequence of shooting order
+        var sel=document.createElement('select');
+        sel.className='pglabel';
+        sel.setAttribute('aria-label','Label for this photo');
+        var opts=LABELS.slice();
+        if(opts.indexOf(lbl)===-1)opts.push(lbl);
+        opts.forEach(function(o){
+          var op=document.createElement('option');
+          op.value=o;op.textContent=o;
+          if(o===lbl)op.selected=true;
+          sel.appendChild(op);
+        });
+        sel.onchange=function(){setLabel(i,sel.value)};
+        d.appendChild(sel);
+      }else{
+        var sp=document.createElement('span');
+        sp.textContent=lbl;
+        d.appendChild(sp);
+      }
+      t.appendChild(d);
     });
+    var th=$('thumbHint');
+    if(th)th.classList.toggle('hidden',!sources.some(function(x){return !!x}));
     upHide();
     $('addPageWrap').classList.toggle('hidden',mode!=='capture');
     // Keep the sender when adding pages to the card already being named
     if(!pages.length||pages.length===1)$('sender').value='';
     paintName();chips();
     if(mode!=='capture')$('sender').focus();
+  }
+
+  /* Duplicate labels would collide in the Storage path (front.jpg twice on
+     one card overwrites), so choosing a taken label swaps with the page that
+     had it — which is also the natural fix when two photos came out in the
+     wrong order. */
+  function setLabel(i,v){
+    var j=pageLabels.indexOf(v);
+    if(j!==-1&&j!==i)pageLabels[j]=pageLabels[i];
+    pageLabels[i]=v;
+    toMeta();
   }
 
   function clean(s){return (s||'').replace(/[\/\\:*?"<>|]/g,'').replace(/\s+/g,' ').trim()}
@@ -1294,7 +1362,7 @@
   function nameFor(i){
     var ext=(pages[i]&&pages[i].type==='image/png')?'png':'jpg';
     if(pages.length===1)return base()+'.'+ext;
-    return base()+' - '+(LABELS[i]||('p'+(i+1)))+'.'+ext;
+    return base()+' - '+(pageLabels[i]||('p'+(i+1)))+'.'+ext;
   }
 
   function esc(t){var d=document.createElement('div');d.textContent=t;return d.innerHTML}
@@ -1341,12 +1409,8 @@
 
   $('skipCard').onclick=function(){
     if(!confirm('Discard this card without saving it?'))return;
-    pages=[];sources=[];cornerSets=[];redoIndex=-1;pageIdx=0;
-    if(mode==='capture'){
-      // Same continue-scanning behaviour as saving, minus the save
-      finish();pendingNewCard=true;openCamera();
-      return;
-    }
+    pages=[];pageLabels=[];sources=[];cornerSets=[];redoIndex=-1;pageIdx=0;
+    if(mode==='capture')return finish();   // tally; continue from there
     startCard();
   };
   $('save').onclick=doSave;
@@ -1367,7 +1431,7 @@
       occasion:occasion(),
       recipient:r,
       sender:s,
-      labels:pages.map(function(_,i){return LABELS[i]||('p'+(i+1))}),
+      labels:pageLabels.slice(),
       savedAt:Date.now()
     };
 
@@ -1399,17 +1463,14 @@
     // The card is saved, so its pages are no longer unsaved work. Without this
     // the beforeunload guard kept firing after a finished batch, warning about
     // losing something that had already gone where it was meant to.
-    pages=[];sources=[];cornerSets=[];redoIndex=-1;pageIdx=0;
+    pages=[];pageLabels=[];sources=[];cornerSets=[];redoIndex=-1;pageIdx=0;
 
     if(mode==='capture'){
-      // Reopen the camera straight away rather than stopping at the tally
-      // after every card — a stack of twenty otherwise costs twenty extra
-      // taps. finish() still runs first, so backing out of the camera lands
-      // on the tally instead of on the card just saved.
-      finish();
-      pendingNewCard=true;
-      openCamera();
-      return;
+      // Land on the tally; "Take Another Card" continues with one tap.
+      // Auto-reopening the camera here was tried and reverted: it fired
+      // outside a click gesture (which browsers may block), surprised the
+      // user, and on desktop popped an uninvited file-picker dialog.
+      return finish();
     }
     startCard();
   }
