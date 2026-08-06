@@ -446,6 +446,9 @@
   }
   button.set-row:hover,button.set-row:focus-visible{color:var(--accent)}
   button.set-row:focus-visible{outline:none}
+  /* Build stamp — bumped every deploy so it's obvious whether the live page is
+     the current version. */
+  .setver{margin-top:16px;text-align:center;font-size:11.5px;color:#9A9AA2;letter-spacing:.02em}
 
   /* Gear, top-right of the scanner header — shown once signed in. */
   header.viewhead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
@@ -659,16 +662,9 @@
         <span class="set-v" id="setEmail">Signed in</span>
       </div>
       <div class="set-sep"></div>
-      <div class="set-row set-toggle">
-        <div class="tt">
-          <b>Also export as files</b>
-          <small id="expNote">Opens the share sheet so you can file each card yourself.</small>
-        </div>
-        <button type="button" class="sw" id="expToggle" role="switch" aria-checked="true" aria-label="Also export as files"></button>
-      </div>
-      <div class="set-sep"></div>
       <button type="button" class="set-row" id="setSignOut">Sign out</button>
     </div>
+    <p class="setver">Tiny Cards &middot; v2026.08.06.1</p>
   </div>
 </div>
 
@@ -793,12 +789,11 @@
      archive it is just an extra tap per card, and on a phone it puts back the
      very files you were trying not to keep — so it defaults off when the
      archive is on. An explicit choice always wins over that default. */
-  var EXPORT_KEY='tinyCards_exportFiles',exportExplicit=false,exportFiles;
-  try{
-    var ev=localStorage.getItem(EXPORT_KEY);
-    exportExplicit=ev!==null;
-    exportFiles=exportExplicit?ev==='1':!useCloud;
-  }catch(e){exportFiles=!useCloud}
+  /* Export UI removed for now: cards go straight to the archive, no share
+     sheet. Locked off (exportExplicit=true keeps paintCloud from flipping it);
+     the save path still branches on exportFiles, and the bulk ZIP export will
+     replace this later. */
+  var EXPORT_KEY='tinyCards_exportFiles',exportExplicit=true,exportFiles=false;
 
   function paintExport(){
     // Can be reached before the export state is set up, so bail rather than

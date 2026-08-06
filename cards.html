@@ -205,6 +205,9 @@
   }
   button.set-row:hover,button.set-row:focus-visible{color:var(--accent)}
   button.set-row:focus-visible{outline:none}
+  /* Build stamp — bumped every deploy so it's obvious whether the live page is
+     the current version. */
+  .setver{margin-top:16px;text-align:center;font-size:11.5px;color:#9A9AA2;letter-spacing:.02em}
 
   /* Gear, top-right of the View header — a deliberate reach, the opposite end
      from the bottom bar so sign-out can't be fat-fingered mid-upload. Only
@@ -370,6 +373,7 @@
       <div class="set-sep"></div>
       <button type="button" class="set-row" id="setSignOut">Sign out</button>
     </div>
+    <p class="setver">Tiny Cards &middot; v2026.08.06.1</p>
   </div>
 </div>
 
