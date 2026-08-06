@@ -216,8 +216,9 @@
   .handle.drag::after{background:var(--accent-soft)}
   .handle:focus-visible{outline:none}
   .handle:focus-visible::after{box-shadow:0 0 0 3px #fff,0 0 0 6px var(--accent)}
-  #h0::after{background:var(--accent);border-color:#fff}
-  #h0.drag::after{background:var(--accent-soft);border-color:var(--accent)}
+  /* All four corner dots look the same. There used to be a distinct "filled"
+     dot marking the output top-left, but Rotate now turns the whole photo
+     (WYSIWYG), so that marker and its explanation only added confusion. */
   .stagehint{font-size:12.5px;color:var(--muted);line-height:1.5}
 
   .tools{display:flex;align-items:center;gap:10px;margin-bottom:14px}
@@ -540,8 +541,7 @@
       <div class="handle" id="h3" tabindex="0" role="slider" aria-label="Bottom-left corner (arrow keys to move)"></div>
     </div>
     <div class="tools">
-      <p class="stagehint">Drag the dots to the card&rsquo;s corners.<br>
-        The <b>filled dot</b> is the top-left.</p>
+      <p class="stagehint">Drag the dots to the card&rsquo;s corners.</p>
       <button type="button" class="tool" id="rot">&#8635; Rotate</button>
     </div>
 
@@ -675,7 +675,7 @@
       <div class="set-sep"></div>
       <button type="button" class="signout" id="setSignOut">Sign out</button>
     </div>
-    <p class="setver">v2026.08.06.5</p>
+    <p class="setver">v2026.08.06.6</p>
   </div>
 </div>
 
