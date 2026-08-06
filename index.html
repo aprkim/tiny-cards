@@ -93,10 +93,6 @@
     display:flex;flex-direction:column;align-items:center;justify-content:center;
     text-align:center;padding:24px 0 3vh;
   }
-  /* Logged out there is no count to fill the space, so centring left the
-     illustration floating far below the header and reading as disconnected.
-     Anchor it just under the header instead; the sign-in stays pinned low. */
-  body.home-out .hero{justify-content:flex-start;padding-top:8px}
   .heroart{position:relative;height:150px;margin:0 auto 18px;width:126px;flex:0 0 auto}
   .heroart span{position:absolute;border-radius:12px;background:#fff;border:2.5px solid var(--accent)}
   .heroart .c1{inset:12px 22px 12px 0;transform:rotate(-9deg);background:var(--accent-soft)}
@@ -107,9 +103,12 @@
   .cardcount{font-size:15px;color:var(--muted);min-height:22px}
   .cardcount b{color:var(--ink);font-weight:700;font-variant-numeric:tabular-nums}
 
-  /* Bottom zone: natural height, so the actions rest against the buttons area
-     rather than filling the screen. */
-  .homefill{flex:0 0 auto;display:flex;flex-direction:column}
+  /* Bottom zone: reserve the same height in both states and pin content to the
+     bottom, so the flexible hero above is identical and the illustration lands
+     in the same place logged out as logged in — otherwise the single sign-in
+     button leaves more room than the two buttons + account row, and the card
+     jumps on login. */
+  .homefill{flex:0 0 auto;display:flex;flex-direction:column;justify-content:flex-end;min-height:162px}
   .signinblock{width:100%}
 
   .gbtn{
@@ -369,7 +368,7 @@
   @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
-<body class="view-home home-out">
+<body class="view-home">
 <div class="wrap">
 
   <header>
@@ -857,9 +856,7 @@
     var signedIn=!!authUser;
     inEl.classList.toggle('hidden',!signedIn);
     outEl.classList.toggle('hidden',signedIn);
-    // Logged out pulls the illustration up under the header (no count to fill
-    // the gap); signed in centres it with the count.
-    document.body.classList.toggle('home-out',!signedIn);
+    // The illustration sits in the same centred position in both states.
     // Explain the app before login — the first thing Nathan and Hazel see;
     // a short tagline once you are in.
     $('pageSub').textContent=signedIn
