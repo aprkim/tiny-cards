@@ -591,6 +591,7 @@
       <div class="field">
         <label for="event">Occasion</label>
         <select id="event">
+          <option value="" selected>Occasion&hellip;</option>
           <option value="Birthday">Birthday</option>
           <option value="Anniversary">Anniversary</option>
           <optgroup label="Holidays">
@@ -679,7 +680,7 @@
       <div class="set-sep"></div>
       <button type="button" class="signout" id="setSignOut">Sign out</button>
     </div>
-    <p class="setver">v2026.08.06.10</p>
+    <p class="setver">v2026.08.06.11</p>
   </div>
 </div>
 
@@ -977,48 +978,64 @@
 
   // Upload every page, then record the card in Firestore. Resolves false on
   // any failure so the caller can tell the user without losing the export.
-  function cloudSave(card,blobs){
-    if(!useCloud)return Promise.resolve(null);
+  /* ---- auto-save (draft) ----
+     A card is saved to the archive the moment its photos are captured, then
+     updated as pages are added and details are filled in — so photos are never
+     lost even if naming is skipped. It upserts by id (read-modify-write of the
+     cards array), so re-syncing the same card never creates a duplicate. Byte
+     sizes are recorded here because nothing else knows them without listing
+     Storage, which the rules forbid. Saves are serialized through one chain so
+     overlapping syncs can't clobber each other's read-modify-write. */
+  var curCardId=null,upPaths=[],upBytes=[],upDone=[],recordCreated=false,pendingSync=false;
+  function genId(){return String(Date.now())+'-'+Math.round(Math.random()*1e6)}
+  function resetDraft(){curCardId=genId();upPaths=[];upBytes=[];upDone=[];recordCreated=false;pendingSync=false}
+  function currentMeta(){
+    return {date:$('date').value||'',occasion:occasion(),
+            recipient:clean($('recipient').value),sender:clean($('sender').value)};
+  }
 
+  var syncChain=Promise.resolve();
+  function saveCard(){                        // upsert current card; resolves true/false/null
+    syncChain=syncChain.then(runSync,runSync); // run regardless of the previous result
+    return syncChain;
+  }
+  function runSync(){
+    if(!useCloud||!pages.length)return Promise.resolve(null);
+    if(!curCardId)curCardId=genId();
     return currentUser().then(function(user){
-      if(!user)return null;              // signed out: nothing to upload to
-      var code=SPACE;
-      var paths=[],bytes=[],done=0;
-      upProgress('Uploading 1 of '+blobs.length+'…',4);
-      return blobs.reduce(function(chain,bl,i){
+      if(!user)return null;                    // signed out: nothing to upload to
+      var todo=[];
+      pages.forEach(function(bl,i){if(!upDone[i])todo.push({i:i,bl:bl})});
+      if(todo.length)upProgress(recordCreated?'Saving…':'Saving draft…',8);
+      return todo.reduce(function(chain,u,k){
         return chain.then(function(){
-          var ext=(bl.type==='image/png')?'png':'jpg';
-          var path='cards/'+code+'/'+card.id+'/'+(card.labels[i]||('p'+(i+1)))+'.'+ext;
-          var ref=fbStore.ref().child(path);
+          var ext=(u.bl&&u.bl.type==='image/png')?'png':'jpg';
+          var path='cards/'+SPACE+'/'+curCardId+'/p'+(u.i+1)+'.'+ext;
           return new Promise(function(res,rej){
-            var task=ref.put(bl,{contentType:bl.type||'image/jpeg'});
+            var task=fbStore.ref().child(path).put(u.bl,{contentType:(u.bl&&u.bl.type)||'image/jpeg'});
             task.on('state_changed',function(s){
-              var frac=(done+(s.bytesTransferred/(s.totalBytes||1)))/blobs.length;
-              upProgress('Uploading '+(i+1)+' of '+blobs.length+'…',Math.round(frac*92)+4);
-            },rej,function(){paths.push(path);bytes.push(bl.size);done++;res()});
+              var frac=(k+(s.bytesTransferred/(s.totalBytes||1)))/todo.length;
+              upProgress('Saving…',Math.round(frac*80)+8);
+            },rej,function(){upPaths[u.i]=path;upBytes[u.i]=u.bl.size;upDone[u.i]=true;res()});
           });
         });
       },Promise.resolve()).then(function(){
-        upProgress('Saving details…',97);
-        var rec={
-          id:card.id,date:card.date,occasion:card.occasion,
-          sender:card.sender,recipient:card.recipient,
-          labels:card.labels,paths:paths,savedAt:card.savedAt,
-          // Byte sizes are recorded here because nothing else knows them
-          // without listing Storage, which the rules forbid. The export needs
-          // a total before it starts, and growth is impossible to see later
-          // if it is not captured at write time.
-          bytes:bytes,
-          totalBytes:bytes.reduce(function(a,b){return a+b},0)
-        };
-        return fbDb.collection('tinyCards').doc(code).set({
-          cards:firebase.firestore.FieldValue.arrayUnion(rec),
-          updatedAt:firebase.firestore.FieldValue.serverTimestamp()
-        },{merge:true});
-      }).then(function(){upProgress('Saved to your archive',100);setTimeout(upHide,900);return true});
+        var m=currentMeta();
+        var rec={id:curCardId,date:m.date,occasion:m.occasion,sender:m.sender,recipient:m.recipient,
+                 labels:pageLabels.slice(),paths:upPaths.slice(),savedAt:Date.now(),
+                 bytes:upBytes.slice(),totalBytes:upBytes.reduce(function(a,b){return a+(b||0)},0)};
+        var ref=fbDb.collection('tinyCards').doc(SPACE);
+        return ref.get().then(function(doc){
+          var rows=(doc.exists&&doc.data().cards)||[],found=false;
+          rows=rows.map(function(x){if(x&&x.id===curCardId){found=true;return rec}return x});
+          if(!found)rows.push(rec);
+          recordCreated=true;
+          return ref.set({cards:rows,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+        });
+      }).then(function(){pendingSync=false;upProgress('Saved to your archive',100);setTimeout(upHide,900);return true});
     }).catch(function(e){
-      upProgress('Could not reach the archive — your exported files are fine.',100,true);
-      if(window.console)console.warn('cloudSave failed',e);
+      upProgress('Could not reach the archive — it will retry when you save.',100,true);
+      if(window.console)console.warn('saveCard failed',e);
       return false;
     });
   }
@@ -1048,6 +1065,7 @@
 
   function startCapture(){
     pages=[];pageLabels=[];sources=[];cornerSets=[];redoIndex=-1;pageIdx=0;pendingNewCard=true;
+    resetDraft();                          // fresh card id for auto-save
     $('warn').classList.add('hidden');
     openCamera();
   }
@@ -1155,6 +1173,7 @@
     cardNo++;
     $('warn').classList.add('hidden');
     pages=[];pageLabels=[];sources=[];cornerSets=[];redoIndex=-1;pageIdx=0;
+    resetDraft();                          // fresh card id for auto-save
     pageCount=Math.min(perCard,files.length-cursor);
     $('cardNo').textContent=cardNo;
     loadPage();
@@ -1391,6 +1410,7 @@
     if(redoIndex>-1){                       // re-cropping an existing page
       pages[redoIndex]=blob;
       cornerSets[redoIndex]=corners.slice();
+      upDone[redoIndex]=false;pendingSync=true;   // the changed page must re-upload
       redoIndex=-1;
       $('applyCrop').textContent='Crop';
       return toMeta();
@@ -1399,6 +1419,7 @@
     pageLabels.push(nextLabel());
     sources.push(curSource);
     cornerSets.push(corners.slice());
+    upDone.push(false);pendingSync=true;
     pageIdx++;
     // In capture mode there is no queue to walk — go straight to naming,
     // where "Add a photo to this card" reopens the camera for it.
@@ -1498,6 +1519,11 @@
     if(!pages.length||pages.length===1)$('sender').value='';
     paintName();chips();
     if(mode!=='capture')$('sender').focus();
+    // In capture mode this is the last step for the card, so the button says so.
+    $('save').textContent=mode==='capture'?'Save & finish':'Save & next';
+    // Auto-save now: the card's photos are captured, so preserve them as a draft
+    // even if the details are never filled in.
+    saveCard();
   }
 
   /* Duplicate labels would collide in the Storage path (front.jpg twice on
@@ -1538,7 +1564,6 @@
     var s=clean($('sender').value);
     var html=pages.map(function(_,i){return '<i>'+esc(nameFor(i))+'</i>'}).join('');
     $('preview').innerHTML=s?html:'<em>'+html+'</em>';
-    $('save').disabled=!s;
   }
 
   function chipRow(box,list,input){
@@ -1583,46 +1608,18 @@
   $('save').onclick=doSave;
 
   function doSave(){
+    // Metadata is optional now — the card was already auto-saved as a draft when
+    // its photos were captured. This writes the final details and finishes.
     var s=clean($('sender').value);
-    if(!s)return;
-    var out=pages.map(function(bl,i){
-      return new File([bl],nameFor(i),{type:bl.type||'image/jpeg'});
-    });
-    if(seen.indexOf(s)===-1)seen.push(s);
+    if(s&&seen.indexOf(s)===-1)seen.push(s);
     var r=clean($('recipient').value);
     if(r&&seenTo.indexOf(r)===-1)seenTo.push(r);
-
-    var card={
-      id:String(Date.now())+'-'+Math.round(Math.random()*1e6),
-      date:$('date').value||'',
-      occasion:occasion(),
-      recipient:r,
-      sender:s,
-      labels:pageLabels.slice(),
-      savedAt:Date.now()
-    };
-
-    // Upload to the archive. Also fire-and-forget — the export is the copy
-    // that must never depend on the network.
-    cloudSave(card,pages.slice()).then(function(ok){
-      if(ok===true)savedToCloud++;
-      else if(ok===false)cloudFailed=true;
+    $('save').disabled=true;
+    saveCard().then(function(ok){
+      if(ok===true)savedToCloud++;else if(ok===false)cloudFailed=true;
+      $('save').disabled=false;
+      finishCard(0);
     });
-
-    if(!exportFiles)return finishCard(0);   // archive only — no share sheet
-
-    if(navigator.canShare&&navigator.canShare({files:out})){
-      navigator.share({files:out}).then(function(){finishCard(out.length)},function(err){
-        // Dismissing the share sheet used to strand the user on this screen
-        // even though the card was already saved, and tapping Save again
-        // uploaded a duplicate. Cancelling now just skips the export.
-        if(err&&err.name==='AbortError')return finishCard(0);
-        out.forEach(download);finishCard(out.length);
-      });
-    }else{
-      out.forEach(function(f,i){setTimeout(function(){download(f)},i*350)});
-      finishCard(out.length);
-    }
   }
 
   // Shows a thumbnail of the saved front on the finish screen. Keeps one object
@@ -1687,7 +1684,7 @@
      swipe-back silently destroys the batch. Warn only when work would be lost:
      pages captured but not yet named, or photos still queued. */
   window.addEventListener('beforeunload',function(e){
-    var unsaved=pages.length>0||(mode==='batch'&&files.length&&cursor<files.length);
+    var unsaved=pendingSync||(mode==='batch'&&files.length&&cursor<files.length);
     if(!unsaved)return;
     e.preventDefault();
     e.returnValue='';   // required by older browsers to trigger the prompt
