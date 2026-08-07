@@ -685,7 +685,7 @@
       <div class="set-sep"></div>
       <button type="button" class="signout" id="setSignOut">Sign out</button>
     </div>
-    <p class="setver">v2026.08.06.16</p>
+    <p class="setver">v2026.08.06.17</p>
   </div>
 </div>
 
@@ -754,6 +754,7 @@
      Access is decided by the email allowlist in the security rules — keying
      data by uid made viewer accounts point at their own empty documents. */
   var SPACE='family';
+  var OWNER_EMAIL='aprkim@gmail.com';   // only the owner can scan; viewers are read-only
   var fbReady=false,fbDb=null,fbStore=null,authUser=null;
 
   function fbInit(){
@@ -959,12 +960,20 @@
     location.replace('./');
   }
 
+  // Only the owner can scan. A signed-in viewer (read-only) is sent to their
+  // cards instead of a scanner that couldn't upload anyway.
+  function afterAuth(u){
+    authUser=u;
+    if(u.email===OWNER_EMAIL){enterScanner();return}
+    $('gateMsg').textContent='Read-only account — opening your cards…';
+    location.replace('cards.html');
+  }
   currentUser().then(function(u){
-    if(u){authUser=u;enterScanner();return}
+    if(u){afterAuth(u);return}
     // Not obviously signed in — a redirect coming back from Google resolves here
     if(fbReady){
       firebase.auth().getRedirectResult().then(function(r){
-        if(r&&r.user){authUser=r.user;enterScanner()}
+        if(r&&r.user){afterAuth(r.user)}
         else goHomeToSignIn();
       }).catch(goHomeToSignIn);
     }else{

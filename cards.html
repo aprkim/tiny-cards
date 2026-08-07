@@ -438,7 +438,7 @@
       <div class="set-sep hidden" id="exportSep"></div>
       <button type="button" class="signout" id="setSignOut">Sign out</button>
     </div>
-    <p class="setver">v2026.08.06.16</p>
+    <p class="setver">v2026.08.06.17</p>
   </div>
 </div>
 
@@ -466,6 +466,11 @@
   var SPACE='family';   // shared space; the rules' email allowlist gates access
   var OWNER_EMAIL='aprkim@gmail.com';   // mirrors the owner in the security rules
   function isOwner(){return !!(authUser&&authUser.email===OWNER_EMAIL)}
+  // Read-only viewers can't scan; hide the Scan tab once a non-owner is signed in.
+  function paintScanTab(){var e=$('tabScan');if(e)e.style.display=(authUser&&!isOwner())?'none':''}
+  // The tab bar parses after this script, so re-apply once the DOM is ready
+  // (covers the case where auth resolves before #tabScan exists).
+  document.addEventListener('DOMContentLoaded',paintScanTab);
   var fbReady=false,fbDb=null,fbStore=null,authUser=null,cloudCode='';
 
   /* ---- reusable confirm dialog ----
@@ -540,7 +545,7 @@
       $('gearBtn').classList.add('hidden');
       $('view').classList.add('hidden');
       $('start').classList.remove('hidden');
-      paintCloudButton();
+      paintCloudButton();paintScanTab();
     };
     if(!fbInit()){reset();return}
     firebase.auth().signOut().then(reset).catch(reset);
@@ -652,6 +657,7 @@
       authUser=u;cloudCode=SPACE;
       paintCloudButton();
       $('gearBtn').classList.remove('hidden');   // signed in → settings reachable
+      paintScanTab();                            // hide Scan for read-only viewers
       return fbDb.collection('tinyCards').doc(SPACE).get();
     }).then(function(doc){
       if(!doc)return;
@@ -1021,7 +1027,7 @@
 </script>
 
 <nav class="tabbar" aria-label="Primary">
-  <a href="scan.html">
+  <a href="scan.html" id="tabScan">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9a2 2 0 0 1 2-2h1.6l1.2-1.8A1 1 0 0 1 9.6 5h4.8a1 1 0 0 1 .8.4L16.4 7H19a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="3.3"/></svg>
     <span>Scan</span>
   </a>

@@ -455,6 +455,7 @@
     appId:"1:497477643272:web:9f8e43fbffd18003e5f5bd"
   };
   var SPACE='family';
+  var OWNER_EMAIL='aprkim@gmail.com';   // only the owner can scan; viewers are read-only
   var fbReady=false,fbDb=null,authUser=null;
 
   function fbInit(){
@@ -497,6 +498,10 @@
     var signedIn=!!authUser;
     $('signedIn').classList.toggle('hidden',!signedIn);
     $('signedOut').classList.toggle('hidden',signedIn);
+    // Read-only viewers can't scan, so hide the Scan tab once a non-owner is
+    // signed in. Signed-out keeps it (it just leads to sign-in).
+    var canScan=!signedIn||authUser.email===OWNER_EMAIL;
+    if($('tabScan'))$('tabScan').style.display=canScan?'':'none';
     // Explain the app before login (what Nathan and Hazel first see); tagline once in.
     $('pageSub').textContent=signedIn
       ? 'Every card, kept.'
@@ -550,11 +555,14 @@
     }
   });
   paintHome();
+  // The tab bar parses after this script, so re-apply once the DOM is ready
+  // (covers the case where auth resolves before #tabScan exists).
+  document.addEventListener('DOMContentLoaded',paintHome);
 })();
 </script>
 
 <nav class="tabbar" aria-label="Primary">
-  <a href="scan.html">
+  <a href="scan.html" id="tabScan">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9a2 2 0 0 1 2-2h1.6l1.2-1.8A1 1 0 0 1 9.6 5h4.8a1 1 0 0 1 .8.4L16.4 7H19a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="3.3"/></svg>
     <span>Scan</span>
   </a>
