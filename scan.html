@@ -458,6 +458,7 @@
   }
   button.set-row:hover,button.set-row:focus-visible{color:var(--accent)}
   button.set-row:focus-visible{outline:none}
+  .set-hint{color:var(--muted);font-weight:400;font-size:13px}
   /* Build stamp — bumped every deploy so it's obvious whether the live page is
      the current version. */
   .setver{margin-top:16px;text-align:center;font-size:10px;color:#9A9AA2;letter-spacing:.02em}
@@ -683,9 +684,13 @@
         <span class="set-v" id="setEmail">Signed in</span>
       </div>
       <div class="set-sep"></div>
+      <button type="button" class="set-row hidden" id="setExport">
+        <span>Export all</span><span class="set-hint" id="setExportHint">ZIP backup</span>
+      </button>
+      <div class="set-sep hidden" id="exportSep"></div>
       <button type="button" class="signout" id="setSignOut">Sign out</button>
     </div>
-    <p class="setver">v2026.08.06.17</p>
+    <p class="setver">v2026.08.06.18</p>
   </div>
 </div>
 
@@ -920,12 +925,29 @@
   $('modalConfirm').onclick=function(){var fn=onConfirm;closeConfirm();if(fn)fn()};
   $('modal').onclick=function(e){if(e.target===$('modal'))closeConfirm()};
 
+  // Same Settings as the View page: Account, Export all (owner + desktop),
+  // Sign out. Export streams a ZIP backup via the exportAll function.
+  var EXPORT_URL='https://us-east1-tiny-wins25.cloudfunctions.net/exportAll';
+  function canExport(){return !!(authUser&&authUser.email===OWNER_EMAIL&&window.matchMedia('(min-width:760px)').matches)}
   function openSettings(){
     $('setEmail').textContent=(authUser&&authUser.email)||'Signed in';
+    var exp=canExport();
+    $('setExport').classList.toggle('hidden',!exp);
+    $('exportSep').classList.toggle('hidden',!exp);
+    $('setExportHint').textContent='ZIP backup';$('setExport').disabled=false;
     $('settings').classList.remove('hidden');
   }
   function closeSettings(){$('settings').classList.add('hidden')}
   $('gearBtn').onclick=openSettings;
+  $('setExport').onclick=function(){
+    if(!canExport())return;
+    var btn=$('setExport'),hint=$('setExportHint');
+    btn.disabled=true;hint.textContent='Preparing…';
+    authUser.getIdToken().then(function(tok){
+      window.location.href=EXPORT_URL+'?token='+encodeURIComponent(tok);
+      setTimeout(function(){hint.textContent='Started — check downloads';btn.disabled=false;},2500);
+    }).catch(function(e){hint.textContent='Couldn’t start — try again';btn.disabled=false;if(window.console)console.warn(e)});
+  };
   $('settings').onclick=function(e){if(e.target===$('settings'))closeSettings()};
   document.addEventListener('keydown',function(e){
     if(e.key!=='Escape')return;
