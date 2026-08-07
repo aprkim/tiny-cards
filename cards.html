@@ -227,6 +227,20 @@
   /* Build stamp — bumped every deploy so it's obvious whether the live page is
      the current version. */
   .setver{margin-top:16px;text-align:center;font-size:10px;color:#9A9AA2;letter-spacing:.02em}
+  /* ---- sharing modal (owner) ---- */
+  .share-sub{font-size:13.5px;color:var(--muted);line-height:1.55;margin:-2px 0 16px}
+  .share-linkrow{display:flex;gap:8px;margin-bottom:12px}
+  .share-linkrow input{flex:1;min-width:0;font:inherit;font-size:13px;padding:10px 12px;border:1px solid var(--rule);border-radius:10px;background:var(--field);color:var(--ink)}
+  #shareCopy{font:inherit;font-size:14px;font-weight:600;padding:0 16px;border-radius:10px;border:1px solid var(--rule);background:var(--field);color:var(--ink);cursor:pointer;flex-shrink:0}
+  #shareNew{width:100%;font:inherit;font-size:15px;font-weight:600;padding:12px;border-radius:12px;border:1.5px solid var(--accent);background:var(--accent-soft);color:var(--accent);cursor:pointer;margin-bottom:18px}
+  #shareNew:disabled{opacity:.6;cursor:progress}
+  .share-people-h{font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px}
+  .share-list{display:flex;flex-direction:column;gap:8px;margin-bottom:18px;max-height:180px;overflow-y:auto}
+  .share-row{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:14px}
+  .share-row .who{overflow-wrap:anywhere}
+  .share-row button{font:inherit;font-size:12.5px;padding:5px 12px;border-radius:100px;border:1px solid var(--rule);background:var(--field);color:var(--muted);cursor:pointer;flex-shrink:0}
+  .share-row button:hover{border-color:#BF3143;color:#BF3143;background:#FEF2F2}
+  .share-empty{font-size:13px;color:var(--muted)}
   /* Sign out reads as a real button and acts on the first tap (no confirm). */
   .signout{
     display:block;width:100%;font:inherit;font-size:15px;font-weight:600;
@@ -441,13 +455,34 @@
         <span class="set-v" id="setEmail">Signed in</span>
       </div>
       <div class="set-sep"></div>
+      <button type="button" class="set-row hidden" id="setShare">
+        <span>Share &amp; viewers</span><span class="set-hint">Invite family</span>
+      </button>
       <button type="button" class="set-row hidden" id="setExport">
         <span>Export all</span><span class="set-hint" id="setExportHint">ZIP backup</span>
       </button>
-      <div class="set-sep hidden" id="exportSep"></div>
+      <div class="set-sep hidden" id="ownerSep"></div>
       <button type="button" class="signout" id="setSignOut">Sign out</button>
     </div>
-    <p class="setver">v2026.08.06.19</p>
+    <p class="setver">v2026.08.06.20</p>
+  </div>
+</div>
+
+<!-- Owner-only sharing: create a reusable invite link and manage who can view. -->
+<div class="scrim hidden" id="share">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="shareTitle">
+    <h2 id="shareTitle">Share your cards</h2>
+    <p class="share-sub">Send this link to a family member — they sign in with Google to view (read-only). You can remove access anytime.</p>
+    <div class="share-linkrow hidden" id="shareLinkRow">
+      <input type="text" id="shareLink" readonly>
+      <button type="button" id="shareCopy">Copy</button>
+    </div>
+    <button type="button" id="shareNew">Create invite link</button>
+    <div class="share-people">
+      <div class="share-people-h">People with access</div>
+      <div id="shareList" class="share-list"></div>
+    </div>
+    <div class="sheet-acts"><button type="button" id="shareClose">Done</button></div>
   </div>
 </div>
 
@@ -455,6 +490,7 @@
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-functions.js"></script>
 <script>
 (function(){
   var cards=[],urls=[],filter=null,openCard=null,openPage=0,fromCloud=false;
@@ -514,6 +550,7 @@
   document.addEventListener('keydown',function(e){
     if(e.key!=='Escape')return;
     if(!$('modal').classList.contains('hidden')){e.stopPropagation();closeConfirm();return}
+    if(!$('share').classList.contains('hidden')){e.stopPropagation();closeShare();return}
     if(!$('settings').classList.contains('hidden')){e.stopPropagation();closeSettings();return}
   },true);   // capture: take Escape before the lightbox handler
 
@@ -528,11 +565,11 @@
   function canExport(){return isOwner()&&window.matchMedia('(min-width:760px)').matches}
   function openSettings(){
     $('setEmail').textContent=(authUser&&authUser.email)||'Signed in';
-    var exp=canExport();
-    $('setExport').classList.toggle('hidden',!exp);
-    $('exportSep').classList.toggle('hidden',!exp);
-    $('setExportHint').textContent='ZIP backup';
-    $('setExport').disabled=false;
+    var owner=isOwner();
+    $('setShare').classList.toggle('hidden',!owner);                 // owner: invite/manage viewers
+    $('setExport').classList.toggle('hidden',!canExport());          // owner + desktop
+    $('ownerSep').classList.toggle('hidden',!owner);
+    $('setExportHint').textContent='ZIP backup';$('setExport').disabled=false;
     $('settings').classList.remove('hidden');
   }
   function closeSettings(){$('settings').classList.add('hidden')}
@@ -555,6 +592,67 @@
       if(window.console)console.warn(e);
     });
   };
+
+  // ---- invites (secure sharing) ----
+  var inviteCode=(new URLSearchParams(location.search)).get('invite');
+  function fns(){return firebase.app().functions('us-east1');}
+  function cleanInviteURL(){try{history.replaceState({},'',location.pathname);}catch(e){}}
+  // Arriving via an invite (and not the owner): redeem it, then refresh the token
+  // so the new viewer claim is in effect before we read the archive.
+  function ensureAccess(){
+    if(inviteCode&&authUser&&!isOwner()){
+      return fns().httpsCallable('redeemInvite')({code:inviteCode})
+        .then(function(){return authUser.getIdToken(true);})
+        .then(cleanInviteURL);
+    }
+    return Promise.resolve();
+  }
+
+  function openShare(){
+    closeSettings();
+    $('shareLinkRow').classList.add('hidden');
+    $('shareNew').textContent='Create invite link';$('shareNew').disabled=false;
+    $('share').classList.remove('hidden');
+    loadViewers();
+  }
+  function closeShare(){$('share').classList.add('hidden');}
+  $('setShare').onclick=openShare;
+  $('shareClose').onclick=closeShare;
+  $('share').onclick=function(e){if(e.target===$('share'))closeShare();};
+  $('shareNew').onclick=function(){
+    var b=$('shareNew');b.disabled=true;b.textContent='Creating…';
+    fns().httpsCallable('createInvite')({}).then(function(r){
+      var code=(r&&r.data&&r.data.code)||'';
+      $('shareLink').value='https://cards.tinywins.space/cards.html?invite='+code;
+      $('shareLinkRow').classList.remove('hidden');
+      b.textContent='Create another link';b.disabled=false;
+      $('shareLink').focus();$('shareLink').select();
+    }).catch(function(e){b.textContent='Create invite link';b.disabled=false;openAlert('Could not create an invite link. Please try again.','Invite');if(window.console)console.warn(e);});
+  };
+  $('shareCopy').onclick=function(){
+    var v=$('shareLink').value,done=function(){$('shareCopy').textContent='Copied';setTimeout(function(){$('shareCopy').textContent='Copy';},1500);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(v).then(done,function(){$('shareLink').select();document.execCommand('copy');done();});}
+    else{$('shareLink').select();document.execCommand('copy');done();}
+  };
+  function loadViewers(){
+    var list=$('shareList');list.innerHTML='<div class="share-empty">Loading…</div>';
+    fbDb.collection('cardViewers').get().then(function(qs){
+      list.innerHTML='';
+      if(qs.empty){list.innerHTML='<div class="share-empty">No one yet.</div>';return;}
+      qs.forEach(function(doc){
+        var d=doc.data()||{};
+        var row=document.createElement('div');row.className='share-row';
+        var who=document.createElement('span');who.className='who';who.textContent=d.email||doc.id;
+        var rm=document.createElement('button');rm.type='button';rm.textContent='Remove';
+        rm.onclick=function(){
+          rm.disabled=true;rm.textContent='…';
+          fns().httpsCallable('revokeViewer')({uid:doc.id}).then(loadViewers)
+            .catch(function(e){rm.disabled=false;rm.textContent='Remove';openAlert('Could not remove that person. Please try again.','Viewers');if(window.console)console.warn(e);});
+        };
+        row.appendChild(who);row.appendChild(rm);list.appendChild(row);
+      });
+    }).catch(function(e){list.innerHTML='<div class="share-empty">Couldn’t load the list.</div>';if(window.console)console.warn(e);});
+  }
   // Signs out on the first tap — no confirm step.
   $('setSignOut').onclick=function(){closeSettings();doSignOut()};
   function doSignOut(){
@@ -643,6 +741,10 @@
       openArchive();
     }else{
       paintCloudButton();
+      if(inviteCode){                    // arrived via an invite link, signed out
+        $('cloudTitle').textContent='You’re invited';
+        $('cloudSub').textContent='Sign in with Google to view the shared cards';
+      }
       $('start').classList.remove('hidden');
       if(fbReady){
         firebase.auth().getRedirectResult().then(function(r){
@@ -676,7 +778,7 @@
       paintCloudButton();
       $('gearBtn').classList.remove('hidden');   // signed in → settings reachable
       paintScanTab();                            // hide Scan for read-only viewers
-      return fbDb.collection('tinyCards').doc(SPACE).get();
+      return ensureAccess().then(function(){return fbDb.collection('tinyCards').doc(SPACE).get();});
     }).then(function(doc){
       if(!doc)return;
       var rows=(doc.exists&&doc.data().cards)||[];
@@ -722,6 +824,12 @@
         $('cloudSub').textContent='This site is not authorised for sign-in yet.';
       }else if(/popup-closed-by-user|cancelled-popup-request/.test(code)){
         paintCloudButton();               // user backed out; say nothing
+      }else if(/permission-denied|not-found|invalid-argument/.test(code)){
+        // Invalid/turned-off invite, or a viewer whose access was removed.
+        cleanInviteURL();
+        $('view').classList.add('hidden');
+        paintCloudButton();$('start').classList.remove('hidden');
+        openAlert('This invite isn’t valid, or your access was removed. Ask the owner for a new link.','No access');
       }else{
         $('cloudSub').textContent='Could not reach the archive.';
       }

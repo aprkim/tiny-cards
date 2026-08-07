@@ -26,10 +26,10 @@ service firebase.storage {
       return cardsVerified() && request.auth.token.email == 'aprkim@gmail.com';
     }
     function cardsViewer() {
-      return cardsVerified() && request.auth.token.email in [
-        'viewer-one-not-yet-set@invalid.example',
-        'viewer-two-not-yet-set@invalid.example'
-      ];
+      // Granted by redeeming an invite (a Cloud Function sets this claim) and
+      // revocable by the owner. Replaced the hardcoded email allowlist; keep in
+      // step with cardsViewer() in tiny-do/firestore.rules.
+      return cardsVerified() && request.auth.token.cardsViewer == true;
     }
 
     match /cards/{space}/{allPaths=**} {

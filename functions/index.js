@@ -18,6 +18,7 @@ const logger = require('firebase-functions/logger');
 const admin = require('firebase-admin');
 const sharp = require('sharp');
 const archiver = require('archiver');
+const crypto = require('crypto');
 
 admin.initializeApp();
 
@@ -227,4 +228,60 @@ exports.exportAll = onRequest({memory: '512MiB', timeoutSeconds: 3600}, async (r
   archive.append(rows.join('\n') + '\n', {name: 'metadata.csv'});
   archive.append(README, {name: 'README.txt'});
   await archive.finalize();
+});
+
+/**
+ * Invites: the owner creates a reusable code; a family member redeems it to earn
+ * a `cardsViewer` custom claim (read-only). The owner can revoke a viewer, which
+ * clears the claim. The security rules check the claim, so access is per-Google-
+ * account and revocable — not a forwardable bearer secret once redeemed. All
+ * three run with the Admin SDK, so they bypass rules and are the only writers of
+ * the invites / cardViewers collections.
+ */
+function requireOwner(auth) {
+  if (!auth) throw new HttpsError('unauthenticated', 'Sign in first.');
+  if (!auth.token.email_verified) throw new HttpsError('permission-denied', 'Verified email required.');
+  if (auth.token.email !== OWNER_EMAIL) throw new HttpsError('permission-denied', 'Only the archive owner can do this.');
+}
+
+exports.createInvite = onCall(async (req) => {
+  requireOwner(req.auth);
+  const code = crypto.randomBytes(9).toString('base64url');   // ~12 url-safe chars
+  await admin.firestore().collection('invites').doc(code).set({
+    active: true,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    createdBy: req.auth.uid,
+  });
+  return {code};
+});
+
+exports.redeemInvite = onCall(async (req) => {
+  const auth = req.auth;
+  if (!auth) throw new HttpsError('unauthenticated', 'Sign in first.');
+  if (!auth.token.email_verified) throw new HttpsError('permission-denied', 'Use a verified Google account.');
+  const code = String((req.data && req.data.code) || '').trim();
+  if (!code) throw new HttpsError('invalid-argument', 'Missing invite code.');
+  if (auth.token.email === OWNER_EMAIL) return {ok: true, owner: true};   // owner already has access
+
+  const snap = await admin.firestore().collection('invites').doc(code).get();
+  if (!snap.exists || snap.data().active !== true) {
+    throw new HttpsError('not-found', 'This invite link is not valid or has been turned off.');
+  }
+  await admin.auth().setCustomUserClaims(auth.uid, {cardsViewer: true});
+  await admin.firestore().collection('cardViewers').doc(auth.uid).set({
+    email: auth.token.email || '',
+    redeemedAt: admin.firestore.FieldValue.serverTimestamp(),
+    invite: code,
+  });
+  // The client must refresh its ID token to pick up the new claim.
+  return {ok: true};
+});
+
+exports.revokeViewer = onCall(async (req) => {
+  requireOwner(req.auth);
+  const uid = String((req.data && req.data.uid) || '').trim();
+  if (!uid) throw new HttpsError('invalid-argument', 'Missing uid.');
+  await admin.auth().setCustomUserClaims(uid, {cardsViewer: false});
+  await admin.firestore().collection('cardViewers').doc(uid).delete();
+  return {ok: true};
 });
