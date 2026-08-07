@@ -464,7 +464,7 @@
       <div class="set-sep hidden" id="ownerSep"></div>
       <button type="button" class="signout" id="setSignOut">Sign out</button>
     </div>
-    <p class="setver">v2026.08.06.20</p>
+    <p class="setver">v2026.08.06.21</p>
   </div>
 </div>
 
@@ -792,22 +792,30 @@
         $('groups').innerHTML='<p class="empty">No cards yet — scan your first from the home screen.</p>';
         return;
       }
-      // Resolve every page path to a download URL before rendering
+      // Resolve each page to a full URL (lightbox/download) and a thumbnail URL
+      // (grid). The grid loads the small _thumb.jpg the Cloud Function wrote, so
+      // browsing is cheap; the full image is only fetched when a card is opened.
+      // Thumb falls back to the full image for anything without one yet.
       return Promise.all(rows.map(function(row){
-        return Promise.all((row.paths||[]).map(function(p){
-          return fbStore.ref().child(p).getDownloadURL().catch(function(){return null});
-        })).then(function(urlsFor){
-          return {row:row,urls:urlsFor.filter(Boolean)};
+        var paths=row.paths||[],labels=row.labels||[];
+        return Promise.all(paths.map(function(p,i){
+          var tp=p.replace(/\.[^.]+$/,'')+'_thumb.jpg';
+          return Promise.all([
+            fbStore.ref().child(p).getDownloadURL().catch(function(){return null}),
+            fbStore.ref().child(tp).getDownloadURL().catch(function(){return null})
+          ]).then(function(a){return {url:a[0],thumb:a[1]||a[0],label:labels[i]||''};});
+        })).then(function(pgs){
+          return {row:row,pages:pgs.filter(function(pg){return !!pg.url;})};
         });
       })).then(function(resolved){
         cards=[];fromCloud=true;
         resolved.forEach(function(x){
-          if(!x.urls.length)return;
+          if(!x.pages.length)return;
           cards.push({
             key:x.row.id,id:x.row.id,date:x.row.date||'',year:(x.row.date||'').slice(0,4),
             event:x.row.occasion||'Unsorted',person:x.row.sender||'Unknown',
             recipient:x.row.recipient||'',ok:!!x.row.date,raw:x.row,
-            pages:x.urls.map(function(u,i){return {url:u,label:(x.row.labels&&x.row.labels[i])||''}})
+            pages:x.pages
           });
         });
         cards.sort(function(a,b){
@@ -907,7 +915,7 @@
         var b=document.createElement('button');b.className='card';b.type='button';
         var badge=x.pages.length>1?'<span class="n">'+x.pages.length+'</span>':'';
         var sub=(x.date||'no date')+(x.recipient?' · to '+x.recipient:'');
-        b.innerHTML='<img loading="lazy" src="'+x.pages[0].url+'" alt="'+esc(x.person)+'">'+badge+
+        b.innerHTML='<img loading="lazy" src="'+(x.pages[0].thumb||x.pages[0].url)+'" alt="'+esc(x.person)+'">'+badge+
                     '<p>'+esc(x.person)+'</p><small>'+esc(sub)+'</small>';
         b.onclick=function(){show(x,0)};
         g.appendChild(b);
