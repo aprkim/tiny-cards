@@ -384,6 +384,21 @@
   /* !important so it beats id-specificity display rules like #home{display:flex}
      — without it, adding .hidden to #home did nothing and the home screen
      stayed on top of the scanner. */
+  /* Designed dialog (matches View/Scan): cream sheet centred on desktop, bottom
+     sheet on mobile. Used for sign-in messages so they aren't native alerts. */
+  .scrim{position:fixed;inset:0;z-index:60;background:rgba(22,22,29,.45);display:flex;justify-content:center;align-items:center;padding:20px}
+  .sheet{background:var(--paper);border-radius:18px;width:100%;max-width:400px;padding:26px 22px 20px;box-shadow:0 16px 48px rgba(22,22,29,.28)}
+  .sheet h2{font-size:18px;font-weight:700;letter-spacing:-.01em;margin-bottom:8px}
+  .sheet p{font-size:14px;color:var(--muted);line-height:1.55;margin-bottom:22px}
+  .sheet-acts{display:flex;flex-direction:column;gap:10px}
+  .sheet-acts button{font:inherit;font-size:15.5px;font-weight:600;padding:14px;border-radius:12px;border:1.5px solid transparent;cursor:pointer}
+  #modalCancel{background:var(--ink);color:#fff}
+  #modalConfirm{background:var(--field);color:var(--ink);border-color:var(--rule)}
+  @media (max-width:560px){
+    .scrim{align-items:flex-end;padding:0}
+    .sheet{max-width:none;border-radius:20px 20px 0 0;padding:24px 20px calc(24px + env(safe-area-inset-bottom));animation:sheetup .22s ease}
+    @keyframes sheetup{from{transform:translateY(100%)}to{transform:translateY(0)}}
+  }
   .hidden{display:none!important}
   @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -433,6 +448,18 @@
   </section>
 
 
+</div>
+
+<!-- Designed dialog for sign-in messages (replaces native alert). -->
+<div class="scrim hidden" id="modal">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="modalTitle" aria-describedby="modalBody">
+    <h2 id="modalTitle">Confirm</h2>
+    <p id="modalBody"></p>
+    <div class="sheet-acts">
+      <button type="button" id="modalCancel">Cancel</button>
+      <button type="button" id="modalConfirm">OK</button>
+    </div>
+  </div>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
@@ -494,6 +521,25 @@
     return firebase.auth().signOut().then(function(){authUser=null});
   }
 
+  // Designed alert dialog (matches View/Scan), replacing window.alert.
+  var onConfirm=null;
+  function openConfirm(opts){
+    opts=opts||{};
+    var t=$('modalTitle'),bd=$('modalBody'),c=$('modalConfirm'),x=$('modalCancel');
+    t.textContent=opts.title||'';t.style.display=opts.title?'':'none';
+    bd.textContent=opts.body||'';bd.style.display=opts.body?'':'none';
+    c.textContent=opts.confirmText||'OK';
+    x.style.display=opts.alert?'none':'';
+    onConfirm=opts.onConfirm||null;
+    $('modal').classList.remove('hidden');(opts.alert?c:x).focus();
+  }
+  function openAlert(body,title){openConfirm({title:title||'',body:body,confirmText:'OK',alert:true});}
+  function closeConfirm(){$('modal').classList.add('hidden');onConfirm=null}
+  $('modalCancel').onclick=closeConfirm;
+  $('modalConfirm').onclick=function(){var fn=onConfirm;closeConfirm();if(fn)fn()};
+  $('modal').onclick=function(e){if(e.target===$('modal'))closeConfirm()};
+  document.addEventListener('keydown',function(e){if(e.key==='Escape'&&!$('modal').classList.contains('hidden'))closeConfirm()});
+
   function paintHome(){
     var signedIn=!!authUser;
     $('signedIn').classList.toggle('hidden',!signedIn);
@@ -535,9 +581,9 @@
     }).catch(function(e){
       var c=e&&e.code||'';
       if(/unauthorized-domain/.test(c)){
-        alert('This site is not authorised for sign-in yet. Add cards.tinywins.space in the Firebase console under Authentication → Settings → Authorized domains.');
+        openAlert('This site isn’t authorised for sign-in yet. Add cards.tinywins.space in the Firebase console under Authentication → Settings → Authorized domains.','Sign-in not set up');
       }else if(!/popup-closed-by-user|cancelled-popup-request/.test(c)){
-        alert('Could not sign in. Check your connection and try again.');
+        openAlert('Could not sign in. Check your connection and try again.','Sign-in failed');
       }
       if(window.console)console.warn(e);
     }).then(function(){

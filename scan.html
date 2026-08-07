@@ -690,7 +690,7 @@
       <div class="set-sep hidden" id="exportSep"></div>
       <button type="button" class="signout" id="setSignOut">Sign out</button>
     </div>
-    <p class="setver">v2026.08.06.18</p>
+    <p class="setver">v2026.08.06.19</p>
   </div>
 </div>
 
@@ -842,7 +842,7 @@
   if($('expToggle')){
     $('expToggle').onclick=function(){
       if(exportFiles&&!useCloud){
-        alert('Turn on “Send cards to your archive” first, otherwise saving a card would do nothing.');
+        openAlert('Turn on sending to your archive first — otherwise saving a card would do nothing.');
         return;
       }
       exportFiles=!exportFiles;exportExplicit=true;
@@ -885,9 +885,9 @@
       paintCloud();
       var code=e&&e.code||'';
       if(/unauthorized-domain/.test(code)){
-        alert('This site is not authorised for sign-in yet. Add cards.tinywins.space to the Firebase console under Authentication → Settings → Authorized domains.');
+        openAlert('This site isn’t authorised for sign-in yet. Add cards.tinywins.space in the Firebase console under Authentication → Settings → Authorized domains.','Sign-in not set up');
       }else if(!/popup-closed-by-user|cancelled-popup-request/.test(code)){
-        alert('Could not sign in. Check your connection and try again.');
+        openAlert('Could not sign in. Check your connection and try again.','Sign-in failed');
       }
       if(window.console)console.warn(e);
     }).then(function(){
@@ -911,15 +911,19 @@
      default; click-outside and Escape cancel. */
   var onConfirm=null;
   function openConfirm(opts){
-    $('modalTitle').textContent=opts.title||'Confirm';
-    $('modalBody').textContent=opts.body||'';
-    var c=$('modalConfirm');
+    opts=opts||{};
+    var t=$('modalTitle'),bd=$('modalBody'),c=$('modalConfirm'),x=$('modalCancel');
+    t.textContent=opts.title||'';t.style.display=opts.title?'':'none';
+    bd.textContent=opts.body||'';bd.style.display=opts.body?'':'none';
     c.textContent=opts.confirmText||'OK';
     c.classList.toggle('danger',!!opts.danger);
+    x.style.display=opts.alert?'none':'';        // alert = single button, no Cancel
     onConfirm=opts.onConfirm||null;
     $('modal').classList.remove('hidden');
-    $('modalCancel').focus();
+    (opts.alert?c:x).focus();
   }
+  // Designed replacement for window.alert — one button, matches the app.
+  function openAlert(body,title){openConfirm({title:title||'',body:body,confirmText:'OK',alert:true});}
   function closeConfirm(){$('modal').classList.add('hidden');onConfirm=null}
   $('modalCancel').onclick=closeConfirm;
   $('modalConfirm').onclick=function(){var fn=onConfirm;closeConfirm();if(fn)fn()};
@@ -1372,7 +1376,7 @@
     setTimeout(function(){
       var dc=warp();
       btn.disabled=false;btn.textContent='Crop';
-      if(!dc){alert('Selected area is too small. Adjust the dots and try again.');return}
+      if(!dc){openAlert('Selected area is too small. Adjust the dots and try again.','Crop too small');return}
       dc.toBlob(function(bl){acceptPage(bl)},'image/jpeg',0.92);
     },30);
   };
@@ -1637,10 +1641,16 @@
   });
 
   $('skipCard').onclick=function(){
-    if(!confirm('Discard this card without saving it?'))return;
-    pages=[];pageLabels=[];sources=[];cornerSets=[];redoIndex=-1;pageIdx=0;
-    if(mode==='capture')return finish();   // tally; continue from there
-    startCard();
+    openConfirm({
+      title:'Discard this card?',
+      body:'The photos you just took won’t be saved.',
+      confirmText:'Discard',danger:true,
+      onConfirm:function(){
+        pages=[];pageLabels=[];sources=[];cornerSets=[];redoIndex=-1;pageIdx=0;
+        if(mode==='capture')return finish();   // tally; continue from there
+        startCard();
+      }
+    });
   };
   $('save').onclick=doSave;
 

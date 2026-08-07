@@ -183,6 +183,14 @@
   #modalConfirm{background:var(--field);color:var(--ink);border-color:var(--rule)}
   #modalConfirm.danger{background:var(--field);color:#C62828;border-color:#C62828}
   #modalConfirm.danger:hover,#modalConfirm.danger:focus-visible{background:#FBEBEA}
+  #modalConfirm:disabled{opacity:.45;cursor:not-allowed}
+  /* Text input inside the dialog (e.g. type-to-confirm for Delete All). */
+  .modal-input{
+    width:100%;font:inherit;font-size:16px;padding:11px 13px;margin:-8px 0 20px;
+    border:1px solid var(--rule);border-radius:10px;background:var(--field);color:var(--ink);
+    -webkit-appearance:none;appearance:none;
+  }
+  .modal-input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
 
   /* Mobile: slide up from the bottom edge, within thumb reach. */
   @media (max-width:560px){
@@ -413,6 +421,7 @@
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="modalTitle" aria-describedby="modalBody">
     <h2 id="modalTitle">Confirm</h2>
     <p id="modalBody"></p>
+    <input type="text" id="modalInput" class="modal-input hidden" autocomplete="off" autocapitalize="characters">
     <div class="sheet-acts">
       <button type="button" id="modalCancel">Cancel</button>
       <button type="button" id="modalConfirm">OK</button>
@@ -438,7 +447,7 @@
       <div class="set-sep hidden" id="exportSep"></div>
       <button type="button" class="signout" id="setSignOut">Sign out</button>
     </div>
-    <p class="setver">v2026.08.06.18</p>
+    <p class="setver">v2026.08.06.19</p>
   </div>
 </div>
 
@@ -479,16 +488,25 @@
      Escape cancel — the destructive action only fires from its own button. */
   var onConfirm=null;
   function openConfirm(opts){
-    $('modalTitle').textContent=opts.title||'Confirm';
-    $('modalBody').textContent=opts.body||'';
-    var c=$('modalConfirm');
+    opts=opts||{};
+    var t=$('modalTitle'),bd=$('modalBody'),inp=$('modalInput'),c=$('modalConfirm'),x=$('modalCancel');
+    t.textContent=opts.title||'';t.style.display=opts.title?'':'none';
+    bd.textContent=opts.body||'';bd.style.display=opts.body?'':'none';
+    var needInput=!!opts.input,req=opts.requireText||null;
+    if(inp){inp.classList.toggle('hidden',!needInput);inp.value='';if(needInput)inp.placeholder=opts.placeholder||'';}
     c.textContent=opts.confirmText||'OK';
     c.classList.toggle('danger',!!opts.danger);
+    x.style.display=opts.alert?'none':'';        // alert = single button, no Cancel
     onConfirm=opts.onConfirm||null;
+    function sync(){c.disabled=!!(needInput&&req)&&(inp.value.trim().toUpperCase()!==req.toUpperCase());}
+    if(inp)inp.oninput=needInput?sync:null;
+    sync();
     $('modal').classList.remove('hidden');
-    $('modalCancel').focus();
+    (needInput&&inp?inp:(opts.alert?c:x)).focus();
   }
-  function closeConfirm(){$('modal').classList.add('hidden');onConfirm=null}
+  // Designed replacement for window.alert — one button, matches the app.
+  function openAlert(body,title){openConfirm({title:title||'',body:body,confirmText:'OK',alert:true});}
+  function closeConfirm(){$('modal').classList.add('hidden');onConfirm=null;var c=$('modalConfirm');if(c)c.disabled=false;}
   $('modalCancel').onclick=closeConfirm;
   $('modalConfirm').onclick=function(){var fn=onConfirm;closeConfirm();if(fn)fn()};
   // Click-outside cancels; it must never trigger the destructive action
@@ -533,7 +551,7 @@
       setTimeout(function(){hint.textContent='Started — check downloads';btn.disabled=false;},2500);
     }).catch(function(e){
       hint.textContent='ZIP backup';btn.disabled=false;
-      alert('Could not start the export. Please try again.');
+      openAlert('Could not start the export. Please try again.','Export failed');
       if(window.console)console.warn(e);
     });
   };
@@ -887,7 +905,7 @@
       $('boxSub').textContent=(openCard.date?openCard.date+' · ':'')+openCard.event;
       filter=null;people();render();
     }).catch(function(e){
-      alert('Could not save the change.');
+      openAlert('Could not save the change.','Save failed');
       if(window.console)console.warn(e);
     });
   };
@@ -921,7 +939,7 @@
       cards=cards.filter(function(c){return c.id!==id});
       close();filter=null;people();render();
     }).catch(function(e){
-      alert('Could not delete that card.');
+      openAlert('Could not delete that card.','Delete failed');
       if(window.console)console.warn(e);
     });
   }
@@ -949,7 +967,7 @@
       setTimeout(function(){
         fetch(pg.url).then(function(r){return r.blob()})
           .then(function(bl){push(bl,i)})
-          .catch(function(){alert('Could not download that page.')});
+          .catch(function(){openAlert('Could not download that page.','Download failed')});
       },i*350);
     });
   };
@@ -976,17 +994,19 @@
   $('wipe').onclick=function(){
     var n=cards.length;
     if(!n)return;
-    var typed=prompt('Delete all '+n+' card'+(n===1?'':'s')+' from your archive, on every device?\n\n'+
-                     'This cannot be undone. Exported files are not affected.\n\n'+
-                     'Type DELETE to confirm:');
-    if(!typed||typed.trim().toUpperCase()!=='DELETE')return;
-
-    $('wipe').disabled=true;$('wipe').textContent='Deleting…';
-
-    var paths=[];
-    cards.forEach(function(c){
-      if(c.raw&&c.raw.paths)paths=paths.concat(c.raw.paths);
+    // Designed confirm with a type-to-confirm input, replacing the old prompt().
+    openConfirm({
+      title:'Delete all '+n+' card'+(n===1?'':'s')+'?',
+      body:'This removes them from your archive on every device and cannot be undone. Exported files are not affected. Type DELETE to confirm.',
+      input:true,requireText:'DELETE',placeholder:'DELETE',
+      confirmText:'Delete all',danger:true,
+      onConfirm:doWipe
     });
+  };
+  function doWipe(){
+    $('wipe').disabled=true;$('wipe').textContent='Deleting…';
+    var paths=[];
+    cards.forEach(function(c){if(c.raw&&c.raw.paths)paths=paths.concat(c.raw.paths)});
     // Images first, then the index — a failure here leaves recoverable entries
     // rather than files nothing points at.
     Promise.all(paths.map(function(p){
@@ -1002,10 +1022,10 @@
       paintCloudButton();
     }).catch(function(e){
       $('wipe').disabled=false;$('wipe').textContent='Delete All';
-      alert('Could not delete everything. Some cards may remain.');
+      openAlert('Could not delete everything. Some cards may remain.','Delete failed');
       if(window.console)console.warn(e);
     });
-  };
+  }
 
   /* View only fetches on load, so a card scanned in another tab wouldn't show
      until a manual reload. Re-pull when the page regains focus (flipping back
