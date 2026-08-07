@@ -12,11 +12,12 @@
  */
 
 const {onObjectFinalized} = require('firebase-functions/v2/storage');
-const {onCall, HttpsError} = require('firebase-functions/v2/https');
+const {onCall, onRequest, HttpsError} = require('firebase-functions/v2/https');
 const {setGlobalOptions} = require('firebase-functions/v2');
 const logger = require('firebase-functions/logger');
 const admin = require('firebase-admin');
 const sharp = require('sharp');
+const archiver = require('archiver');
 
 admin.initializeApp();
 
@@ -133,4 +134,97 @@ exports.backfill = onCall({memory: '2GiB', timeoutSeconds: 540}, async (req) => 
 
   await ref.set({cards, updatedAt: admin.firestore.FieldValue.serverTimestamp()}, {merge: true});
   return {cards: cards.length, thumbs, sized, failed};
+});
+
+/**
+ * Export the whole archive as a single streaming ZIP: every card's images at
+ * full quality, a metadata.csv, and a README. Owner-only. Streamed with
+ * archiver in "store" mode (images are already compressed) so memory stays flat
+ * regardless of how big the archive grows.
+ *
+ * onRequest (not onCall) so the browser can download the response directly. Auth
+ * is a Firebase ID token, accepted either as `?token=` (so a plain navigation
+ * can stream the file straight to disk) or as a Bearer header. The token is
+ * short-lived; only the owner's verified email is allowed through.
+ */
+const clean = (s) => String(s == null ? '' : s).replace(/[\/\\:*?"<>|]/g, '').replace(/\s+/g, ' ').trim();
+const csvCell = (v) => {
+  const s = String(v == null ? '' : v);
+  return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+};
+function cardBase(card) {
+  return (card.date || 'Date') + ' ' + (clean(card.occasion) || 'Occasion') +
+    (card.recipient ? ' - ' + clean(card.recipient) : '') +
+    ' from ' + (clean(card.sender) || 'Sender');
+}
+const README = [
+  'Tiny Cards — backup export',
+  '',
+  'A complete backup of your Tiny Cards archive.',
+  '',
+  "WHAT'S HERE",
+  '  cards/         Every card image at full quality. Each filename describes the',
+  '                 card: "<date> <occasion> - <recipient> from <sender> - <page>".',
+  '  metadata.csv   Every card\'s details (sender, recipient, occasion, date, pages,',
+  '                 filenames). Opens in any spreadsheet app.',
+  '',
+  'BROWSE IT OFFLINE',
+  '  Open  https://cards.tinywins.space/viewer.html  and choose this folder. It',
+  '  reads the filenames and shows your cards with their details — the images',
+  '  themselves need no account or connection.',
+  '',
+  'Keep this folder somewhere safe (an external drive, another cloud). Re-export',
+  'any time to capture newly scanned cards.',
+  ''
+].join('\n');
+
+exports.exportAll = onRequest({memory: '512MiB', timeoutSeconds: 3600}, async (req, res) => {
+  // --- auth: verified owner only ---
+  const token = req.query.token || (req.get('authorization') || '').replace(/^Bearer\s+/i, '');
+  if (!token) { res.status(401).send('Sign in required.'); return; }
+  let user;
+  try { user = await admin.auth().verifyIdToken(String(token)); }
+  catch (e) { res.status(401).send('Session expired — reopen the app and try again.'); return; }
+  if (!user.email_verified || user.email !== OWNER_EMAIL) {
+    res.status(403).send('Only the archive owner can export.'); return;
+  }
+
+  const snap = await admin.firestore().collection('tinyCards').doc(SPACE).get();
+  const cards = (snap.exists && snap.data().cards) || [];
+
+  const stamp = new Date().toISOString().slice(0, 10);
+  res.setHeader('Content-Type', 'application/zip');
+  res.setHeader('Content-Disposition', `attachment; filename="tiny-cards-backup-${stamp}.zip"`);
+
+  const archive = archiver('zip', {store: true});   // images are already compressed
+  archive.on('warning', (err) => logger.warn('archive warning: ' + err.message));
+  archive.on('error', (err) => { logger.error('archive error', err); try { res.destroy(err); } catch (_) {} });
+  archive.pipe(res);
+
+  const bucket = admin.storage().bucket();
+  const rows = [['id', 'sender', 'recipient', 'occasion', 'date', 'pages', 'files', 'storagePaths', 'totalBytes', 'savedAt'].join(',')];
+
+  for (const card of cards) {
+    const paths = card.paths || [];
+    const labels = card.labels || [];
+    const base = cardBase(card);
+    const names = [];
+    for (let i = 0; i < paths.length; i++) {
+      const p = paths[i];
+      const ext = /\.png$/i.test(p) ? 'png' : 'jpg';
+      const label = labels[i] || ('p' + (i + 1));
+      const name = paths.length > 1 ? `${base} - ${label}.${ext}` : `${base}.${ext}`;
+      names.push(name);
+      archive.append(bucket.file(p).createReadStream(), {name: `cards/${name}`});
+    }
+    rows.push([
+      csvCell(card.id), csvCell(card.sender), csvCell(card.recipient), csvCell(card.occasion),
+      csvCell(card.date), csvCell(paths.length), csvCell(names.join(' | ')),
+      csvCell(paths.join(' | ')), csvCell(card.totalBytes || ''), csvCell(card.savedAt || '')
+    ].join(','));
+  }
+
+  archive.append(rows.join('\n') + '\n', {name: 'metadata.csv'});
+  archive.append(README, {name: 'README.txt'});
+  await archive.finalize();
 });

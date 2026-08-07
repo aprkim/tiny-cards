@@ -215,6 +215,7 @@
   }
   button.set-row:hover,button.set-row:focus-visible{color:var(--accent)}
   button.set-row:focus-visible{outline:none}
+  .set-hint{color:var(--muted);font-weight:400;font-size:13px}
   /* Build stamp — bumped every deploy so it's obvious whether the live page is
      the current version. */
   .setver{margin-top:16px;text-align:center;font-size:10px;color:#9A9AA2;letter-spacing:.02em}
@@ -431,9 +432,13 @@
         <span class="set-v" id="setEmail">Signed in</span>
       </div>
       <div class="set-sep"></div>
+      <button type="button" class="set-row hidden" id="setExport">
+        <span>Export all</span><span class="set-hint" id="setExportHint">ZIP backup</span>
+      </button>
+      <div class="set-sep hidden" id="exportSep"></div>
       <button type="button" class="signout" id="setSignOut">Sign out</button>
     </div>
-    <p class="setver">v2026.08.06.15</p>
+    <p class="setver">v2026.08.06.16</p>
   </div>
 </div>
 
@@ -494,13 +499,39 @@
      later; sign-out is the only action today and routes through openConfirm —
      the second real use of that dialog. Click-outside and Escape dismiss, the
      same as the confirm. */
+  // Export is owner-only and desktop-only (a whole-archive ZIP is a big download
+  // that doesn't belong on a phone). Shown only when both hold.
+  var EXPORT_URL='https://us-east1-tiny-wins25.cloudfunctions.net/exportAll';
+  function canExport(){return isOwner()&&window.matchMedia('(min-width:760px)').matches}
   function openSettings(){
     $('setEmail').textContent=(authUser&&authUser.email)||'Signed in';
+    var exp=canExport();
+    $('setExport').classList.toggle('hidden',!exp);
+    $('exportSep').classList.toggle('hidden',!exp);
+    $('setExportHint').textContent='ZIP backup';
+    $('setExport').disabled=false;
     $('settings').classList.remove('hidden');
   }
   function closeSettings(){$('settings').classList.add('hidden')}
   $('gearBtn').onclick=openSettings;
   $('settings').onclick=function(e){if(e.target===$('settings'))closeSettings()};
+
+  // Fetch a fresh ID token and hand it to the export function via the URL, so the
+  // browser streams the ZIP straight to disk. Content-Disposition:attachment
+  // keeps the current page put (it just downloads).
+  $('setExport').onclick=function(){
+    if(!authUser||!canExport())return;
+    var btn=$('setExport'),hint=$('setExportHint');
+    btn.disabled=true;hint.textContent='Preparing…';
+    authUser.getIdToken().then(function(tok){
+      window.location.href=EXPORT_URL+'?token='+encodeURIComponent(tok);
+      setTimeout(function(){hint.textContent='Started — check downloads';btn.disabled=false;},2500);
+    }).catch(function(e){
+      hint.textContent='ZIP backup';btn.disabled=false;
+      alert('Could not start the export. Please try again.');
+      if(window.console)console.warn(e);
+    });
+  };
   // Signs out on the first tap — no confirm step.
   $('setSignOut').onclick=function(){closeSettings();doSignOut()};
   function doSignOut(){
