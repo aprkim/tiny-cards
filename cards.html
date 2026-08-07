@@ -317,7 +317,7 @@
        when signed out, as a sign-in prompt. -->
   <section id="start" class="hidden">
     <div class="drop primary" id="cloudOpen" tabindex="0" role="button">
-      <strong id="cloudTitle">Sign in to Your Archive</strong>
+      <strong id="cloudTitle">Sign in to view your cards</strong>
       <span id="cloudSub">Google sign-in — nothing to remember</span>
     </div>
 
@@ -433,7 +433,7 @@
       <div class="set-sep"></div>
       <button type="button" class="signout" id="setSignOut">Sign out</button>
     </div>
-    <p class="setver">v2026.08.06.14</p>
+    <p class="setver">v2026.08.06.15</p>
   </div>
 </div>
 
@@ -576,7 +576,7 @@
       t.textContent='Open Your Archive';
       s.textContent=(authUser.email||authUser.displayName||'Signed in')+' · tap to open';
     }else{
-      t.textContent='Sign in to Your Archive';
+      t.textContent='Sign in to view your cards';
       s.textContent='Google sign-in — nothing to remember';
     }
   }
