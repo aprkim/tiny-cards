@@ -464,7 +464,7 @@
       <div class="set-sep hidden" id="ownerSep"></div>
       <button type="button" class="signout" id="setSignOut">Sign out</button>
     </div>
-    <p class="setver">v2026.08.09.1</p>
+    <p class="setver">v2026.08.09.2</p>
   </div>
 </div>
 
@@ -1101,6 +1101,26 @@
     if(e.key==='ArrowRight'&&openPage<openCard.pages.length-1)show(openCard,openPage+1);
     if(e.key==='ArrowLeft'&&openPage>0)show(openCard,openPage-1);
   });
+
+  /* Swipe left/right on the lightbox to move between a card's photos, the
+     natural phone gesture next to the page pills. Only clearly-horizontal
+     swipes count, so a vertical drag still scrolls a tall card, and swiping is
+     ignored while the edit form is open. */
+  var swX=0,swY=0;
+  $('box').addEventListener('touchstart',function(e){
+    if(e.touches.length!==1)return;
+    swX=e.touches[0].clientX;swY=e.touches[0].clientY;
+  },{passive:true});
+  $('box').addEventListener('touchend',function(e){
+    if(!openCard||openCard.pages.length<2)return;
+    if(!$('boxForm').classList.contains('hidden'))return;
+    var t=e.changedTouches[0];if(!t)return;
+    var dx=t.clientX-swX,dy=t.clientY-swY;
+    if(Math.abs(dx)<45||Math.abs(dx)<Math.abs(dy)*1.4)return;
+    if(dx<0&&openPage<openCard.pages.length-1)show(openCard,openPage+1);
+    else if(dx>0&&openPage>0)show(openCard,openPage-1);
+  },{passive:true});
+
   $('q').addEventListener('input',render);
 
   /* ---- delete everything ----
