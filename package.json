@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "rm -rf www && mkdir -p www && cp index.html cards.html scan.html viewer.html favicon.svg og-image.png www/ && cp -r vendor www/"
   },
   "repository": {
     "type": "git",

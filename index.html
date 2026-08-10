@@ -23,7 +23,12 @@
   :root{
     --ink:#16161D;--paper:#FAF9F6;--accent:#B0184F;--accent-soft:#FBEDF2;
     --muted:#6E6E78;--rule:#E4E2DB;--field:#FFFFFF;
-    --barh:calc(54px + env(safe-area-inset-bottom));
+    /* Bottom-nav sizing in one place. --tabbar-height is the icon row's own
+       height; --barh adds the iPhone home-indicator inset below it. Both the
+       bar and the content that must clear it reference these. env() is 0 in a
+       desktop browser, so --barh collapses to --tabbar-height there. */
+    --tabbar-height:54px;
+    --barh:calc(var(--tabbar-height) + env(safe-area-inset-bottom));
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html{-webkit-text-size-adjust:100%}
@@ -42,6 +47,11 @@
   .tabbar{
     position:fixed;left:0;right:0;bottom:0;z-index:40;
     display:flex;background:var(--paper);border-top:1px solid var(--rule);
+    /* min-height (not height) keeps the icon row at full size while the
+       safe-area inset is ADDED below it, so nothing lands under the home
+       indicator. With box-sizing:border-box this is a floor the bar exceeds on
+       a notched device, so the icons never get squeezed. */
+    min-height:var(--tabbar-height);
     padding-bottom:env(safe-area-inset-bottom);
   }
   .tabbar a{

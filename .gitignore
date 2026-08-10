@@ -1,2 +1,3 @@
 .DS_Store
-functions/node_modules/
+node_modules/
+www/
