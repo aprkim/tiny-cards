@@ -464,7 +464,7 @@
       <div class="set-sep hidden" id="ownerSep"></div>
       <button type="button" class="signout" id="setSignOut">Sign out</button>
     </div>
-    <p class="setver">v2026.08.06.21</p>
+    <p class="setver">v2026.08.09.1</p>
   </div>
 </div>
 
@@ -860,7 +860,7 @@
 
     // Previously this silently cut off at 14, so senders beyond that simply
     // did not appear and nothing said so. Now the rest are one tap away.
-    var LIMIT=14;
+    var LIMIT=7;
     var shown=(showAllPeople||names.length<=LIMIT)?names:names.slice(0,LIMIT);
 
     shown.forEach(function(n){
