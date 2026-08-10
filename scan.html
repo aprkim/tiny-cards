@@ -99,8 +99,20 @@
   /* Primary deepens rather than changing character */
   .drop.cam:hover,.drop.cam:focus-visible{border-color:#8E1340;background:#F7DCE6}
 
-  /* Two stacked entry buttons, evenly spaced (no divider between them) */
-  #start{display:flex;flex-direction:column;gap:16px}
+  /* Landing (Add a Card) screen: fill the space between header and tab bar so the
+     entry buttons sit vertically centred. Scoped to :not(.scanning) so the
+     crop/meta capture screens (tab bar hidden) keep their normal top-flow. */
+  body:not(.scanning) .wrap{
+    display:flex;flex-direction:column;
+    min-height:calc(100dvh - env(safe-area-inset-top) - var(--barh));
+    padding-bottom:16px;
+  }
+  /* Take Photos + tip + Choose Photos, evenly spaced (no divider), centred */
+  #start{
+    display:flex;flex-direction:column;gap:16px;
+    flex:1 1 auto;justify-content:center;
+    padding-bottom:24px;        /* optical: true centre reads a touch low */
+  }
   /* Shooting tip, sits just below the Take Photos button */
   .tip{text-align:center;font-size:12.5px;color:var(--muted)}
 
@@ -755,7 +767,7 @@
       <div class="set-sep hidden" id="ownerSep"></div>
       <button type="button" class="signout" id="setSignOut">Sign out</button>
     </div>
-    <p class="setver">v2026.08.10.11</p>
+    <p class="setver">v2026.08.10.12</p>
   </div>
 </div>
 
