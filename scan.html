@@ -475,8 +475,8 @@
      the dark default ("Keep Editing") dominant below. Scoped by .confirm-top so
      other confirms (delete, sign-out) keep the standard outlined-danger look. */
   #modal.confirm-top #modalConfirm{order:-1}
-  #modal.confirm-top #modalConfirm.danger{background:none;border-color:transparent;color:#FF3B30}
-  #modal.confirm-top #modalConfirm.danger:hover,#modal.confirm-top #modalConfirm.danger:focus-visible{background:rgba(255,59,48,.08)}
+  #modal.confirm-top #modalConfirm.danger{background:none;border-color:transparent;color:var(--accent)}
+  #modal.confirm-top #modalConfirm.danger:hover,#modal.confirm-top #modalConfirm.danger:focus-visible{background:var(--accent-soft)}
   @media (max-width:560px){
     .scrim{align-items:flex-end;padding:0}
     .sheet{
@@ -767,7 +767,7 @@
       <div class="set-sep hidden" id="ownerSep"></div>
       <button type="button" class="signout" id="setSignOut">Sign out</button>
     </div>
-    <p class="setver">v2026.08.10.14</p>
+    <p class="setver">v2026.08.10.15</p>
   </div>
 </div>
 
