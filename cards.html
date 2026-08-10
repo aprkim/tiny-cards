@@ -309,6 +309,9 @@
     background-repeat:no-repeat;background-position:right 10px center;
   }
   .edit .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  /* Year / Month / Day dropdowns share one row */
+  .edit .datesel{display:flex;gap:8px}
+  .edit .datesel select{flex:1;min-width:0}
   .edit .act{display:flex;gap:8px;margin-top:14px}
   .edit .act button{
     flex:1;font:inherit;font-size:14px;font-weight:600;padding:11px;border-radius:9px;
@@ -438,8 +441,7 @@
   <div class="edit hidden" id="boxForm">
     <div class="f"><label for="eSender">From</label><input type="text" id="eSender" autocomplete="off"></div>
     <div class="f"><label for="eRecipient">To</label><input type="text" id="eRecipient" autocomplete="off"></div>
-    <div class="two">
-      <div class="f"><label for="eEvent">Occasion</label>
+    <div class="f"><label for="eEvent">Occasion</label>
         <select id="eEvent">
           <option value="">Occasion&hellip;</option>
           <option value="Birthday">Birthday</option>
@@ -474,7 +476,12 @@
           <option value="__other">Other&hellip;</option>
         </select>
       </div>
-      <div class="f"><label for="eDate">Date</label><input type="date" id="eDate"></div>
+    <div class="f"><label for="eDateY">Date</label>
+      <div class="datesel">
+        <select id="eDateY" aria-label="Year"></select>
+        <select id="eDateM" aria-label="Month"></select>
+        <select id="eDateD" aria-label="Day"></select>
+      </div>
     </div>
     <div class="f hidden" id="eOtherWrap"><label for="eEventOther">Occasion name</label><input type="text" id="eEventOther" autocomplete="off" placeholder="Baptism"></div>
     <div class="act">
@@ -545,7 +552,7 @@
       <div class="set-sep hidden" id="ownerSep"></div>
       <button type="button" class="signout" id="setSignOut">Sign out</button>
     </div>
-    <p class="setver">v2026.08.10.4</p>
+    <p class="setver">v2026.08.10.5</p>
   </div>
 </div>
 
@@ -1081,6 +1088,48 @@
   // Point the Occasion dropdown at the card's current value. If that value isn't
   // one of the presets (an old free-text occasion), add it as its own option so
   // it still shows and isn't silently lost.
+  /* Year/Month/Day dropdowns in place of the OS date input, so picking a day
+     never needs a second tap. Stored value stays 'YYYY-MM-DD' (or '' if not
+     fully set). Year runs from this year back to 1950, newest first. */
+  var DP_MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  function dpPad(n){return (n<10?'0':'')+n;}
+  function dpMax(y,m){return new Date(y,m,0).getDate();}
+  function dpDays(yId,mId,dId){
+    var y=parseInt($(yId).value,10),m=parseInt($(mId).value,10),d=$(dId),cur=d.value;
+    var max=(y&&m)?dpMax(y,m):31,h='<option value="">Day</option>';
+    for(var i=1;i<=max;i++)h+='<option value="'+dpPad(i)+'">'+i+'</option>';
+    d.innerHTML=h;
+    if(cur&&parseInt(cur,10)<=max)d.value=cur;
+  }
+  function dpInit(yId,mId,dId){
+    var y=$(yId);
+    if(y.options.length)return;                       // build the fixed lists once
+    var now=new Date().getFullYear(),h='<option value="">Year</option>';
+    for(var yr=now;yr>=1950;yr--)h+='<option value="'+yr+'">'+yr+'</option>';
+    y.innerHTML=h;
+    var mh='<option value="">Month</option>';
+    for(var i=0;i<12;i++)mh+='<option value="'+dpPad(i+1)+'">'+DP_MONTHS[i]+'</option>';
+    $(mId).innerHTML=mh;
+    y.onchange=function(){dpDays(yId,mId,dId)};        // day count depends on year+month
+    $(mId).onchange=function(){dpDays(yId,mId,dId)};
+    dpDays(yId,mId,dId);
+  }
+  function getDateVal(yId,mId,dId){
+    var y=$(yId).value,m=$(mId).value,d=$(dId).value;
+    return (y&&m&&d)?(y+'-'+m+'-'+d):'';
+  }
+  function setDateVal(yId,mId,dId,val){
+    dpInit(yId,mId,dId);
+    var p=(val||'').split('-'),y=$(yId);
+    if(p[0]){
+      var ok=false,o=y.options;for(var i=0;i<o.length;i++)if(o[i].value===p[0]){ok=true;break;}
+      if(!ok){var e=document.createElement('option');e.value=p[0];e.textContent=p[0];y.insertBefore(e,y.children[1]||null);}
+      y.value=p[0];
+    }else y.value='';
+    $(mId).value=p[1]||'';
+    dpDays(yId,mId,dId);
+    $(dId).value=p[2]||'';
+  }
   function setEventSelect(ev){
     var sel=$('eEvent');
     Array.prototype.slice.call(sel.querySelectorAll('option[data-custom]')).forEach(function(o){o.remove()});
@@ -1108,7 +1157,7 @@
     $('eSender').value=openCard.person==='Unknown'?'':openCard.person;
     $('eRecipient').value=openCard.recipient||'';
     setEventSelect(openCard.event==='Unsorted'?'':openCard.event);
-    $('eDate').value=openCard.date||'';
+    setDateVal('eDateY','eDateM','eDateD',openCard.date||'');
     var hidden=$('boxForm').classList.toggle('hidden');
     $('box').classList.toggle('editing',!hidden);
   };
@@ -1124,7 +1173,7 @@
     row.sender=$('eSender').value.trim()||'Unknown';
     row.recipient=$('eRecipient').value.trim();
     row.occasion=readEventValue()||'Unsorted';
-    row.date=$('eDate').value||'';
+    row.date=getDateVal('eDateY','eDateM','eDateD');
 
     cloudMutate(function(rows){
       return rows.map(function(x){

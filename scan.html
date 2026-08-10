@@ -342,6 +342,9 @@
   }
   input:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
   .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  /* Year / Month / Day dropdowns share one row */
+  .datesel{display:flex;gap:8px}
+  .datesel select{flex:1;min-width:0}
   .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
   .chip{
     font:inherit;font-size:13px;padding:5px 12px;border-radius:100px;
@@ -617,8 +620,7 @@
       <div class="chips" id="toChips"></div>
     </div>
 
-    <div class="row">
-      <div class="field">
+    <div class="field">
         <label for="event">Occasion</label>
         <select id="event">
           <option value="" selected>Occasion&hellip;</option>
@@ -654,11 +656,14 @@
           <option value="__other">Other&hellip;</option>
         </select>
       </div>
-      <div class="field">
-        <label for="date">Date</label>
-        <input type="date" id="date">
+    <div class="field">
+        <label for="dateY">Date</label>
+        <div class="datesel">
+          <select id="dateY" aria-label="Year"></select>
+          <select id="dateM" aria-label="Month"></select>
+          <select id="dateD" aria-label="Day"></select>
+        </div>
       </div>
-    </div>
 
     <div class="field hidden" id="otherWrap">
       <label for="eventOther">Occasion name</label>
@@ -717,7 +722,7 @@
       <div class="set-sep hidden" id="ownerSep"></div>
       <button type="button" class="signout" id="setSignOut">Sign out</button>
     </div>
-    <p class="setver">v2026.08.10.4</p>
+    <p class="setver">v2026.08.10.5</p>
   </div>
 </div>
 
@@ -774,7 +779,50 @@
 
   var $=function(id){return document.getElementById(id)};
   var picker=$('picker');
-  $('date').value=new Date().toISOString().slice(0,10);
+
+  /* Year/Month/Day dropdowns in place of the OS date input, so picking a day
+     never needs a second tap. Stored value stays 'YYYY-MM-DD' (or '' if not
+     fully set). Year runs from this year back to 1950, newest first. */
+  var DP_MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  function dpPad(n){return (n<10?'0':'')+n;}
+  function dpMax(y,m){return new Date(y,m,0).getDate();}
+  function dpDays(yId,mId,dId){
+    var y=parseInt($(yId).value,10),m=parseInt($(mId).value,10),d=$(dId),cur=d.value;
+    var max=(y&&m)?dpMax(y,m):31,h='<option value="">Day</option>';
+    for(var i=1;i<=max;i++)h+='<option value="'+dpPad(i)+'">'+i+'</option>';
+    d.innerHTML=h;
+    if(cur&&parseInt(cur,10)<=max)d.value=cur;
+  }
+  function dpInit(yId,mId,dId){
+    var y=$(yId);
+    if(y.options.length)return;                       // build the fixed lists once
+    var now=new Date().getFullYear(),h='<option value="">Year</option>';
+    for(var yr=now;yr>=1950;yr--)h+='<option value="'+yr+'">'+yr+'</option>';
+    y.innerHTML=h;
+    var mh='<option value="">Month</option>';
+    for(var i=0;i<12;i++)mh+='<option value="'+dpPad(i+1)+'">'+DP_MONTHS[i]+'</option>';
+    $(mId).innerHTML=mh;
+    y.onchange=function(){dpDays(yId,mId,dId)};        // day count depends on year+month
+    $(mId).onchange=function(){dpDays(yId,mId,dId)};
+    dpDays(yId,mId,dId);
+  }
+  function getDateVal(yId,mId,dId){
+    var y=$(yId).value,m=$(mId).value,d=$(dId).value;
+    return (y&&m&&d)?(y+'-'+m+'-'+d):'';
+  }
+  function setDateVal(yId,mId,dId,val){
+    dpInit(yId,mId,dId);
+    var p=(val||'').split('-'),y=$(yId);
+    if(p[0]){
+      var ok=false,o=y.options;for(var i=0;i<o.length;i++)if(o[i].value===p[0]){ok=true;break;}
+      if(!ok){var e=document.createElement('option');e.value=p[0];e.textContent=p[0];y.insertBefore(e,y.children[1]||null);}
+      y.value=p[0];
+    }else y.value='';
+    $(mId).value=p[1]||'';
+    dpDays(yId,mId,dId);
+    $(dId).value=p[2]||'';
+  }
+  setDateVal('dateY','dateM','dateD',new Date().toISOString().slice(0,10));
 
   /* ==================== ARCHIVE (Firebase) ====================
      Images go to Cloud Storage at cards/family/{cardId}/{label}.jpg — one
@@ -1167,7 +1215,7 @@
   function genId(){return String(Date.now())+'-'+Math.round(Math.random()*1e6)}
   function resetDraft(){curCardId=genId();upPaths=[];upBytes=[];upDone=[];recordCreated=false;pendingSync=false}
   function currentMeta(){
-    return {date:$('date').value||'',occasion:occasion(),
+    return {date:getDateVal('dateY','dateM','dateD'),occasion:occasion(),
             recipient:clean($('recipient').value),sender:clean($('sender').value)};
   }
 
@@ -1722,7 +1770,7 @@
   }
 
   function base(){
-    var d=$('date').value||'Date';
+    var d=getDateVal('dateY','dateM','dateD')||'Date';
     var e=occasion()||'Occasion';
     var r=clean($('recipient').value);
     var s=clean($('sender').value)||'Sender';
@@ -1758,8 +1806,11 @@
     chipRow($('toChips'),seenTo,$('recipient'));
   }
 
-  ['sender','recipient','event','eventOther','date'].forEach(function(id){
+  ['sender','recipient','event','eventOther'].forEach(function(id){
     $(id).addEventListener('input',paintName);
+  });
+  ['dateY','dateM','dateD'].forEach(function(id){
+    $(id).addEventListener('change',paintName);   // refresh the filename preview when the date changes
   });
 
   $('event').addEventListener('change',function(){
