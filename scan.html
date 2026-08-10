@@ -270,6 +270,14 @@
   }
 
   .actions{display:flex;gap:10px}
+  /* Crop screen fills the height so the controls stay pinned at the bottom and
+     don't jump when Rotate flips the photo's orientation (the image area above
+     flexes instead). Scoped to the active crop screen. */
+  body.scanning #crop{
+    display:flex;flex-direction:column;
+    min-height:calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 40px);
+  }
+  #crop .tools{margin-top:auto}    /* push tools (hint + Rotate) + actions to the bottom */
   button.go{
     flex:1;font:inherit;font-size:15.5px;font-weight:600;padding:15px;
     border:none;border-radius:12px;background:var(--accent);color:#fff;cursor:pointer;
@@ -767,7 +775,7 @@
       <div class="set-sep hidden" id="ownerSep"></div>
       <button type="button" class="signout" id="setSignOut">Sign out</button>
     </div>
-    <p class="setver">v2026.08.10.15</p>
+    <p class="setver">v2026.08.10.16</p>
   </div>
 </div>
 
