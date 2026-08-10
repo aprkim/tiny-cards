@@ -128,9 +128,16 @@
   .box::before{margin-top:auto}
   .box::after{margin-bottom:auto}
   .box>*{flex:0 0 auto}
-  .box img{max-width:100%;max-height:calc(100vh - 200px);object-fit:contain;border-radius:8px}
+  .box .imgstage{width:100%;display:flex;align-items:center;justify-content:center}
+  .box img{max-width:100%;max-height:calc(100vh - 200px);object-fit:contain;border-radius:8px;display:block}
+  /* Multi-photo cards pin the image area to a constant height, so paging between
+     photos of different shapes keeps the layout still instead of jumping. Each
+     photo is letterboxed inside the fixed box. */
+  .box.multi .imgstage{height:calc(100vh - 200px)}
+  .box.multi img{max-height:100%}
   /* Give the form room on short screens */
   .box.editing img{max-height:32vh}
+  .box.editing .imgstage{height:auto}
   .box .cap{color:#fff;text-align:center}
   .box .cap strong{display:block;font-size:16px;font-weight:600}
   .box .cap small{font-size:13px;opacity:.6;font-variant-numeric:tabular-nums}
@@ -409,7 +416,7 @@
   <button id="boxClose" class="boxx" type="button" aria-label="Close">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
   </button>
-  <img id="boxImg" alt="">
+  <div class="imgstage" id="boxStage"><img id="boxImg" alt=""></div>
   <div class="cap">
     <strong id="boxName"></strong>
     <small id="boxSub"></small>
@@ -532,7 +539,7 @@
       <div class="set-sep hidden" id="ownerSep"></div>
       <button type="button" class="signout" id="setSignOut">Sign out</button>
     </div>
-    <p class="setver">v2026.08.10.1</p>
+    <p class="setver">v2026.08.10.2</p>
   </div>
 </div>
 
@@ -998,6 +1005,8 @@
     $('boxImg').src=p.url;
     $('boxName').textContent=card.person+(card.recipient?' \u2192 '+card.recipient:'');
     $('boxSub').textContent=(card.date?card.date+' \u00b7 ':'')+card.event;
+    // Multi-photo cards get a fixed-height image area so swiping doesn't jump.
+    $('box').classList.toggle('multi',card.pages.length>1);
     var nav=$('boxNav');nav.innerHTML='';
     if(card.pages.length>1){
       card.pages.forEach(function(pg,i){
