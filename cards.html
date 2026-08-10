@@ -552,7 +552,7 @@
       <div class="set-sep hidden" id="ownerSep"></div>
       <button type="button" class="signout" id="setSignOut">Sign out</button>
     </div>
-    <p class="setver">v2026.08.10.5</p>
+    <p class="setver">v2026.08.10.6</p>
   </div>
 </div>
 
@@ -697,8 +697,17 @@
 
   // ---- invites (secure sharing) ----
   var inviteCode=(new URLSearchParams(location.search)).get('invite');
+  // Deep link from the scanner's finish thumbnail: ?card=<id> opens that card.
+  var openCardId=(new URLSearchParams(location.search)).get('card');
   function fns(){return firebase.app().functions('us-east1');}
   function cleanInviteURL(){try{history.replaceState({},'',location.pathname);}catch(e){}}
+  function openCardFromURL(){
+    if(!openCardId)return;
+    var c=cards.filter(function(x){return x.id===openCardId;})[0];
+    if(c)show(c,0);                 // if not found yet (image still uploading), stay in the grid
+    openCardId=null;
+    try{history.replaceState({},'',location.pathname);}catch(e){}
+  }
   // Arriving via an invite (and not the owner): redeem it, then refresh the token
   // so the new viewer claim is in effect before we read the archive.
   function ensureAccess(){
@@ -952,6 +961,7 @@
         $('start').classList.add('hidden');
         $('view').classList.remove('hidden');
         people();render();
+        openCardFromURL();
       });
     }).catch(function(e){
       var code=e&&e.code||'';

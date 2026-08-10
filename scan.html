@@ -355,12 +355,17 @@
   .done{text-align:center;padding:52px 20px}
   .done h2{font-size:20px;font-weight:700;margin-bottom:8px}
   .done p{font-size:14px;color:var(--muted);margin-bottom:24px}
-  /* A thumbnail of the saved front, so the finish screen confirms visually. */
+  /* A thumbnail of the saved front, so the finish screen confirms visually.
+     Tapping it opens the card's detail in the archive. */
   .finthumb{
-    display:block;max-width:150px;max-height:190px;margin:14px auto 20px;
+    display:block;max-width:150px;max-height:190px;margin:14px auto 6px;
     border-radius:12px;border:1px solid var(--rule);background:var(--field);
     object-fit:contain;box-shadow:0 6px 20px rgba(22,22,29,.14);
+    cursor:pointer;transition:transform .12s,box-shadow .12s;
   }
+  .finthumb:hover,.finthumb:focus-visible{transform:translateY(-2px);box-shadow:0 10px 26px rgba(22,22,29,.2);outline:none}
+  .finthumbcap{text-align:center;font-size:12.5px;color:var(--muted);margin-bottom:18px}
+  .finthumbcap.hidden{display:none}
 
   .altlink{
     display:inline-block;font-size:13.5px;color:var(--accent);
@@ -681,7 +686,8 @@
   <section id="finish" class="hidden">
     <div class="done">
       <h2>All done</h2>
-      <img id="finThumb" class="finthumb hidden" alt="Front of the card you just saved">
+      <img id="finThumb" class="finthumb hidden" alt="Front of the card you just saved" role="button" tabindex="0" title="View this card">
+      <p class="finthumbcap hidden" id="finThumbCap">Tap the photo to see this card</p>
       <p id="tally"></p>
       <button class="go" id="again" style="max-width:210px;margin:0 auto">Choose More Photos</button>
     </div>
@@ -722,7 +728,7 @@
       <div class="set-sep hidden" id="ownerSep"></div>
       <button type="button" class="signout" id="setSignOut">Sign out</button>
     </div>
-    <p class="setver">v2026.08.10.5</p>
+    <p class="setver">v2026.08.10.6</p>
   </div>
 </div>
 
@@ -1858,21 +1864,29 @@
 
   // Shows a thumbnail of the saved front on the finish screen. Keeps one object
   // URL alive at a time (revokes the previous), so a batch doesn't leak.
-  var finThumbURL=null;
+  var finThumbURL=null,finishCardId=null;
   function setFinishThumb(blob){
-    var el=$('finThumb');
+    var el=$('finThumb'),cap=$('finThumbCap');
     if(finThumbURL){URL.revokeObjectURL(finThumbURL);finThumbURL=null}
     if(!el)return;
-    if(!blob){el.classList.add('hidden');el.removeAttribute('src');return}
+    if(!blob){el.classList.add('hidden');el.removeAttribute('src');if(cap)cap.classList.add('hidden');return}
     finThumbURL=URL.createObjectURL(blob);
     el.src=finThumbURL;
     el.classList.remove('hidden');
+    if(cap)cap.classList.toggle('hidden',!finishCardId);   // only invite a tap if we know which card
   }
+  // Tapping the finish thumbnail opens that card's detail in the archive.
+  function viewSavedCard(){ if(finishCardId)location.href='cards.html?card='+encodeURIComponent(finishCardId); }
+  $('finThumb').onclick=viewSavedCard;
+  $('finThumb').addEventListener('keydown',function(e){
+    if(e.key==='Enter'||e.key===' '){e.preventDefault();viewSavedCard();}
+  });
 
   function finishCard(n){
     savedCards++;savedFiles+=n;
-    // Remember the front of the card just saved, so the finish screen can show
-    // it as a visual confirmation. Grab it before pages is cleared below.
+    // Remember which card was just saved (so its thumbnail can open the detail)
+    // and its front image, before pages is cleared below.
+    finishCardId=curCardId;
     setFinishThumb(pages[0]||null);
     // The card is saved, so its pages are no longer unsaved work. Without this
     // the beforeunload guard kept firing after a finished batch, warning about
