@@ -319,6 +319,48 @@
   }
   .scanlink:hover,.scanlink:focus-visible{border-bottom-color:var(--accent)}
 
+  /* ---- crop-on-edit overlay (ported from the scanner's cropper) ---- */
+  .cropov{
+    position:fixed;inset:0;background:rgba(22,22,29,.96);z-index:60;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding:18px;overflow-y:auto;
+  }
+  .cropinner{width:100%;max-width:520px}
+  .cropov .stage{
+    position:relative;background:#26262E;border-radius:14px;
+    overflow:visible;margin-bottom:14px;user-select:none;-webkit-user-select:none;
+  }
+  .cropov .stage canvas{display:block;width:100%;height:auto;border-radius:14px}
+  .cropov .stage svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+  .cropov .stage polygon{fill:rgba(176,24,79,.14);stroke:var(--accent);stroke-width:2}
+  .cropov .handle{position:absolute;width:44px;height:44px;margin:-22px 0 0 -22px;touch-action:none;cursor:grab}
+  .cropov .handle::after{
+    content:'';position:absolute;inset:11px;border-radius:50%;
+    background:#fff;border:3px solid var(--accent);box-shadow:0 1px 6px rgba(0,0,0,.35);
+  }
+  .cropov .handle.drag::after{background:var(--accent-soft)}
+  .cropov .handle:focus-visible{outline:none}
+  .cropov .handle:focus-visible::after{box-shadow:0 0 0 3px #fff,0 0 0 6px var(--accent)}
+  .cropov .tools{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+  .cropov .stagehint{font-size:12.5px;color:#C8C6CF;line-height:1.5;flex:1}
+  .cropov .tool{
+    font:inherit;font-size:13px;padding:9px 14px;border-radius:100px;
+    border:1px solid rgba(255,255,255,.28);background:none;color:#fff;
+    cursor:pointer;white-space:nowrap;
+  }
+  .cropov .tool:hover{border-color:#fff}
+  .cropov .actions{display:flex;gap:10px}
+  .cropov button.go{
+    flex:1;font:inherit;font-size:15.5px;font-weight:600;padding:14px;
+    border:none;border-radius:12px;background:var(--accent);color:#fff;cursor:pointer;
+  }
+  .cropov button.go:disabled{background:#5A4550;color:#B9AEB4;cursor:not-allowed}
+  .cropov button.skip{
+    font:inherit;font-size:14px;padding:14px 16px;border:1px solid rgba(255,255,255,.28);
+    border-radius:12px;background:none;color:#fff;cursor:pointer;
+  }
+  .cropov button.skip:hover{border-color:#fff}
+
   .hidden{display:none}
   @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -375,6 +417,7 @@
   <div class="nav" id="boxNav"></div>
   <div class="rowbtns hidden" id="boxTools">
     <button class="minibtn" id="boxEdit">Edit</button>
+    <button class="minibtn" id="boxCrop">Crop</button>
     <button class="minibtn" id="boxDl">Download</button>
     <button class="minibtn danger" id="boxDel">Delete</button>
   </div>
@@ -428,6 +471,31 @@
   </div>
 </div>
 
+<!-- Crop-on-edit overlay. Opens over the lightbox for the currently-viewed
+     photo; drag the four dots (or Rotate), then Save overwrites the image at
+     its existing storage path (so the thumbnail regenerates and no metadata
+     changes). Cancel returns to the lightbox untouched. -->
+<div class="cropov hidden" id="cropov">
+  <div class="cropinner">
+    <div class="stage" id="cstage">
+      <canvas id="ccv"></canvas>
+      <svg><polygon id="cpoly" points=""/></svg>
+      <div class="handle" id="ch0" tabindex="0" role="slider" aria-label="Top-left corner (arrow keys to move)"></div>
+      <div class="handle" id="ch1" tabindex="0" role="slider" aria-label="Top-right corner (arrow keys to move)"></div>
+      <div class="handle" id="ch2" tabindex="0" role="slider" aria-label="Bottom-right corner (arrow keys to move)"></div>
+      <div class="handle" id="ch3" tabindex="0" role="slider" aria-label="Bottom-left corner (arrow keys to move)"></div>
+    </div>
+    <div class="tools">
+      <p class="stagehint" id="chint">Drag the dots to the card&rsquo;s corners.</p>
+      <button type="button" class="tool" id="crot">&#8635; Rotate</button>
+    </div>
+    <div class="actions">
+      <button class="go" id="cropSave" type="button">Save</button>
+      <button class="skip" id="cropCancel" type="button">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- Reusable confirm dialog. Centred on desktop, a bottom sheet on mobile.
      Cancel is the safe default (focused on open); click-outside and Escape
      cancel, never confirm. Driven by openConfirm() below. -->
@@ -464,7 +532,7 @@
       <div class="set-sep hidden" id="ownerSep"></div>
       <button type="button" class="signout" id="setSignOut">Sign out</button>
     </div>
-    <p class="setver">v2026.08.09.2</p>
+    <p class="setver">v2026.08.10.1</p>
   </div>
 </div>
 
@@ -946,6 +1014,7 @@
     var owner=fromCloud&&isOwner();
     $('boxTools').classList.toggle('hidden',!fromCloud);
     $('boxEdit').classList.toggle('hidden',!owner);
+    $('boxCrop').classList.toggle('hidden',!owner);
     $('boxDel').classList.toggle('hidden',!owner);
     $('boxForm').classList.add('hidden');$('box').classList.remove('editing');
     $('box').classList.remove('hidden');
@@ -1091,6 +1160,8 @@
   $('boxClose').onclick=close;
   $('box').onclick=function(e){if(e.target===$('box'))close()};
   document.addEventListener('keydown',function(e){
+    // The crop overlay owns its own keys (corner nudges, its own Escape).
+    if(!$('cropov').classList.contains('hidden'))return;
     // Don't hijack arrow keys while the user is typing in the edit form
     var t=e.target,typing=t&&(t.tagName==='INPUT'||t.tagName==='TEXTAREA');
     if(e.key==='Escape'){
@@ -1114,6 +1185,7 @@
   $('box').addEventListener('touchend',function(e){
     if(!openCard||openCard.pages.length<2)return;
     if(!$('boxForm').classList.contains('hidden'))return;
+    if(!$('cropov').classList.contains('hidden'))return;
     var t=e.changedTouches[0];if(!t)return;
     var dx=t.clientX-swX,dy=t.clientY-swY;
     if(Math.abs(dx)<45||Math.abs(dx)<Math.abs(dy)*1.4)return;
@@ -1171,6 +1243,7 @@
   function refreshArchive(){
     if(!authUser)return;                                     // signed out
     if(!$('box').classList.contains('hidden'))return;        // lightbox / edit open
+    if(!$('cropov').classList.contains('hidden'))return;     // crop overlay open
     if(!$('settings').classList.contains('hidden'))return;   // settings sheet open
     if(!$('modal').classList.contains('hidden'))return;      // confirm dialog open
     loadCloud();
@@ -1179,6 +1252,227 @@
     if(document.visibilityState==='visible')refreshArchive();
   });
   window.addEventListener('pageshow',function(e){if(e.persisted)refreshArchive()});
+
+  /* ---- crop an existing photo ----------------------------------------------
+     The same corner-drag deskew the scanner uses, run against a photo already
+     in the archive. The image is pulled down as a blob and loaded from a
+     same-origin blob: URL, so the canvas is never tainted and reading pixels
+     needs no bucket CORS. Save overwrites the object at its existing storage
+     path — the makeThumbnail function refires on the new upload and no index
+     entry changes, so only the pixels move. The warp code is copied verbatim
+     from the scanner; do not modify it. */
+  var cimg=null,ccorners=[],cscale=1,cbusy=false,ccard=null,cpage=0;
+
+  $('boxCrop').onclick=function(e){
+    e.stopPropagation();
+    if(!openCard||!isOwner())return;
+    var pg=openCard.pages[openPage];
+    if(!pg||!pg.url)return;
+    // Pin the target now: arrow-key corner nudges must not be able to change
+    // which page Save writes to.
+    ccard=openCard;cpage=openPage;
+    var btn=$('boxCrop');btn.disabled=true;btn.textContent='Loading…';
+    var reset=function(){btn.disabled=false;btn.textContent='Crop';};
+    fetch(pg.url).then(function(r){if(!r.ok)throw 0;return r.blob();}).then(function(bl){
+      var u=URL.createObjectURL(bl);
+      var im=new Image();
+      im.onload=function(){
+        URL.revokeObjectURL(u);reset();
+        cimg=im;cInitCorners();
+        $('cropov').classList.remove('hidden');
+        cDrawStage();cPaintOverlay();
+      };
+      im.onerror=function(){URL.revokeObjectURL(u);reset();openAlert('Could not open this photo for cropping.','Crop unavailable');};
+      im.src=u;
+    }).catch(function(){reset();openAlert('Could not open this photo for cropping.','Crop unavailable');});
+  };
+
+  function cDrawStage(){
+    var cv=$('ccv');
+    var maxW=$('cstage').clientWidth||360;
+    cscale=Math.min(1,maxW/cimg.naturalWidth);
+    cv.width=Math.round(cimg.naturalWidth*cscale);
+    cv.height=Math.round(cimg.naturalHeight*cscale);
+    cv.getContext('2d').drawImage(cimg,0,0,cv.width,cv.height);
+    var svg=$('cstage').querySelector('svg');
+    svg.setAttribute('viewBox','0 0 '+cimg.naturalWidth+' '+cimg.naturalHeight);
+    svg.setAttribute('preserveAspectRatio','none');
+  }
+  function cInitCorners(){
+    var W=cimg.naturalWidth,H=cimg.naturalHeight;
+    ccorners=[{x:0,y:0},{x:W,y:0},{x:W,y:H},{x:0,y:H}];
+  }
+  function cPaintOverlay(){
+    $('cpoly').setAttribute('points',ccorners.map(function(p){return p.x+','+p.y}).join(' '));
+    ccorners.forEach(function(p,i){
+      var h=$('ch'+i);
+      h.style.left=(p.x/cimg.naturalWidth*100)+'%';
+      h.style.top=(p.y/cimg.naturalHeight*100)+'%';
+    });
+  }
+  [0,1,2,3].forEach(function(i){
+    var h=$('ch'+i);
+    h.addEventListener('pointerdown',function(e){
+      if(!cimg)return;
+      e.preventDefault();h.setPointerCapture(e.pointerId);h.classList.add('drag');
+      var move=function(ev){
+        var r=$('cstage').getBoundingClientRect();
+        var x=(ev.clientX-r.left)/r.width*cimg.naturalWidth;
+        var y=(ev.clientY-r.top)/r.height*cimg.naturalHeight;
+        ccorners[i].x=Math.max(0,Math.min(cimg.naturalWidth,x));
+        ccorners[i].y=Math.max(0,Math.min(cimg.naturalHeight,y));
+        cPaintOverlay();
+      };
+      var up=function(){
+        h.classList.remove('drag');
+        h.removeEventListener('pointermove',move);
+        h.removeEventListener('pointerup',up);
+        h.removeEventListener('pointercancel',up);
+      };
+      h.addEventListener('pointermove',move);
+      h.addEventListener('pointerup',up);
+      h.addEventListener('pointercancel',up);
+    });
+    h.addEventListener('keydown',function(e){
+      if(!cimg)return;
+      var step=e.shiftKey?20:4,dx=0,dy=0;
+      if(e.key==='ArrowLeft')dx=-step;
+      else if(e.key==='ArrowRight')dx=step;
+      else if(e.key==='ArrowUp')dy=-step;
+      else if(e.key==='ArrowDown')dy=step;
+      else return;
+      // Keep the nudge from bubbling to the lightbox's arrow-key page nav.
+      e.preventDefault();e.stopPropagation();
+      ccorners[i].x=Math.max(0,Math.min(cimg.naturalWidth,ccorners[i].x+dx));
+      ccorners[i].y=Math.max(0,Math.min(cimg.naturalHeight,ccorners[i].y+dy));
+      cPaintOverlay();
+    });
+  });
+
+  /* ---- perspective warp: do not modify ---- */
+  function cSolveH(src,W,H){
+    var d=[[0,0],[W,0],[W,H],[0,H]],A=[],b=[];
+    for(var i=0;i<4;i++){
+      var X=d[i][0],Y=d[i][1],x=src[i].x,y=src[i].y;
+      A.push([X,Y,1,0,0,0,-x*X,-x*Y]);b.push(x);
+      A.push([0,0,0,X,Y,1,-y*X,-y*Y]);b.push(y);
+    }
+    for(var c=0;c<8;c++){
+      var piv=c;
+      for(var r=c+1;r<8;r++)if(Math.abs(A[r][c])>Math.abs(A[piv][c]))piv=r;
+      var t=A[c];A[c]=A[piv];A[piv]=t;
+      var tb=b[c];b[c]=b[piv];b[piv]=tb;
+      if(Math.abs(A[c][c])<1e-10)return null;
+      for(var r2=c+1;r2<8;r2++){
+        var f=A[r2][c]/A[c][c];
+        for(var k=c;k<8;k++)A[r2][k]-=f*A[c][k];
+        b[r2]-=f*b[c];
+      }
+    }
+    var hh=new Array(8);
+    for(var r3=7;r3>=0;r3--){
+      var s=b[r3];
+      for(var k2=r3+1;k2<8;k2++)s-=A[r3][k2]*hh[k2];
+      hh[r3]=s/A[r3][r3];
+    }
+    return hh;
+  }
+  function cDist(a,b){var dx=a.x-b.x,dy=a.y-b.y;return Math.sqrt(dx*dx+dy*dy)}
+  function cWarp(){
+    var corners=ccorners,img=cimg;
+    var W=Math.round((cDist(corners[0],corners[1])+cDist(corners[3],corners[2]))/2);
+    var H=Math.round((cDist(corners[0],corners[3])+cDist(corners[1],corners[2]))/2);
+    var cap=1600,m=Math.max(W,H);
+    if(m>cap){W=Math.round(W*cap/m);H=Math.round(H*cap/m)}
+    if(W<20||H<20)return null;
+    var h=cSolveH(corners,W,H);
+    if(!h)return null;
+    var sW=img.naturalWidth,sH=img.naturalHeight,sCap=2400,sm=Math.max(sW,sH),sf=1;
+    if(sm>sCap){sf=sCap/sm;sW=Math.round(sW*sf);sH=Math.round(sH*sf)}
+    var sc=document.createElement('canvas');sc.width=sW;sc.height=sH;
+    var sctx=sc.getContext('2d');sctx.drawImage(img,0,0,sW,sH);
+    var sd=sctx.getImageData(0,0,sW,sH).data;
+    var dc=document.createElement('canvas');dc.width=W;dc.height=H;
+    var dctx=dc.getContext('2d'),out=dctx.createImageData(W,H),od=out.data;
+    for(var Y=0;Y<H;Y++){
+      for(var X=0;X<W;X++){
+        var den=h[6]*X+h[7]*Y+1;
+        var sx=(h[0]*X+h[1]*Y+h[2])/den*sf, sy=(h[3]*X+h[4]*Y+h[5])/den*sf;
+        var o=(Y*W+X)*4;
+        if(sx<0||sy<0||sx>=sW-1||sy>=sH-1){od[o]=od[o+1]=od[o+2]=250;od[o+3]=255;continue}
+        var x0=sx|0,y0=sy|0,fx=sx-x0,fy=sy-y0;
+        var i00=(y0*sW+x0)*4,i10=i00+4,i01=i00+sW*4,i11=i01+4;
+        for(var ch=0;ch<3;ch++){
+          od[o+ch]=sd[i00+ch]*(1-fx)*(1-fy)+sd[i10+ch]*fx*(1-fy)+
+                   sd[i01+ch]*(1-fx)*fy+sd[i11+ch]*fx*fy;
+        }
+        od[o+3]=255;
+      }
+    }
+    dctx.putImageData(out,0,0);
+    return dc;
+  }
+  /* ---- end warp ---- */
+
+  $('crot').onclick=function(){
+    if(!cimg||ccorners.length!==4)return;
+    var W=cimg.naturalWidth,H=cimg.naturalHeight;
+    var rc=document.createElement('canvas');rc.width=H;rc.height=W;
+    var rx=rc.getContext('2d');
+    rx.translate(H,0);rx.rotate(Math.PI/2);rx.drawImage(cimg,0,0);
+    var nc=ccorners.map(function(p){return {x:H-p.y,y:p.x}});
+    nc.unshift(nc.pop());
+    rc.toBlob(function(bl){
+      if(!bl)return;
+      var u=URL.createObjectURL(bl);
+      var rotated=new Image();
+      rotated.onload=function(){URL.revokeObjectURL(u);cimg=rotated;ccorners=nc;cDrawStage();cPaintOverlay();};
+      rotated.src=u;
+    },'image/jpeg',0.95);
+  };
+
+  function closeCrop(){
+    $('cropov').classList.add('hidden');
+    cimg=null;ccorners=[];
+    $('ccv').width=1;$('ccv').height=1;
+  }
+  $('cropCancel').onclick=function(){if(!cbusy)closeCrop();};
+
+  $('cropSave').onclick=function(){
+    if(cbusy||!cimg||!openCard)return;
+    var dc=cWarp();
+    if(!dc){openAlert('Selected area is too small. Adjust the dots and try again.','Crop too small');return}
+    var save=$('cropSave'),cancel=$('cropCancel');
+    cbusy=true;save.disabled=true;cancel.disabled=true;save.textContent='Saving…';
+    var page=cpage,card=ccard,path=(card.raw.paths||[])[page];
+    var done=function(ok,msg){
+      cbusy=false;save.disabled=false;cancel.disabled=false;save.textContent='Save';
+      if(ok)closeCrop();
+      else openAlert(msg||'Could not save the crop.','Save failed');
+    };
+    if(!path){done(false,'This photo has no storage path to save to.');return}
+    dc.toBlob(function(bl){
+      if(!bl){done(false);return}
+      var task=fbStore.ref().child(path).put(bl,{contentType:'image/jpeg'});
+      task.on('state_changed',
+        function(s){var pct=s.totalBytes?Math.round(s.bytesTransferred/s.totalBytes*100):0;save.textContent='Saving '+pct+'%';},
+        function(err){if(window.console)console.warn(err);done(false);},
+        function(){
+          // Same storage path, new bytes: point the in-memory page at the fresh
+          // crop so the lightbox and grid update now. The thumbnail regenerates
+          // server-side and a later reload re-resolves the real URLs.
+          var ourl=URL.createObjectURL(bl);
+          card.pages[page].url=ourl;card.pages[page].thumb=ourl;
+          render();
+          if(openCard===card)show(card,page);
+          done(true);
+        });
+    },'image/jpeg',0.92);
+  };
+
+  $('cropov').addEventListener('keydown',function(e){
+    if(e.key==='Escape'&&!cbusy)closeCrop();
+  });
 })();
 </script>
 
