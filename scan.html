@@ -101,6 +101,8 @@
 
   /* Two stacked entry buttons, evenly spaced (no divider between them) */
   #start{display:flex;flex-direction:column;gap:16px}
+  /* Shooting tip, sits just below the Take Photos button */
+  .tip{text-align:center;font-size:12.5px;color:var(--muted)}
 
   /* ---- home screen ----
      Fills the space under the header so the pieces can be distributed:
@@ -572,9 +574,11 @@
   <section id="start" class="hidden">
     <div class="drop cam" id="camzone" tabindex="0" role="button">
       <strong>Take Photos</strong>
-      <span>Photos won&rsquo;t show up in your camera roll</span>
+      <span>Photos won&rsquo;t show up in your photo library</span>
     </div>
     <input type="file" id="camera" accept="image/*" capture="environment" class="hidden">
+
+    <p class="tip">Tip: a dark surface makes the card edges easy to detect.</p>
 
     <div class="drop" id="dropzone" tabindex="0" role="button">
       <strong>Choose Photos</strong>
@@ -751,7 +755,7 @@
       <div class="set-sep hidden" id="ownerSep"></div>
       <button type="button" class="signout" id="setSignOut">Sign out</button>
     </div>
-    <p class="setver">v2026.08.10.10</p>
+    <p class="setver">v2026.08.10.11</p>
   </div>
 </div>
 
