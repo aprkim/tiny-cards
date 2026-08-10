@@ -767,7 +767,7 @@
       <div class="set-sep hidden" id="ownerSep"></div>
       <button type="button" class="signout" id="setSignOut">Sign out</button>
     </div>
-    <p class="setver">v2026.08.10.12</p>
+    <p class="setver">v2026.08.10.13</p>
   </div>
 </div>
 
@@ -1340,6 +1340,7 @@
     pages=[];pageLabels=[];sources=[];cornerSets=[];redoIndex=-1;pageIdx=0;pendingNewCard=true;
     resetDraft();                          // fresh card id for auto-save
     $('warn').classList.add('hidden');
+    if(isNativeApp())return nativeCapture();   // straight to the native camera
     openCamera();
   }
 
@@ -1389,9 +1390,20 @@
     }).catch(function(e){showConverting(false);throw e});
   }
 
-  camera.onchange=function(){
-    var f=camera.files&&camera.files[0];
-    if(!f)return;                      // cancelled: leave the screen as it was
+  // Native (Capacitor) uses @capacitor/camera to open the camera/library directly
+  // — no iOS action sheet. Web falls back to the file inputs. Both feed the same
+  // crop/upload pipeline through ingestCapturePhoto / ingestBatch.
+  function cam(){return window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Camera;}
+  function uriToFile(webPath,name){
+    return fetch(webPath).then(function(r){return r.blob();}).then(function(bl){
+      try{return new File([bl],name||'photo.jpg',{type:bl.type||'image/jpeg'});}catch(e){return bl;}
+    });
+  }
+
+  // One captured page -> the crop stage. Cancelled captures never call this, so
+  // the current screen is left untouched.
+  function ingestCapturePhoto(f){
+    if(!f)return;
     if(pendingNewCard){cardNo++;pendingNewCard=false}
     $('start').classList.add('hidden');
     $('finish').classList.add('hidden');
@@ -1413,9 +1425,19 @@
       if(window.console)console.warn('HEIC convert failed',e);
       curSource=f;noteBad();acceptPage(f);
     });
-  };
+  }
+  camera.onchange=function(){ ingestCapturePhoto(camera.files&&camera.files[0]); };
 
-  function addAnotherPhoto(){if(pages.length>=MAX_PAGES)return;openCamera();}
+  // Native camera capture (getPhoto). Cancel throws → swallowed (stay put).
+  function nativeCapture(){
+    var C=cam(); if(!C)return openCamera();
+    C.getPhoto({source:'CAMERA',resultType:'uri',quality:92})
+      .then(function(p){return uriToFile(p.webPath,'photo.'+(p.format||'jpg'));})
+      .then(ingestCapturePhoto)
+      .catch(function(e){if(window.console)console.warn('getPhoto',e);});
+  }
+
+  function addAnotherPhoto(){if(pages.length>=MAX_PAGES)return;if(isNativeApp())return nativeCapture();openCamera();}
 
   /* Full-screen page viewer: tap a thumbnail to open. Redo-crop and the
      front/inside label control live here (off the naming form). Uses its own
@@ -1448,19 +1470,21 @@
   $('pvRedo').onclick=function(){var i=pvIndex;closePageView();if(i>-1)redoPage(i);};
   $('pvLabel').onchange=function(){if(pvIndex>-1)setLabel(pvIndex,$('pvLabel').value);};
 
-  $('dropzone').onclick=function(){mode='batch';picker.value='';picker.click()};
+  function choosePhotos(){mode='batch';if(isNativeApp())return nativePick();picker.value='';picker.click();}
+  $('dropzone').onclick=choosePhotos;
   $('dropzone').onkeydown=function(e){
-    if(e.key==='Enter'||e.key===' '){e.preventDefault();mode='batch';picker.value='';picker.click()}
+    if(e.key==='Enter'||e.key===' '){e.preventDefault();choosePhotos()}
   };
   $('again').onclick=function(){
     if(mode==='capture')return startCapture();
-    picker.value='';picker.click();
+    choosePhotos();
   };
 
-  picker.onchange=function(){
-    if(!picker.files.length)return;
-    files=Array.prototype.slice.call(picker.files).filter(function(f){
-      return /^image\//.test(f.type)||/\.(heic|heif)$/i.test(f.name);
+  // A chosen set of photos -> the batch crop walk (shared by the web picker and
+  // the native photo picker).
+  function ingestBatch(arr){
+    files=arr.filter(function(f){
+      return /^image\//.test(f.type)||/\.(heic|heif)$/i.test(f.name||'');
     });
     if(!files.length)return;
     cursor=0;cardNo=0;savedCards=0;savedFiles=0;
@@ -1468,7 +1492,20 @@
     $('start').classList.add('hidden');
     $('finish').classList.add('hidden');
     startCard();
+  }
+  picker.onchange=function(){
+    if(!picker.files.length)return;
+    ingestBatch(Array.prototype.slice.call(picker.files));
   };
+  // Native multi-select straight from the library (pickImages). Cancel → empty
+  // result or throw, both ignored.
+  function nativePick(){
+    var C=cam(); if(!C){picker.value='';picker.click();return;}
+    C.pickImages({quality:92})
+      .then(function(res){var ph=(res&&res.photos)||[];return Promise.all(ph.map(function(x){return uriToFile(x.webPath,'photo.'+(x.format||'jpg'));}));})
+      .then(function(arr){if(arr.length)ingestBatch(arr);})
+      .catch(function(e){if(window.console)console.warn('pickImages',e);});
+  }
 
   function noteBad(){$('warn').classList.remove('hidden')}
 

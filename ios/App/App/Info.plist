@@ -32,6 +32,10 @@
 			</array>
 		</dict>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Take photos of your cards to add them to your archive.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Choose card photos from your library to add them to your archive.</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>
