@@ -527,8 +527,28 @@
       });
     });
   }
+  // Native (Capacitor iOS) uses the native Google Sign-In plugin — Google blocks
+  // OAuth inside embedded webviews. skipNativeAuth:true means the plugin returns
+  // only the OAuth credential; we hand it to the JS SDK via signInWithCredential,
+  // so onAuthStateChanged and the rest of the session code stay unchanged. On the
+  // web window.Capacitor is undefined, so isNativeApp() is false and the existing
+  // popup/redirect path below runs untouched.
+  function isNativeApp(){
+    return !!(window.Capacitor && typeof window.Capacitor.isNativePlatform==='function'
+              && window.Capacitor.isNativePlatform());
+  }
+  function nativeGoogleSignIn(){
+    var FA=window.Capacitor.Plugins.FirebaseAuthentication;
+    return FA.signInWithGoogle().then(function(res){
+      var c=(res&&res.credential)||{};
+      if(!c.idToken)throw new Error('No Google credential returned');
+      var cred=firebase.auth.GoogleAuthProvider.credential(c.idToken,c.accessToken);
+      return firebase.auth().signInWithCredential(cred);
+    }).then(function(r){authUser=r.user;return authUser;});
+  }
   function signIn(){
     if(!fbInit())return Promise.reject(new Error('firebase unavailable'));
+    if(isNativeApp())return nativeGoogleSignIn();
     var p=new firebase.auth.GoogleAuthProvider();
     p.setCustomParameters({prompt:'select_account'});
     return firebase.auth().signInWithPopup(p).then(function(r){authUser=r.user;return authUser})
@@ -542,7 +562,13 @@
   }
   function signOutUser(){
     if(!fbInit())return Promise.resolve();
-    return firebase.auth().signOut().then(function(){authUser=null});
+    var jsOut=function(){return firebase.auth().signOut().then(function(){authUser=null});};
+    if(isNativeApp()){
+      // Clear the native Google session too, so the next sign-in shows the
+      // account picker instead of silently reusing the last account.
+      return window.Capacitor.Plugins.FirebaseAuthentication.signOut().catch(function(){}).then(jsOut);
+    }
+    return jsOut();
   }
 
   // Designed alert dialog (matches View/Scan), replacing window.alert.

@@ -1,5 +1,11 @@
 {
   "appId": "space.tinywins.cards",
   "appName": "Tiny Cards",
-  "webDir": "www"
+  "webDir": "www",
+  "plugins": {
+    "FirebaseAuthentication": {
+      "skipNativeAuth": true,
+      "providers": ["google.com"]
+    }
+  }
 }

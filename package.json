@@ -19,6 +19,7 @@
   },
   "homepage": "https://github.com/aprkim/tiny-cards#readme",
   "dependencies": {
+    "@capacitor-firebase/authentication": "^8.3.0",
     "@capacitor/cli": "^8.5.0",
     "@capacitor/core": "^8.5.0",
     "@capacitor/ios": "^8.5.0"
