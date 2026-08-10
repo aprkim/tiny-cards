@@ -269,48 +269,66 @@
   }
   button.skip:hover{border-color:var(--ink);color:var(--ink)}
 
-  .pages{display:flex;gap:10px;margin-bottom:18px}
-  .pg{flex:1;text-align:center}
+  /* Captured pages: a horizontal, scrollable row of fixed-height thumbnails.
+     The form is this screen's primary job, so photos stay compact reference —
+     tap one to view it full-screen (and redo its crop). */
+  .pages{display:flex;gap:10px;margin-bottom:14px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px}
+  .pg{flex:0 0 auto;position:relative}
+  .pgredo{display:block;padding:0;border:none;background:none;cursor:pointer;-webkit-appearance:none;appearance:none}
   .pg img{
-    width:100%;aspect-ratio:1/1;object-fit:contain;background:var(--field);
-    border:1px solid var(--rule);border-radius:10px;display:block;padding:4px;
+    height:120px;width:auto;max-width:150px;object-fit:contain;background:var(--field);
+    border:1px solid var(--rule);border-radius:10px;display:block;transition:border-color .15s;
   }
-  .pg span{
-    display:block;font-size:11.5px;color:var(--muted);margin-top:5px;
-    text-transform:uppercase;letter-spacing:.04em;
-  }
-  /* The image doubles as the way back into the crop for that page. It is
-     its own button so the label select beside it stays independent. */
-  .pgredo{
-    display:block;width:100%;font:inherit;background:none;border:none;padding:0;
-    cursor:pointer;-webkit-appearance:none;appearance:none;
-  }
-  .pgredo img{transition:border-color .15s}
   .pgredo:hover img,.pgredo:focus-visible img{border-color:var(--accent)}
   .pgredo:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:12px}
-
-  .pglabel{
-    width:100%;margin-top:5px;font:inherit;font-size:11px;font-weight:600;
-    text-transform:uppercase;letter-spacing:.04em;
-    color:var(--accent);background:var(--accent-soft);
-    border:1px solid transparent;border-radius:6px;padding:4px 20px 4px 8px;cursor:pointer;
-    -webkit-appearance:none;appearance:none;
-    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'><path d='M1 1l4 4 4-4' fill='none' stroke='%23B0184F' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/></svg>");
-    background-repeat:no-repeat;background-position:right 7px center;
+  /* Label badge, bottom-left of each thumbnail (display only) */
+  .pgbadge{
+    position:absolute;left:6px;bottom:6px;pointer-events:none;
+    background:rgba(22,22,29,.82);color:#fff;font-size:10px;font-weight:600;
+    padding:2px 8px;border-radius:100px;text-transform:uppercase;letter-spacing:.04em;
   }
-  .pglabel:hover{border-color:var(--accent)}
-  .pglabel:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
-
-  .thumbhint{
-    text-align:center;font-size:11.5px;color:var(--muted);
-    margin:-10px 0 14px;
+  /* "+ Add a photo" as the last tile in the row */
+  .pgadd{
+    flex:0 0 auto;height:120px;width:96px;border:1.5px dashed var(--rule);border-radius:10px;
+    background:var(--field);color:var(--muted);cursor:pointer;font:inherit;font-size:11.5px;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;text-align:center;padding:8px;
   }
+  .pgadd:hover,.pgadd:focus-visible{border-color:var(--accent);color:var(--accent);outline:none}
+  .pgadd .plus{font-size:24px;line-height:1;font-weight:300}
   .pg .bad{
-    width:100%;aspect-ratio:3/4;background:var(--field);
-    border:1px dashed var(--rule);border-radius:10px;
+    height:120px;width:90px;background:var(--field);border:1px dashed var(--rule);border-radius:10px;
     display:flex;align-items:center;justify-content:center;text-align:center;
-    font-size:11.5px;color:var(--muted);padding:10px;line-height:1.5;
+    font-size:11px;color:var(--muted);padding:8px;line-height:1.5;
   }
+
+  /* Full-screen photo viewer (tap a thumbnail). Holds redo-crop + the
+     front/inside label control, off the main naming screen. */
+  .pvov{
+    position:fixed;inset:0;z-index:60;background:rgba(22,22,29,.95);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;
+    padding:calc(env(safe-area-inset-top) + 56px) 18px calc(env(safe-area-inset-bottom) + 18px);
+  }
+  .pvov img{max-width:100%;max-height:62vh;object-fit:contain;border-radius:10px;background:var(--field)}
+  .pvx{
+    position:fixed;top:calc(env(safe-area-inset-top) + 12px);right:14px;z-index:61;
+    width:40px;height:40px;padding:0;border-radius:50%;border:1px solid rgba(255,255,255,.28);
+    background:rgba(0,0,0,.28);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  }
+  .pvx svg{width:20px;height:20px;display:block}
+  .pvbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:center}
+  .pvlabel{
+    font:inherit;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:#fff;
+    background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.28);border-radius:100px;
+    padding:9px 30px 9px 14px;cursor:pointer;-webkit-appearance:none;appearance:none;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'><path d='M1 1l4 4 4-4' fill='none' stroke='%23fff' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+    background-repeat:no-repeat;background-position:right 12px center;
+  }
+  .pvredo{
+    font:inherit;font-size:13px;padding:9px 16px;border-radius:100px;
+    border:1px solid rgba(255,255,255,.28);background:none;color:#fff;cursor:pointer;white-space:nowrap;
+  }
+  .pvredo:hover,.pvredo:focus-visible{border-color:#fff;outline:none}
+  .pvredo[disabled]{opacity:.4;cursor:not-allowed}
 
   .warn{
     margin-bottom:16px;padding:12px 14px;border-radius:12px;
@@ -613,10 +631,6 @@
       <div class="upbar"><i id="upFill"></i></div>
     </div>
     <div class="pages" id="thumbs"></div>
-    <p class="thumbhint hidden" id="thumbHint">Tap a photo to redo its crop &middot; use the label to mark front / inside</p>
-    <div class="footlink hidden" id="addPageWrap" style="margin-top:0;margin-bottom:16px">
-      <button type="button" class="tool" id="addPage">+ Add a photo to this card</button>
-    </div>
     <div class="name" id="preview"></div>
 
     <div class="field">
@@ -701,6 +715,19 @@
 
 </div>
 
+<!-- Full-screen photo viewer, opened by tapping a page thumbnail on the naming
+     screen. Redo-crop and the front/inside label live here, off the main form. -->
+<div class="pvov hidden" id="pageView">
+  <button class="pvx" id="pvClose" type="button" aria-label="Close">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+  </button>
+  <img id="pvImg" alt="">
+  <div class="pvbar">
+    <select id="pvLabel" class="pvlabel hidden" aria-label="Label for this photo"></select>
+    <button class="pvredo" id="pvRedo" type="button">&#8635; Redo crop</button>
+  </div>
+</div>
+
 <!-- Reusable confirm dialog (matches the View page). Cancel is the safe
      default, focused on open; click-outside and Escape cancel. -->
 <div class="scrim hidden" id="modal">
@@ -734,7 +761,7 @@
       <div class="set-sep hidden" id="ownerSep"></div>
       <button type="button" class="signout" id="setSignOut">Sign out</button>
     </div>
-    <p class="setver">v2026.08.10.7</p>
+    <p class="setver">v2026.08.10.8</p>
   </div>
 </div>
 
@@ -1382,7 +1409,38 @@
     });
   };
 
-  $('addPage').onclick=function(){if(pages.length>=MAX_PAGES)return;openCamera()};
+  function addAnotherPhoto(){if(pages.length>=MAX_PAGES)return;openCamera();}
+
+  /* Full-screen page viewer: tap a thumbnail to open. Redo-crop and the
+     front/inside label control live here (off the naming form). Uses its own
+     object URL so re-rendering the thumbnail row (setLabel -> toMeta) can't
+     revoke the image currently on screen. */
+  var pvIndex=-1,pvURL=null;
+  function openPageView(i){
+    pvIndex=i;
+    if(pvURL){URL.revokeObjectURL(pvURL);pvURL=null}
+    pvURL=URL.createObjectURL(pages[i]);
+    $('pvImg').src=pvURL;
+    var sel=$('pvLabel');
+    if(pages.length>1){
+      sel.classList.remove('hidden');
+      var lbl=pageLabels[i]||('p'+(i+1)),opts=LABELS.slice();
+      if(opts.indexOf(lbl)===-1)opts.push(lbl);
+      sel.innerHTML='';
+      opts.forEach(function(o){var op=document.createElement('option');op.value=o;op.textContent=o;if(o===lbl)op.selected=true;sel.appendChild(op);});
+    }else sel.classList.add('hidden');
+    $('pvRedo').disabled=!sources[i];       // can only redo a crop if the source was kept
+    $('pageView').classList.remove('hidden');
+  }
+  function closePageView(){
+    $('pageView').classList.add('hidden');
+    if(pvURL){URL.revokeObjectURL(pvURL);pvURL=null}
+    pvIndex=-1;
+  }
+  $('pvClose').onclick=closePageView;
+  $('pageView').addEventListener('keydown',function(e){if(e.key==='Escape')closePageView();});
+  $('pvRedo').onclick=function(){var i=pvIndex;closePageView();if(i>-1)redoPage(i);};
+  $('pvLabel').onchange=function(){if(pvIndex>-1)setLabel(pvIndex,$('pvLabel').value);};
 
   $('dropzone').onclick=function(){mode='batch';picker.value='';picker.click()};
   $('dropzone').onkeydown=function(e){
@@ -1704,21 +1762,17 @@
     pages.forEach(function(bl,i){
       var u=URL.createObjectURL(bl);thumbURLs.push(u);
       var lbl=pageLabels[i]||('p'+(i+1));
-      var canRedo=!!sources[i];
       var d=document.createElement('div');d.className='pg';
 
-      // The image is the way back into the crop. It must be its own button:
-      // nesting the label <select> inside a button would send every label
-      // tap through to redoPage as well.
-      var holder=d;
-      if(canRedo){
-        holder=document.createElement('button');
-        holder.type='button';holder.className='pgredo';
-        holder.title='Redo this crop';
-        holder.setAttribute('aria-label','Redo the crop for '+lbl);
-        holder.onclick=function(){redoPage(i)};
-        d.appendChild(holder);
-      }
+      // Tapping a thumbnail opens the full-screen viewer, where redo-crop and the
+      // label control live. It's a button for keyboard/a11y.
+      var holder=document.createElement('button');
+      holder.type='button';holder.className='pgredo';
+      holder.title='View this photo';
+      holder.setAttribute('aria-label','View '+lbl);
+      holder.onclick=function(){openPageView(i)};
+      d.appendChild(holder);
+
       var im=document.createElement('img');im.src=u;im.alt=lbl;
       im.onerror=function(){
         var ph=document.createElement('div');
@@ -1728,33 +1782,22 @@
       };
       holder.appendChild(im);
 
-      if(pages.length>1){
-        // Label is a choice, not just a consequence of shooting order
-        var sel=document.createElement('select');
-        sel.className='pglabel';
-        sel.setAttribute('aria-label','Label for this photo');
-        var opts=LABELS.slice();
-        if(opts.indexOf(lbl)===-1)opts.push(lbl);
-        opts.forEach(function(o){
-          var op=document.createElement('option');
-          op.value=o;op.textContent=o;
-          if(o===lbl)op.selected=true;
-          sel.appendChild(op);
-        });
-        sel.onchange=function(){setLabel(i,sel.value)};
-        d.appendChild(sel);
-      }else{
-        var sp=document.createElement('span');
-        sp.textContent=lbl;
-        d.appendChild(sp);
-      }
+      // Label badge, bottom-left (display only — change it inside the viewer)
+      var badge=document.createElement('span');
+      badge.className='pgbadge';badge.textContent=lbl;
+      d.appendChild(badge);
+
       t.appendChild(d);
     });
-    var th=$('thumbHint');
-    if(th)th.classList.toggle('hidden',!sources.some(function(x){return !!x}));
+    // "+ Add a photo" as the last tile in the row (capture mode, under the cap)
+    if(mode==='capture'&&pages.length<MAX_PAGES){
+      var add=document.createElement('button');
+      add.type='button';add.className='pgadd';
+      add.innerHTML='<span class="plus">+</span><span>Add a photo</span>';
+      add.onclick=addAnotherPhoto;
+      t.appendChild(add);
+    }
     upHide();
-    // Cap a card at 4 photos (front/inside/back/extra): hide "Add a photo" at 4.
-    $('addPageWrap').classList.toggle('hidden',mode!=='capture'||pages.length>=MAX_PAGES);
     // Keep the sender when adding pages to the card already being named
     if(!pages.length||pages.length===1)$('sender').value='';
     paintName();chips();
