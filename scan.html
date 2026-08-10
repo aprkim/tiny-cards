@@ -442,6 +442,12 @@
   #modalConfirm{background:var(--field);color:var(--ink);border-color:var(--rule)}
   #modalConfirm.danger{background:var(--field);color:#C62828;border-color:#C62828}
   #modalConfirm.danger:hover,#modalConfirm.danger:focus-visible{background:#FBEBEA}
+  /* Discard-style dialogs only: destructive action on top as plain red text, with
+     the dark default ("Keep Editing") dominant below. Scoped by .confirm-top so
+     other confirms (delete, sign-out) keep the standard outlined-danger look. */
+  #modal.confirm-top #modalConfirm{order:-1}
+  #modal.confirm-top #modalConfirm.danger{background:none;border-color:transparent;color:#FF3B30}
+  #modal.confirm-top #modalConfirm.danger:hover,#modal.confirm-top #modalConfirm.danger:focus-visible{background:rgba(255,59,48,.08)}
   @media (max-width:560px){
     .scrim{align-items:flex-end;padding:0}
     .sheet{
@@ -728,7 +734,7 @@
       <div class="set-sep hidden" id="ownerSep"></div>
       <button type="button" class="signout" id="setSignOut">Sign out</button>
     </div>
-    <p class="setver">v2026.08.10.6</p>
+    <p class="setver">v2026.08.10.7</p>
   </div>
 </div>
 
@@ -1043,7 +1049,10 @@
     bd.textContent=opts.body||'';bd.style.display=opts.body?'':'none';
     c.textContent=opts.confirmText||'OK';
     c.classList.toggle('danger',!!opts.danger);
+    x.textContent=opts.cancelText||'Cancel';
     x.style.display=opts.alert?'none':'';        // alert = single button, no Cancel
+    // confirmTop: destructive action on top, safe default below (see .confirm-top CSS)
+    $('modal').classList.toggle('confirm-top',!!opts.confirmTop);
     onConfirm=opts.onConfirm||null;
     $('modal').classList.remove('hidden');
     (opts.alert?c:x).focus();
@@ -1837,7 +1846,7 @@
     openConfirm({
       title:'Discard this card?',
       body:'The photos you just took won’t be saved.',
-      confirmText:'Discard',danger:true,
+      confirmText:'Discard',cancelText:'Keep Editing',danger:true,confirmTop:true,
       onConfirm:function(){
         pages=[];pageLabels=[];sources=[];cornerSets=[];redoIndex=-1;pageIdx=0;
         if(mode==='capture')return finish();   // tally; continue from there
