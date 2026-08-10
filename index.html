@@ -104,24 +104,38 @@
      illustration + count at the top, the action pair low in the thumb zone,
      the account row pinned to the very bottom. 100dvh tracks the real visible
      height as Safari's toolbars come and go. */
-  /* Three zones: the header sits above (its own element), the illustration +
-     count take the flexible middle and centre within it, and the actions sit
-     at the bottom. 100dvh tracks the real visible height as Safari toolbars
-     come and go. */
-  #home{
+  /* The home page is exactly one viewport tall and never scrolls. The .wrap
+     fills the space from the top down to the tab bar; the header takes its
+     natural height and #home flexes to fill the rest, with the sign-in button
+     (the only CTA) pinned to the bottom of that flex — so it is always visible
+     just above the tab bar, with no magic header-height number to drift out of
+     sync. On short screens the illustration shrinks/clips instead of pushing
+     the button off-screen. */
+  body.view-home{overflow:hidden}
+  body.view-home .wrap{
     display:flex;flex-direction:column;
-    min-height:calc(100dvh - 150px - var(--barh));
+    /* Down to the tab bar: --barh already covers the bar plus the home-indicator
+       inset, and env(safe-area-inset-top) is what the body's own top padding
+       pushed us down by. env() is 0 on desktop, so this is just
+       100dvh - --tabbar-height there — desktop layout is unchanged. */
+    height:calc(100dvh - env(safe-area-inset-top) - var(--barh));
+  }
+  #home{
+    flex:1 1 auto;min-height:0;
+    display:flex;flex-direction:column;
   }
   /* Middle zone. justify-content:center would land dead-centre, which reads as
      low with this much whitespace, so the extra bottom padding nudges the block
      to roughly 45%. The top/bottom padding also keeps a gap from the header and
      buttons on short screens (iPhone SE). min-height:0 lets it shrink there. */
   .hero{
-    flex:1 1 auto;min-height:0;
+    flex:1 1 auto;min-height:0;overflow:hidden;
     display:flex;flex-direction:column;align-items:center;justify-content:center;
     text-align:center;padding:24px 0 3vh;
   }
-  .heroart{position:relative;height:150px;margin:0 auto 18px;width:126px;flex:0 0 auto}
+  /* 150px when there's room, but flex-shrink lets it scale down on a very short
+     screen so the button below is never pushed off. */
+  .heroart{position:relative;height:150px;max-height:150px;margin:0 auto 18px;width:126px;flex:0 1 auto;min-height:0}
   .heroart span{position:absolute;border-radius:12px;background:#fff;border:2.5px solid var(--accent)}
   .heroart .c1{inset:12px 22px 12px 0;transform:rotate(-9deg);background:var(--accent-soft)}
   .heroart .c2{inset:0 0 0 24px;display:flex;align-items:center;justify-content:center}
