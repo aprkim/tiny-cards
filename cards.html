@@ -545,7 +545,7 @@
       <div class="set-sep hidden" id="ownerSep"></div>
       <button type="button" class="signout" id="setSignOut">Sign out</button>
     </div>
-    <p class="setver">v2026.08.10.3</p>
+    <p class="setver">v2026.08.10.4</p>
   </div>
 </div>
 
@@ -648,9 +648,18 @@
     $('setEmail').textContent=(authUser&&authUser.email)||'Signed in';
     var owner=isOwner();
     $('setShare').classList.toggle('hidden',!owner);                 // owner: invite/manage viewers
-    $('setExport').classList.toggle('hidden',!canExport());          // owner + desktop
     $('ownerSep').classList.toggle('hidden',!owner);
-    $('setExportHint').textContent='ZIP backup';$('setExport').disabled=false;
+    $('setExport').disabled=false;
+    // The native app can't stream a browser download (WKWebView has no download
+    // manager), so rather than a broken button, owners see a note pointing them
+    // to the computer. The web keeps the real desktop-only export.
+    if(owner&&isNativeApp()){
+      $('setExport').classList.remove('hidden');
+      $('setExportHint').textContent='On a computer';
+    }else{
+      $('setExport').classList.toggle('hidden',!canExport());        // owner + desktop
+      $('setExportHint').textContent='ZIP backup';
+    }
     $('settings').classList.remove('hidden');
   }
   function closeSettings(){$('settings').classList.add('hidden')}
@@ -661,7 +670,12 @@
   // browser streams the ZIP straight to disk. Content-Disposition:attachment
   // keeps the current page put (it just downloads).
   $('setExport').onclick=function(){
-    if(!authUser||!canExport())return;
+    if(!authUser||!isOwner())return;
+    if(isNativeApp()){
+      openAlert('A full backup is a large ZIP download. Open cards.tinywins.space on a computer and use Settings → Export all.','Back up on a computer');
+      return;
+    }
+    if(!canExport())return;
     var btn=$('setExport'),hint=$('setExportHint');
     btn.disabled=true;hint.textContent='Preparing…';
     authUser.getIdToken().then(function(tok){
