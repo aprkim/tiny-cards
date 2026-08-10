@@ -118,26 +118,22 @@
 
   .box{
     position:fixed;inset:0;background:rgba(22,22,29,.94);z-index:50;
-    display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
-    padding:22px;gap:14px;overflow-y:auto;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:10px;overflow-y:auto;
+    padding:calc(env(safe-area-inset-top) + 56px) 14px calc(env(safe-area-inset-bottom) + 14px);
   }
-  /* Auto-margin pseudo-elements centre the content while still allowing it to
-     scroll. justify-content:center would clip the top once the edit form makes
-     the contents taller than the viewport, putting Save out of reach. */
-  .box::before,.box::after{content:'';flex:0 0 auto}
-  .box::before{margin-top:auto}
-  .box::after{margin-bottom:auto}
   .box>*{flex:0 0 auto}
-  .box .imgstage{width:100%;display:flex;align-items:center;justify-content:center}
-  .box img{max-width:100%;max-height:calc(100vh - 200px);object-fit:contain;border-radius:8px;display:block}
-  /* Multi-photo cards pin the image area to a constant height, so paging between
-     photos of different shapes keeps the layout still instead of jumping. Each
-     photo is letterboxed inside the fixed box. */
-  .box.multi .imgstage{height:calc(100vh - 200px)}
-  .box.multi img{max-height:100%}
-  /* Give the form room on short screens */
+  /* The photo fills whatever height the caption, page pills and buttons leave.
+     That height is identical for every page of a card, so swiping between photos
+     of different shapes doesn't jump — and the whole thing fits the screen, so
+     nothing is letterboxed away or pushed into a scroll. */
+  .box .imgstage{flex:1 1 auto;min-height:0;width:100%;display:flex;align-items:center;justify-content:center}
+  .box img{max-width:100%;max-height:100%;object-fit:contain;border-radius:8px;display:block}
+  /* Editing: the form can be taller than the screen, so scroll from the top and
+     shrink the photo to leave room for the fields. */
+  .box.editing{justify-content:flex-start}
+  .box.editing .imgstage{flex:0 0 auto}
   .box.editing img{max-height:32vh}
-  .box.editing .imgstage{height:auto}
   .box .cap{color:#fff;text-align:center}
   .box .cap strong{display:block;font-size:16px;font-weight:600}
   .box .cap small{font-size:13px;opacity:.6;font-variant-numeric:tabular-nums}
@@ -539,7 +535,7 @@
       <div class="set-sep hidden" id="ownerSep"></div>
       <button type="button" class="signout" id="setSignOut">Sign out</button>
     </div>
-    <p class="setver">v2026.08.10.2</p>
+    <p class="setver">v2026.08.10.3</p>
   </div>
 </div>
 
@@ -1005,8 +1001,6 @@
     $('boxImg').src=p.url;
     $('boxName').textContent=card.person+(card.recipient?' \u2192 '+card.recipient:'');
     $('boxSub').textContent=(card.date?card.date+' \u00b7 ':'')+card.event;
-    // Multi-photo cards get a fixed-height image area so swiping doesn't jump.
-    $('box').classList.toggle('multi',card.pages.length>1);
     var nav=$('boxNav');nav.innerHTML='';
     if(card.pages.length>1){
       card.pages.forEach(function(pg,i){
