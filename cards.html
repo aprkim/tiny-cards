@@ -197,6 +197,12 @@
   #modalConfirm.danger{background:var(--field);color:#C62828;border-color:#C62828}
   #modalConfirm.danger:hover,#modalConfirm.danger:focus-visible{background:#FBEBEA}
   #modalConfirm:disabled{opacity:.45;cursor:not-allowed}
+  /* Delete-style dialogs: destructive action on top as plain red text, with the
+     dark default ("Keep Card") dominant below. Scoped by .confirm-top so the
+     Delete-All / sign-out confirms keep the standard outlined-danger look. */
+  #modal.confirm-top #modalConfirm{order:-1}
+  #modal.confirm-top #modalConfirm.danger{background:none;border-color:transparent;color:#FF3B30}
+  #modal.confirm-top #modalConfirm.danger:hover,#modal.confirm-top #modalConfirm.danger:focus-visible{background:rgba(255,59,48,.08)}
   /* Text input inside the dialog (e.g. type-to-confirm for Delete All). */
   .modal-input{
     width:100%;font:inherit;font-size:16px;padding:11px 13px;margin:-8px 0 20px;
@@ -552,7 +558,7 @@
       <div class="set-sep hidden" id="ownerSep"></div>
       <button type="button" class="signout" id="setSignOut">Sign out</button>
     </div>
-    <p class="setver">v2026.08.10.13</p>
+    <p class="setver">v2026.08.10.14</p>
   </div>
 </div>
 
@@ -620,7 +626,10 @@
     if(inp){inp.classList.toggle('hidden',!needInput);inp.value='';if(needInput)inp.placeholder=opts.placeholder||'';}
     c.textContent=opts.confirmText||'OK';
     c.classList.toggle('danger',!!opts.danger);
+    x.textContent=opts.cancelText||'Cancel';
     x.style.display=opts.alert?'none':'';        // alert = single button, no Cancel
+    // confirmTop: destructive action on top, safe default below (see .confirm-top CSS)
+    $('modal').classList.toggle('confirm-top',!!opts.confirmTop);
     onConfirm=opts.onConfirm||null;
     function sync(){c.disabled=!!(needInput&&req)&&(inp.value.trim().toUpperCase()!==req.toUpperCase());}
     if(inp)inp.oninput=needInput?sync:null;
@@ -1214,7 +1223,9 @@
       title:'Delete this card?',
       body:'It disappears from your archive on every device.',
       confirmText:'Delete',
+      cancelText:'Keep Card',
       danger:true,
+      confirmTop:true,
       onConfirm:function(){deleteCard(card)}
     });
   };
