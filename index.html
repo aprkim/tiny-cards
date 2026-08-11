@@ -505,8 +505,7 @@
     messagingSenderId:"497477643272",
     appId:"1:497477643272:web:9f8e43fbffd18003e5f5bd"
   };
-  var SPACE='family';
-  var OWNER_EMAIL='aprkim@gmail.com';   // only the owner can scan; viewers are read-only
+  // Multi-tenant: each signed-in user's archive lives at their own uid.
   var fbReady=false,fbDb=null,authUser=null;
 
   function fbInit(){
@@ -594,14 +593,12 @@
     var signedIn=!!authUser;
     $('signedIn').classList.toggle('hidden',!signedIn);
     $('signedOut').classList.toggle('hidden',signedIn);
-    // Read-only viewers can't scan, so hide the Scan tab once a non-owner is
-    // signed in. Signed-out keeps it (it just leads to sign-in).
-    var canScan=!signedIn||authUser.email===OWNER_EMAIL;
-    if($('tabScan'))$('tabScan').style.display=canScan?'':'none';
+    // Everyone owns their own archive, so scanning is always available.
+    if($('tabScan'))$('tabScan').style.display='';
     // Explain the app before login (what Nathan and Hazel first see); tagline once in.
     $('pageSub').textContent=signedIn
       ? 'Every card, kept.'
-      : 'Scan greeting cards into one shared archive.';
+      : 'Scan and keep your greeting cards.';
     if(signedIn){
       $('whoText').textContent='Signed in as '+(authUser.email||authUser.displayName||'your account');
       paintCount();
@@ -615,7 +612,7 @@
     if(!el||!authUser)return;
     currentUser().then(function(u){
       if(!u)return null;
-      return fbDb.collection('tinyCards').doc(SPACE).get();
+      return fbDb.collection('tinyCards').doc(u.uid).get();
     }).then(function(doc){
       var n=(doc&&doc.exists&&(doc.data().cards||[]).length)||0;
       el.innerHTML=n?'<b>'+n+'</b> card'+(n===1?'':'s')+' saved':'No cards yet — scan your first';

@@ -93,14 +93,9 @@ exports.backfill = onCall({memory: '2GiB', timeoutSeconds: 540}, async (req) => 
   const auth = req.auth;
   if (!auth) throw new HttpsError('unauthenticated', 'Sign in first.');
   if (!auth.token.email_verified) throw new HttpsError('permission-denied', 'Verified email required.');
-  // Owner-only, judged by email like the rules — viewers cannot trigger work
-  if (auth.token.email !== OWNER_EMAIL) {
-    throw new HttpsError('permission-denied', 'Only the archive owner can run the backfill.');
-  }
-
   const db = admin.firestore();
   const bucket = admin.storage().bucket();
-  const ref = db.collection('tinyCards').doc(SPACE);
+  const ref = db.collection('tinyCards').doc(auth.uid);   // caller's own space
   const snap = await ref.get();
   if (!snap.exists) return {cards: 0, thumbs: 0, sized: 0};
 
@@ -186,11 +181,11 @@ exports.exportAll = onRequest({memory: '512MiB', timeoutSeconds: 3600}, async (r
   let user;
   try { user = await admin.auth().verifyIdToken(String(token)); }
   catch (e) { res.status(401).send('Session expired — reopen the app and try again.'); return; }
-  if (!user.email_verified || user.email !== OWNER_EMAIL) {
-    res.status(403).send('Only the archive owner can export.'); return;
+  if (!user.email_verified) {
+    res.status(403).send('Sign in with a verified account to export.'); return;
   }
 
-  const snap = await admin.firestore().collection('tinyCards').doc(SPACE).get();
+  const snap = await admin.firestore().collection('tinyCards').doc(user.uid).get();
   const cards = (snap.exists && snap.data().cards) || [];
 
   const stamp = new Date().toISOString().slice(0, 10);
@@ -285,3 +280,6 @@ exports.revokeViewer = onCall(async (req) => {
   await admin.firestore().collection('cardViewers').doc(uid).delete();
   return {ok: true};
 });
+
+// (The one-off `migrateFamily` function was removed after the family → per-uid
+// migration completed; the original `family` data is kept as a backup.)

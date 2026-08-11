@@ -1,47 +1,35 @@
 rules_version = '2';
 
-// One shared family space with an email allowlist: the owner can read and
-// write, named viewers can only read, and everyone must have a verified
-// email. This replaced uid-keyed paths, which made viewer access impossible
-// — a viewer's uid never matches the owner's path segment.
+// Multi-tenant: each signed-in user owns their OWN photos under cards/{uid}/…,
+// keyed by their auth uid. Access is granted only when the path's uid segment
+// equals the caller's uid, so no one can read/write another person's images.
+// Everyone must have a verified email.
 //
-// `get` and NOT `read`. In Storage rules `read` means `get` + `list`, and
-// granting `list` lets a client walk the tree (an earlier revision leaked
-// every sync code that way). Nothing here can be listed: the Firestore index
-// records which paths exist, and images are fetched by exact path.
+// This replaced the single shared "family" space + email allowlist. Cross-user
+// sharing is deferred to a later phase.
 //
-// Thumbnails (*_thumb.jpg) are written by the Cloud Function through the
-// Admin SDK, which bypasses these rules — no extra write grant is needed.
+// `get` and NOT `read`: granting `list` would let a client walk the tree.
+// Images are fetched by exact path (the Firestore index records which exist).
 //
-// The viewer list must be kept in step with the one in
-// tiny-do/firestore.rules (Firestore rules are project-wide and deploy from
-// that repo).
+// Thumbnails (*_thumb.jpg) are written by the Cloud Function through the Admin
+// SDK, which bypasses these rules — no extra write grant is needed.
 service firebase.storage {
   match /b/{bucket}/o {
 
     function cardsVerified() {
       return request.auth != null && request.auth.token.email_verified == true;
     }
-    function cardsOwner() {
-      return cardsVerified() && request.auth.token.email == 'aprkim@gmail.com';
-    }
-    function cardsViewer() {
-      // Granted by redeeming an invite (a Cloud Function sets this claim) and
-      // revocable by the owner. Replaced the hardcoded email allowlist; keep in
-      // step with cardsViewer() in tiny-do/firestore.rules.
-      return cardsVerified() && request.auth.token.cardsViewer == true;
-    }
 
-    match /cards/{space}/{allPaths=**} {
-      allow get: if cardsOwner() || cardsViewer();
+    match /cards/{uid}/{allPaths=**} {
+      allow get: if cardsVerified() && request.auth.uid == uid;
 
-      // Writes must be images of a sane size, so a compromised session
-      // cannot be used to park arbitrary files in the bucket.
-      allow write: if cardsOwner()
+      // Writes must be images of a sane size, so a compromised session cannot be
+      // used to park arbitrary files in the bucket.
+      allow write: if cardsVerified() && request.auth.uid == uid
                    && request.resource.size < 15 * 1024 * 1024
                    && request.resource.contentType.matches('image/.*');
 
-      allow delete: if cardsOwner();
+      allow delete: if cardsVerified() && request.auth.uid == uid;
     }
 
     // Everything else is denied.

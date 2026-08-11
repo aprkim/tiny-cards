@@ -808,7 +808,7 @@
       <div class="set-sep hidden" id="ownerSep"></div>
       <button type="button" class="signout" id="setSignOut">Sign out</button>
     </div>
-    <p class="setver">v2026.08.10.22</p>
+    <p class="setver">v2026.08.11.1</p>
   </div>
 </div>
 
@@ -938,8 +938,7 @@
   /* All cards live in one shared space rather than under each account's uid.
      Access is decided by the email allowlist in the security rules — keying
      data by uid made viewer accounts point at their own empty documents. */
-  var SPACE='family';
-  var OWNER_EMAIL='aprkim@gmail.com';   // only the owner can scan; viewers are read-only
+  var SPACE=null;   // set to the signed-in user's uid (their own archive) in afterAuth
   var fbReady=false,fbDb=null,fbStore=null,authUser=null;
 
   function fbInit(){
@@ -1141,12 +1140,12 @@
   // Same Settings as the View page: Account, Export all (owner + desktop),
   // Sign out. Export streams a ZIP backup via the exportAll function.
   var EXPORT_URL='https://us-east1-tiny-wins25.cloudfunctions.net/exportAll';
-  function canExport(){return !!(authUser&&authUser.email===OWNER_EMAIL&&window.matchMedia('(min-width:760px)').matches)}
-  function isOwner(){return !!(authUser&&authUser.email===OWNER_EMAIL);}
+  function canExport(){return !!(authUser&&window.matchMedia('(min-width:760px)').matches)}
+  function isOwner(){return !!authUser;}   // every user owns their own space
   function openSettings(){
     $('setEmail').textContent=(authUser&&authUser.email)||'Signed in';
     var owner=isOwner();
-    $('setShare').classList.toggle('hidden',!owner);            // owner: invite/manage viewers
+    $('setShare').classList.add('hidden');                       // sharing deferred to Phase 2
     $('ownerSep').classList.toggle('hidden',!owner);
     $('setExport').disabled=false;
     // Native app can't stream a browser download (no WKWebView download manager),
@@ -1260,13 +1259,11 @@
     location.replace('./');
   }
 
-  // Only the owner can scan. A signed-in viewer (read-only) is sent to their
-  // cards instead of a scanner that couldn't upload anyway.
+  // Every signed-in user gets their own archive, keyed by their uid.
   function afterAuth(u){
     authUser=u;
-    if(u.email===OWNER_EMAIL){enterScanner();return}
-    $('gateMsg').textContent='Read-only account — opening your cards…';
-    location.replace('cards.html');
+    SPACE=u.uid;
+    enterScanner();
   }
   currentUser().then(function(u){
     if(u){afterAuth(u);return}

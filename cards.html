@@ -570,7 +570,7 @@
       <div class="set-sep hidden" id="ownerSep"></div>
       <button type="button" class="signout" id="setSignOut">Sign out</button>
     </div>
-    <p class="setver">v2026.08.10.22</p>
+    <p class="setver">v2026.08.11.1</p>
   </div>
 </div>
 
@@ -614,11 +614,10 @@
     messagingSenderId:"497477643272",
     appId:"1:497477643272:web:9f8e43fbffd18003e5f5bd"
   };
-  var SPACE='family';   // shared space; the rules' email allowlist gates access
-  var OWNER_EMAIL='aprkim@gmail.com';   // mirrors the owner in the security rules
-  function isOwner(){return !!(authUser&&authUser.email===OWNER_EMAIL)}
-  // Read-only viewers can't scan; hide the Scan tab once a non-owner is signed in.
-  function paintScanTab(){var e=$('tabScan');if(e)e.style.display=(authUser&&!isOwner())?'none':''}
+  var SPACE=null;   // set to the signed-in user's uid (their own archive) after auth
+  function isOwner(){return !!authUser;}   // every user owns their own space
+  // Everyone owns their own archive, so the Scan tab is always available.
+  function paintScanTab(){var e=$('tabScan');if(e)e.style.display='';}
   // The tab bar parses after this script, so re-apply once the DOM is ready
   // (covers the case where auth resolves before #tabScan exists).
   document.addEventListener('DOMContentLoaded',paintScanTab);
@@ -675,7 +674,7 @@
   function openSettings(){
     $('setEmail').textContent=(authUser&&authUser.email)||'Signed in';
     var owner=isOwner();
-    $('setShare').classList.toggle('hidden',!owner);                 // owner: invite/manage viewers
+    $('setShare').classList.add('hidden');                           // sharing deferred to Phase 2
     $('ownerSep').classList.toggle('hidden',!owner);
     $('setExport').disabled=false;
     // The native app can't stream a browser download (WKWebView has no download
@@ -932,11 +931,11 @@
       return u || signIn();
     }).then(function(u){
       if(!u)return null;                 // redirect flow: we return later
-      authUser=u;cloudCode=SPACE;
+      authUser=u;SPACE=u.uid;cloudCode=SPACE;
       paintCloudButton();
       $('gearBtn').classList.remove('hidden');   // signed in → settings reachable
-      paintScanTab();                            // hide Scan for read-only viewers
-      return ensureAccess().then(function(){return fbDb.collection('tinyCards').doc(SPACE).get();});
+      paintScanTab();
+      return fbDb.collection('tinyCards').doc(SPACE).get();
     }).then(function(doc){
       if(!doc)return;
       var rows=(doc.exists&&doc.data().cards)||[];
