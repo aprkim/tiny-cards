@@ -843,7 +843,7 @@
         <span>Delete All Cards</span>
       </button>
     </div>
-    <p class="setver">v2026.08.11.19</p>
+    <p class="setver">v2026.08.11.20</p>
   </div>
 </div>
 
@@ -1277,39 +1277,52 @@
 
   // ---- invites (owner sharing) — same as the View page ----
   function fns(){return firebase.app().functions('us-east1');}
+  var inviteLink='';   // cached reusable invite link for this owner/session
+  function ensureInvite(){
+    if(inviteLink)return Promise.resolve(inviteLink);
+    return fns().httpsCallable('createInvite')({}).then(function(r){
+      var code=(r&&r.data&&r.data.code)||'';
+      inviteLink='https://cards.tinywins.space/cards.html?invite='+code;
+      $('shareLink').value=inviteLink;
+      return inviteLink;
+    });
+  }
   function openShare(){
     closeSettings();
     $('shareLinkRow').classList.add('hidden');
     $('shareNew').disabled=false;
     $('share').classList.remove('hidden');
-    loadViewers();      // picks the empty hero vs the viewer list + button label
+    loadViewers();                          // empty hero vs viewer list + button label
+    ensureInvite().catch(function(){});     // pre-mint so sharing fires inside the tap
   }
   function closeShare(){$('share').classList.add('hidden');}
   $('setShare').onclick=openShare;
   $('shareClose').onclick=closeShare;
   $('share').onclick=function(e){if(e.target===$('share'))closeShare();};
-  // Invite by email: mint a reusable invite link, reveal it (copy fallback), and
-  // open the user's mail app with the link prefilled.
+  // Invite: open the native share sheet with the link (Mail, Messages, …). The
+  // link is pre-minted on open so this runs inside the tap gesture. Anything
+  // without Web Share (desktop) falls back to copying the visible link. (The old
+  // mailto: approach broke the iOS WebView, so it's gone.)
   $('shareNew').onclick=function(){
-    var b=$('shareNew'),old=b.textContent;b.disabled=true;b.textContent='Creating…';
-    fns().httpsCallable('createInvite')({}).then(function(r){
-      var code=(r&&r.data&&r.data.code)||'';
-      var link='https://cards.tinywins.space/cards.html?invite='+code;
-      $('shareLink').value=link;$('shareLinkRow').classList.remove('hidden');
-      b.disabled=false;b.textContent=old;
-      emailInvite(link);
+    $('shareLinkRow').classList.remove('hidden');
+    if(inviteLink){doShare(inviteLink);return;}
+    var b=$('shareNew'),old=b.textContent;b.disabled=true;b.textContent='Preparing…';
+    ensureInvite().then(function(l){
+      b.disabled=false;b.textContent=old;$('shareLinkRow').classList.remove('hidden');doShare(l);
     }).catch(function(e){b.disabled=false;b.textContent=old;openAlert('Could not create an invite. Please try again.','Invite');if(window.console)console.warn(e);});
   };
-  function emailInvite(link){
-    var subj=encodeURIComponent('View my cards on Tiny Cards');
-    var body=encodeURIComponent('I’d like to share my greeting-card archive with you — view only.\n\nOpen this link and sign in with Google:\n'+link);
-    try{var a=document.createElement('a');a.href='mailto:?subject='+subj+'&body='+body;a.style.display='none';document.body.appendChild(a);a.click();document.body.removeChild(a);}catch(e){}
+  function doShare(link){
+    if(navigator.share){navigator.share({title:'Tiny Cards',text:'View my cards on Tiny Cards — view only:',url:link}).catch(function(){});return;}
+    copyInvite();
   }
-  $('shareCopy').onclick=function(){
-    var v=$('shareLink').value,done=function(){$('shareCopy').textContent='Copied';setTimeout(function(){$('shareCopy').textContent='Copy';},1500);};
-    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(v).then(done,function(){$('shareLink').select();document.execCommand('copy');done();});}
-    else{$('shareLink').select();document.execCommand('copy');done();}
-  };
+  function copyInvite(){
+    var v=$('shareLink').value;
+    function flash(){$('shareCopy').textContent='Copied';setTimeout(function(){$('shareCopy').textContent='Copy';},1500);}
+    function sel(){try{$('shareLink').select();document.execCommand('copy');}catch(e){}flash();}
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(v).then(flash,sel);}
+    else{sel();}
+  }
+  $('shareCopy').onclick=copyInvite;
   function loadViewers(){
     var list=$('shareList');list.innerHTML='';
     fbDb.collection('cardViewers').doc(SPACE).collection('viewers').get().then(function(qs){
