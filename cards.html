@@ -99,11 +99,12 @@
      clears the edge instead of being cut mid-text. */
   /* One horizontal-scroll container holding two flex rows. Chips are dealt into
      the rows in order (1st→row 1, 2nd→row 2, 3rd→row 1 …); each chip is only as
-     wide as its content (no column alignment). Right padding keeps the last chip
-     from being clipped at the scroll end. */
+     wide as its content (no column alignment). Stays within the content width
+     (aligned with the search box); right padding keeps the last chip from being
+     clipped at the scroll end. */
   .chips{
     display:flex;flex-direction:column;align-items:flex-start;gap:8px;
-    width:calc(100% + 36px);margin:12px -18px 20px;padding:6px 18px;
+    margin:12px 0 20px;padding:6px 14px 6px 0;
     overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;
   }
   .chips::-webkit-scrollbar{display:none}
@@ -623,7 +624,7 @@
         <span>Delete All Cards</span>
       </button>
     </div>
-    <p class="setver">v2026.08.11.12</p>
+    <p class="setver">v2026.08.11.13</p>
   </div>
 </div>
 
