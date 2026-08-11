@@ -93,7 +93,14 @@
   }
   .switcher:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
   .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
-  .years{margin-top:2px;margin-bottom:10px}
+  .yearsel{
+    width:auto;min-width:130px;font:inherit;font-size:15px;padding:9px 34px 9px 12px;margin:2px 0 12px;
+    border:1px solid var(--rule);border-radius:10px;background:var(--field);
+    color:var(--ink);-webkit-appearance:none;appearance:none;cursor:pointer;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='none' stroke='%239A9AA2' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round' d='M1 1.5 6 6.5 11 1.5'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 12px center;
+  }
+  .yearsel:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
   .chip{
     font:inherit;font-size:13px;padding:6px 13px;border-radius:100px;
     border:1px solid var(--rule);background:var(--field);color:var(--ink);cursor:pointer;
@@ -439,7 +446,7 @@
       <p class="meta" id="meta"></p>
       <button type="button" class="dangerbtn hidden" id="wipe">Delete All</button>
     </div>
-    <div class="chips years hidden" id="years"></div>
+    <select id="years" class="yearsel hidden" aria-label="Filter by year"></select>
     <div id="groups"></div>
   </section>
 
@@ -579,7 +586,7 @@
       <div class="set-sep hidden" id="ownerSep"></div>
       <button type="button" class="signout" id="setSignOut">Sign out</button>
     </div>
-    <p class="setver">v2026.08.11.3</p>
+    <p class="setver">v2026.08.11.4</p>
   </div>
 </div>
 
@@ -1053,21 +1060,17 @@
   var showAllPeople=false;
   var yearFilter=null;
 
-  // Year quick-filter, above the grid. Built from all cards in the space (like the
-  // sender pills), so it stays stable as you type. Hidden when there's ≤1 year.
+  // Year quick-filter dropdown, above the grid. Built from all cards in the space
+  // (like the sender pills), so it stays stable as you type. Hidden when ≤1 year.
   function years(){
-    var box=$('years');if(!box)return;box.innerHTML='';
+    var sel=$('years');if(!sel)return;
     var c={};cards.forEach(function(x){if(x.ok&&x.year)c[x.year]=(c[x.year]||0)+1;});
     var ys=Object.keys(c).sort(function(a,b){return b.localeCompare(a);});   // newest first
-    if(ys.length<=1){box.classList.add('hidden');yearFilter=null;return;}
-    box.classList.remove('hidden');
-    ys.forEach(function(y){
-      var b=document.createElement('button');
-      b.className='chip'+(yearFilter===y?' on':'');b.type='button';
-      b.innerHTML=esc(y)+'<b>'+c[y]+'</b>';
-      b.onclick=function(){yearFilter=(yearFilter===y?null:y);years();render()};
-      box.appendChild(b);
-    });
+    if(ys.length<=1){sel.classList.add('hidden');sel.innerHTML='';yearFilter=null;return;}
+    var html='<option value="">All years</option>';
+    ys.forEach(function(y){html+='<option value="'+esc(y)+'">'+esc(y)+' ('+c[y]+')</option>';});
+    sel.innerHTML=html;sel.value=yearFilter||'';sel.classList.remove('hidden');
+    sel.onchange=function(){yearFilter=sel.value||null;render()};
   }
 
   function people(){
