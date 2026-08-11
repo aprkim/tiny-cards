@@ -100,7 +100,7 @@
   .chips{
     display:grid;grid-auto-flow:column;grid-template-rows:repeat(2,auto);
     grid-auto-columns:max-content;justify-items:start;align-items:center;gap:8px;
-    width:calc(100% + 36px);margin:12px -18px 0;padding:0 18px;
+    width:calc(100% + 36px);margin:12px -18px 20px;padding:6px 18px;
     overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;
   }
   .chips::-webkit-scrollbar{display:none}
@@ -118,7 +118,13 @@
     background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 12 8'%3E%3Cpath fill='none' stroke='%239A9AA2' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round' d='M1 1.5 6 6.5 11 1.5'/%3E%3C/svg%3E");
     background-repeat:no-repeat;background-position:right 11px center;
   }
-  .yearchip.on{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 12 8'%3E%3Cpath fill='none' stroke='%23ffffff' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round' d='M1 1.5 6 6.5 11 1.5'/%3E%3C/svg%3E")}
+  /* .chip.on uses the `background` shorthand, which resets repeat/position — so
+     the active year chip must re-declare them or the caret tiles across the pill. */
+  .yearchip.on{
+    background-color:var(--ink);
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 12 8'%3E%3Cpath fill='none' stroke='%23ffffff' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round' d='M1 1.5 6 6.5 11 1.5'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 11px center;
+  }
   .yearchip:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
 
   .metarow{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:22px 0 12px}
@@ -602,7 +608,7 @@
         <span>Delete All Cards</span>
       </button>
     </div>
-    <p class="setver">v2026.08.11.6</p>
+    <p class="setver">v2026.08.11.7</p>
   </div>
 </div>
 
