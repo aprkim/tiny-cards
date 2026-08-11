@@ -232,6 +232,7 @@
   .sheetx:hover,.sheetx:focus-visible{color:var(--ink);background:rgba(0,0,0,.05);outline:none}
   .sheetx svg{width:20px;height:20px;display:block}
   .sheet h2{font-size:18px;font-weight:700;letter-spacing:-.01em;margin-bottom:8px}
+  #modalTitle{padding-right:30px}   /* clear the corner X */
   .sheet p{font-size:14px;color:var(--muted);line-height:1.55;margin-bottom:22px}
   .sheet-acts{display:flex;flex-direction:column;gap:10px}
   /* Same geometry as the home Scan/View buttons. */
@@ -598,6 +599,9 @@
      cancel, never confirm. Driven by openConfirm() below. -->
 <div class="scrim hidden" id="modal">
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="modalTitle" aria-describedby="modalBody">
+    <button type="button" class="sheetx" id="modalClose" aria-label="Close">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+    </button>
     <h2 id="modalTitle">Confirm</h2>
     <p id="modalBody"></p>
     <input type="text" id="modalInput" class="modal-input hidden" autocomplete="off" autocapitalize="characters">
@@ -640,7 +644,7 @@
         <span>Delete All Cards</span>
       </button>
     </div>
-    <p class="setver">v2026.08.11.14</p>
+    <p class="setver">v2026.08.11.15</p>
   </div>
 </div>
 
@@ -738,6 +742,7 @@
   function openAlert(body,title){openConfirm({title:title||'',body:body,confirmText:'OK',alert:true});}
   function closeConfirm(){$('modal').classList.add('hidden');onConfirm=null;var c=$('modalConfirm');if(c)c.disabled=false;}
   $('modalCancel').onclick=closeConfirm;
+  $('modalClose').onclick=closeConfirm;   // corner X = cancel (never confirms)
   $('modalConfirm').onclick=function(){var fn=onConfirm;closeConfirm();if(fn)fn()};
   // Click-outside cancels; it must never trigger the destructive action
   $('modal').onclick=function(e){if(e.target===$('modal'))closeConfirm()};
