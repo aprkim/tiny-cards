@@ -305,6 +305,19 @@
   }
   button.skip:hover{border-color:var(--ink);color:var(--ink)}
 
+  /* Crop screen: "Crop" and "Keep Original" as two equal, equal-weight buttons —
+     neither is the primary/default. View-only override scoped to #crop, so the
+     meta form's Save button keeps its primary filled .go style. */
+  #crop .actions .go,
+  #crop .actions .skip{
+    flex:1 1 0;font:inherit;font-size:15px;font-weight:600;padding:15px;
+    border:1px solid var(--rule);border-radius:12px;
+    background:var(--field);color:var(--ink);cursor:pointer;
+  }
+  #crop .actions .go:hover,
+  #crop .actions .skip:hover{border-color:var(--accent);color:var(--accent)}
+  #crop .actions .go:disabled{background:var(--rule);color:var(--muted);border-color:var(--rule);cursor:progress}
+
   /* Captured pages: a horizontal, scrollable row of fixed-height thumbnails.
      The form is this screen's primary job, so photos stay compact reference —
      tap one to view it full-screen (and redo its crop). */
@@ -845,7 +858,7 @@
         <span>Delete All Cards</span>
       </button>
     </div>
-    <p class="setver">v2026.08.11.24</p>
+    <p class="setver">v2026.08.11.25</p>
   </div>
 </div>
 
