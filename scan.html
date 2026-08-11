@@ -218,19 +218,18 @@
   }
   .hint b{color:var(--ink);font-weight:600}
 
-  .bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .bar{display:flex;align-items:center;gap:10px;margin-bottom:10px}
   /* The crop screen has its own top bar (X / card / label), so the main
      "Add a Card" header is hidden while cropping to give the photo full height. */
   body.cropping header{display:none}
   /* Cancel (X) — a way out of the crop screen */
   .cropx{
-    width:32px;height:32px;padding:0;margin:-4px 8px -4px -6px;flex-shrink:0;
+    width:32px;height:32px;padding:0;margin:-4px -6px -4px auto;flex-shrink:0;
     border:none;background:none;color:var(--muted);cursor:pointer;
     display:flex;align-items:center;justify-content:center;border-radius:8px;
   }
   .cropx:hover,.cropx:focus-visible{color:var(--ink);background:rgba(0,0,0,.05);outline:none}
   .cropx svg{width:20px;height:20px;display:block}
-  .bar .count{margin-right:auto}   /* keep the tag pushed to the far right */
   .count{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
   .count b{color:var(--ink);font-weight:700;font-size:15px}
   .tag{
@@ -626,11 +625,11 @@
 
   <section id="crop" class="hidden">
     <div class="bar">
+      <span class="count">Card <b id="cardNo">1</b> / <span id="cardTot">1</span></span>
+      <span class="tag" id="pageTag">front</span>
       <button type="button" class="cropx" id="cropCancel" aria-label="Cancel">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
       </button>
-      <span class="count">Card <b id="cardNo">1</b> / <span id="cardTot">1</span></span>
-      <span class="tag" id="pageTag">front</span>
     </div>
     <div class="track"><i id="fill"></i></div>
 
@@ -797,7 +796,7 @@
       <div class="set-sep hidden" id="ownerSep"></div>
       <button type="button" class="signout" id="setSignOut">Sign out</button>
     </div>
-    <p class="setver">v2026.08.10.20</p>
+    <p class="setver">v2026.08.10.21</p>
   </div>
 </div>
 
