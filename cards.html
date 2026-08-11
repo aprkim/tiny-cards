@@ -93,6 +93,7 @@
   }
   .switcher:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
   .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+  .years{margin-top:2px;margin-bottom:10px}
   .chip{
     font:inherit;font-size:13px;padding:6px 13px;border-radius:100px;
     border:1px solid var(--rule);background:var(--field);color:var(--ink);cursor:pointer;
@@ -438,6 +439,7 @@
       <p class="meta" id="meta"></p>
       <button type="button" class="dangerbtn hidden" id="wipe">Delete All</button>
     </div>
+    <div class="chips years hidden" id="years"></div>
     <div id="groups"></div>
   </section>
 
@@ -577,7 +579,7 @@
       <div class="set-sep hidden" id="ownerSep"></div>
       <button type="button" class="signout" id="setSignOut">Sign out</button>
     </div>
-    <p class="setver">v2026.08.11.2</p>
+    <p class="setver">v2026.08.11.3</p>
   </div>
 </div>
 
@@ -798,7 +800,7 @@
   $('setSignOut').onclick=function(){closeSettings();doSignOut()};
   function doSignOut(){
     var reset=function(){
-      authUser=null;myUid=null;SPACE=null;cards=[];filter=null;
+      authUser=null;myUid=null;SPACE=null;cards=[];filter=null;yearFilter=null;
       var sw=$('spaceSwitcher');if(sw){sw.classList.add('hidden');sw.innerHTML='';}
       $('gearBtn').classList.add('hidden');
       $('view').classList.add('hidden');
@@ -962,7 +964,7 @@
         $('people').innerHTML='';$('meta').textContent='';
         $('wipe').classList.add('hidden');
         $('groups').innerHTML='<p class="empty">'+(isOwner()?'No cards yet — scan your first from the home screen.':'No cards in this shared archive yet.')+'</p>';
-        loadSpaces();return;
+        years();loadSpaces();return;
       }
       // Resolve each page to a full URL (lightbox/download) and a thumbnail URL
       // (grid). The grid loads the small _thumb.jpg the Cloud Function wrote, so
@@ -996,7 +998,7 @@
         });
         $('start').classList.add('hidden');
         $('view').classList.remove('hidden');
-        people();render();loadSpaces();
+        people();years();render();loadSpaces();
         openCardFromURL();
       });
     }).catch(function(e){
@@ -1037,7 +1039,7 @@
     });
     sel.innerHTML=html;sel.value=SPACE;sel.classList.remove('hidden');
     sel.onchange=function(){
-      SPACE=sel.value;$('groups').innerHTML='';$('q').value='';filter=null;
+      SPACE=sel.value;$('groups').innerHTML='';$('q').value='';filter=null;yearFilter=null;
       $('cloudSub').textContent='Opening…';loadCloud();
     };
   }
@@ -1049,6 +1051,24 @@
   function esc(t){var d=document.createElement('div');d.textContent=t;return d.innerHTML}
 
   var showAllPeople=false;
+  var yearFilter=null;
+
+  // Year quick-filter, above the grid. Built from all cards in the space (like the
+  // sender pills), so it stays stable as you type. Hidden when there's ≤1 year.
+  function years(){
+    var box=$('years');if(!box)return;box.innerHTML='';
+    var c={};cards.forEach(function(x){if(x.ok&&x.year)c[x.year]=(c[x.year]||0)+1;});
+    var ys=Object.keys(c).sort(function(a,b){return b.localeCompare(a);});   // newest first
+    if(ys.length<=1){box.classList.add('hidden');yearFilter=null;return;}
+    box.classList.remove('hidden');
+    ys.forEach(function(y){
+      var b=document.createElement('button');
+      b.className='chip'+(yearFilter===y?' on':'');b.type='button';
+      b.innerHTML=esc(y)+'<b>'+c[y]+'</b>';
+      b.onclick=function(){yearFilter=(yearFilter===y?null:y);years();render()};
+      box.appendChild(b);
+    });
+  }
 
   function people(){
     var c={},box=$('people');box.innerHTML='';
@@ -1081,6 +1101,7 @@
     var q=$('q').value.trim().toLowerCase();
     var list=cards.filter(function(x){
       if(filter&&x.person!==filter)return false;
+      if(yearFilter&&x.year!==yearFilter)return false;
       if(!q)return true;
       return (x.person+' '+x.recipient+' '+x.event+' '+x.date).toLowerCase().indexOf(q)>-1;
     });
@@ -1259,7 +1280,7 @@
       $('boxForm').classList.add('hidden');$('box').classList.remove('editing');
       $('boxName').textContent=openCard.person+(openCard.recipient?' → '+openCard.recipient:'');
       $('boxSub').textContent=(openCard.date?openCard.date+' · ':'')+openCard.event;
-      filter=null;people();render();
+      filter=null;yearFilter=null;people();years();render();
     }).catch(function(e){
       openAlert('Could not save the change.','Save failed');
       if(window.console)console.warn(e);
@@ -1295,7 +1316,7 @@
       });
     }).then(function(){
       cards=cards.filter(function(c){return c.id!==id});
-      close();filter=null;people();render();
+      close();filter=null;yearFilter=null;people();years();render();
     }).catch(function(e){
       openAlert('Could not delete that card.','Delete failed');
       if(window.console)console.warn(e);
@@ -1398,9 +1419,9 @@
     })).then(function(){
       return fbDb.collection('tinyCards').doc(cloudCode).delete();
     }).then(function(){
-      cards=[];filter=null;
+      cards=[];filter=null;yearFilter=null;
       $('wipe').disabled=false;$('wipe').textContent='Delete All';
-      people();render();
+      people();years();render();
       $('view').classList.add('hidden');
       $('start').classList.remove('hidden');
       paintCloudButton();
