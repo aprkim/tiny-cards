@@ -92,7 +92,15 @@
     color:var(--ink);-webkit-appearance:none;appearance:none;
   }
   .switcher:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
-  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+  /* Sender pills as a 2-row strip that scrolls sideways, so a long roster stays
+     compact instead of wrapping into many rows. The last chip is left partly
+     clipped by the overflow to hint there's more to scroll. */
+  .chips{
+    display:grid;grid-auto-flow:column;grid-template-rows:repeat(2,auto);
+    grid-auto-columns:max-content;justify-items:start;gap:8px;margin-top:12px;
+    overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;
+  }
+  .chips::-webkit-scrollbar{display:none}
   .yearsel{
     width:auto;min-width:130px;font:inherit;font-size:15px;padding:9px 34px 9px 12px;margin:2px 0 12px;
     border:1px solid var(--rule);border-radius:10px;background:var(--field);
@@ -265,6 +273,7 @@
   }
   button.set-row:hover,button.set-row:focus-visible{color:var(--accent)}
   button.set-row:focus-visible{outline:none}
+  button.set-row.danger{color:var(--accent)}
   .set-hint{color:var(--muted);font-weight:400;font-size:13px}
   /* Build stamp — bumped every deploy so it's obvious whether the live page is
      the current version. */
@@ -442,10 +451,6 @@
     <select id="spaceSwitcher" class="switcher hidden" aria-label="Choose an archive"></select>
     <input type="search" id="q" placeholder="Search a name or occasion" autocomplete="off">
     <div class="chips" id="people"></div>
-    <div class="metarow">
-      <p class="meta" id="meta"></p>
-      <button type="button" class="dangerbtn hidden" id="wipe">Delete All</button>
-    </div>
     <select id="years" class="yearsel hidden" aria-label="Filter by year"></select>
     <div id="groups"></div>
   </section>
@@ -585,8 +590,16 @@
       </button>
       <div class="set-sep hidden" id="ownerSep"></div>
       <button type="button" class="signout" id="setSignOut">Sign out</button>
+      <div class="set-sep hidden" id="wipeSep"></div>
+      <div class="set-row hidden" id="setStatsRow">
+        <span class="set-k">Library</span>
+        <span class="set-v" id="meta"></span>
+      </div>
+      <button type="button" class="set-row danger hidden" id="setWipe">
+        <span>Delete All Cards</span>
+      </button>
     </div>
-    <p class="setver">v2026.08.11.4</p>
+    <p class="setver">v2026.08.11.5</p>
   </div>
 </div>
 
@@ -704,6 +717,12 @@
       $('setExport').classList.toggle('hidden',!canExport());        // owner + desktop
       $('setExportHint').textContent='ZIP backup';
     }
+    // Library stats + Delete All live here now (moved out of the View header).
+    // Stats show for anyone viewing a non-empty space; Delete All is owner-only.
+    var hasCards=fromCloud&&cards.length>0;
+    $('setStatsRow').classList.toggle('hidden',!hasCards);
+    $('wipeSep').classList.toggle('hidden',!hasCards);
+    $('setWipe').classList.toggle('hidden',!(owner&&hasCards));
     $('settings').classList.remove('hidden');
   }
   function closeSettings(){$('settings').classList.add('hidden')}
@@ -935,8 +954,7 @@
   function openArchive(){
     $('start').classList.add('hidden');
     $('view').classList.remove('hidden');
-    $('meta').textContent='Loading your cards…';
-    $('groups').innerHTML='';
+    $('groups').innerHTML='<p class="empty">Loading your cards…</p>';
     loadCloud();
   }
 
@@ -969,7 +987,6 @@
         $('start').classList.add('hidden');
         $('view').classList.remove('hidden');
         $('people').innerHTML='';$('meta').textContent='';
-        $('wipe').classList.add('hidden');
         $('groups').innerHTML='<p class="empty">'+(isOwner()?'No cards yet — scan your first from the home screen.':'No cards in this shared archive yet.')+'</p>';
         years();loadSpaces();return;
       }
@@ -1111,10 +1128,9 @@
 
     var who={},shots=0;
     list.forEach(function(x){who[x.person]=1;shots+=x.pages.length});
+    // Library stats now live in Settings (#meta was moved there); still refreshed
+    // here so the sheet shows the current filtered totals when opened.
     $('meta').textContent=list.length+' cards \u00b7 '+shots+' photos \u00b7 '+Object.keys(who).length+' people';
-    // Only offer a bulk delete for stores we own; folder files are read-only
-    // Delete All is owner-only too, for the same reason as the per-card delete
-    $('wipe').classList.toggle('hidden',!(fromCloud&&cards.length&&isOwner()));
 
     var buckets={},order=[];
     list.forEach(function(x){
@@ -1399,10 +1415,12 @@
      Irreversible and, for the cloud archive, affects every device sharing the
      code. A plain confirm() is too easy to click through for that, so this
      asks the user to type the word. */
-  $('wipe').onclick=function(){
+  // Delete All now lives in the settings sheet. Close the sheet first so the
+  // type-to-confirm dialog shows on its own (same pattern as Share).
+  $('setWipe').onclick=function(){
     var n=cards.length;
-    if(!n)return;
-    // Designed confirm with a type-to-confirm input, replacing the old prompt().
+    if(!n||!isOwner())return;
+    closeSettings();
     openConfirm({
       title:'Delete all '+n+' card'+(n===1?'':'s')+'?',
       body:'This removes them from your archive on every device and cannot be undone. Exported files are not affected. Type DELETE to confirm.',
@@ -1412,7 +1430,6 @@
     });
   };
   function doWipe(){
-    $('wipe').disabled=true;$('wipe').textContent='Deleting…';
     var paths=[];
     cards.forEach(function(c){if(c.raw&&c.raw.paths)paths=paths.concat(c.raw.paths)});
     // Images first, then the index — a failure here leaves recoverable entries
@@ -1423,13 +1440,11 @@
       return fbDb.collection('tinyCards').doc(cloudCode).delete();
     }).then(function(){
       cards=[];filter=null;yearFilter=null;
-      $('wipe').disabled=false;$('wipe').textContent='Delete All';
       people();years();render();
       $('view').classList.add('hidden');
       $('start').classList.remove('hidden');
       paintCloudButton();
     }).catch(function(e){
-      $('wipe').disabled=false;$('wipe').textContent='Delete All';
       openAlert('Could not delete everything. Some cards may remain.','Delete failed');
       if(window.console)console.warn(e);
     });
