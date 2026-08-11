@@ -479,9 +479,18 @@
     display:flex;justify-content:center;align-items:center;padding:20px;
   }
   .sheet{
+    position:relative;
     background:var(--paper);border-radius:18px;width:100%;max-width:400px;
     padding:26px 22px 20px;box-shadow:0 16px 48px rgba(22,22,29,.28);
   }
+  /* Close (X) in the top-right of a sheet (Settings) */
+  .sheetx{
+    position:absolute;top:14px;right:14px;width:32px;height:32px;padding:0;
+    border:none;background:none;color:var(--muted);cursor:pointer;border-radius:8px;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .sheetx:hover,.sheetx:focus-visible{color:var(--ink);background:rgba(0,0,0,.05);outline:none}
+  .sheetx svg{width:20px;height:20px;display:block}
   .sheet h2{font-size:18px;font-weight:700;letter-spacing:-.01em;margin-bottom:8px}
   .sheet p{font-size:14px;color:var(--muted);line-height:1.55;margin-bottom:22px}
   .sheet-acts{display:flex;flex-direction:column;gap:10px}
@@ -780,6 +789,9 @@
      out; sign-out routes through the confirm dialog above. -->
 <div class="scrim hidden" id="settings">
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="setTitle">
+    <button type="button" class="sheetx" id="setClose" aria-label="Close">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+    </button>
     <h2 id="setTitle">Settings</h2>
     <div class="set-list">
       <div class="set-row">
@@ -796,7 +808,7 @@
       <div class="set-sep hidden" id="ownerSep"></div>
       <button type="button" class="signout" id="setSignOut">Sign out</button>
     </div>
-    <p class="setver">v2026.08.10.21</p>
+    <p class="setver">v2026.08.10.22</p>
   </div>
 </div>
 
@@ -1150,6 +1162,7 @@
     $('settings').classList.remove('hidden');
   }
   function closeSettings(){$('settings').classList.add('hidden')}
+  $('setClose').onclick=closeSettings;
   $('gearBtn').onclick=openSettings;
 
   // ---- invites (owner sharing) — same as the View page ----
