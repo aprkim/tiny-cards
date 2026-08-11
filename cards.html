@@ -231,6 +231,7 @@
   .sheetx svg{width:20px;height:20px;display:block}
   .sheet h2{font-size:18px;font-weight:700;letter-spacing:-.01em;margin-bottom:8px}
   .modal-inlabel{font-weight:500;font-size:14px;color:var(--ink);margin:2px 0 8px}
+  #shareTitle{padding-right:30px}   /* clear the corner X */
   .sheet p{font-size:14px;color:var(--muted);line-height:1.55;margin-bottom:22px}
   .sheet-acts{display:flex;flex-direction:column;gap:10px}
   /* Same geometry as the home Scan/View buttons. */
@@ -637,7 +638,7 @@
         <span>Delete All Cards</span>
       </button>
     </div>
-    <p class="setver">v2026.08.11.21</p>
+    <p class="setver">v2026.08.11.22</p>
   </div>
 </div>
 
@@ -645,6 +646,9 @@
      Empty state (no viewers) shows a centered hero; otherwise the list. -->
 <div class="scrim hidden" id="share">
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="shareTitle">
+    <button type="button" class="sheetx" id="shareClose" aria-label="Close">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+    </button>
     <h2 id="shareTitle">Family viewers</h2>
 
     <div id="shareHero" class="share-hero hidden">
@@ -669,7 +673,6 @@
     </div>
 
     <button type="button" class="share-primary" id="shareNew">Invite by email</button>
-    <div class="sheet-acts"><button type="button" id="shareClose">Done</button></div>
   </div>
 </div>
 
