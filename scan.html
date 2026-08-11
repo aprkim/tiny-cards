@@ -808,7 +808,7 @@
       <div class="set-sep hidden" id="ownerSep"></div>
       <button type="button" class="signout" id="setSignOut">Sign out</button>
     </div>
-    <p class="setver">v2026.08.11.1</p>
+    <p class="setver">v2026.08.11.2</p>
   </div>
 </div>
 
@@ -1145,7 +1145,7 @@
   function openSettings(){
     $('setEmail').textContent=(authUser&&authUser.email)||'Signed in';
     var owner=isOwner();
-    $('setShare').classList.add('hidden');                       // sharing deferred to Phase 2
+    $('setShare').classList.toggle('hidden',!owner);             // share your own space
     $('ownerSep').classList.toggle('hidden',!owner);
     $('setExport').disabled=false;
     // Native app can't stream a browser download (no WKWebView download manager),
@@ -1193,7 +1193,7 @@
   };
   function loadViewers(){
     var list=$('shareList');list.innerHTML='<div class="share-empty">Loading…</div>';
-    fbDb.collection('cardViewers').get().then(function(qs){
+    fbDb.collection('cardViewers').doc(SPACE).collection('viewers').get().then(function(qs){
       list.innerHTML='';
       if(qs.empty){list.innerHTML='<div class="share-empty">No one yet.</div>';return;}
       qs.forEach(function(doc){
@@ -1203,7 +1203,7 @@
         var rm=document.createElement('button');rm.type='button';rm.textContent='Remove';
         rm.onclick=function(){
           rm.disabled=true;rm.textContent='…';
-          fns().httpsCallable('revokeViewer')({uid:doc.id}).then(loadViewers)
+          fns().httpsCallable('revokeViewer')({viewerUid:doc.id}).then(loadViewers)
             .catch(function(e){rm.disabled=false;rm.textContent='Remove';openAlert('Could not remove that person. Please try again.','Viewers');if(window.console)console.warn(e);});
         };
         row.appendChild(who);row.appendChild(rm);list.appendChild(row);

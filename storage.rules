@@ -1,34 +1,35 @@
 rules_version = '2';
 
-// Multi-tenant: each signed-in user owns their OWN photos under cards/{uid}/…,
-// keyed by their auth uid. Access is granted only when the path's uid segment
-// equals the caller's uid, so no one can read/write another person's images.
-// Everyone must have a verified email.
+// Multi-tenant with per-space sharing: each user owns cards/{uid}/…. A user can
+// always read+write their own photos, and can additionally READ another user's
+// photos if that owner's uid is in their `viewOf` custom claim (granted by
+// redeeming an invite). Viewers are read-only. Everyone must have a verified
+// email.
 //
-// This replaced the single shared "family" space + email allowlist. Cross-user
-// sharing is deferred to a later phase.
+// Storage rules can't read Firestore, so viewer access rides on the custom claim
+// (the same one the Firestore rules check). Keep in step with
+// tiny-do/firestore.rules.
 //
-// `get` and NOT `read`: granting `list` would let a client walk the tree.
-// Images are fetched by exact path (the Firestore index records which exist).
-//
-// Thumbnails (*_thumb.jpg) are written by the Cloud Function through the Admin
-// SDK, which bypasses these rules — no extra write grant is needed.
+// `get` and NOT `read` (no `list`). Thumbnails (*_thumb.jpg) are written by the
+// Cloud Function via the Admin SDK, which bypasses these rules.
 service firebase.storage {
   match /b/{bucket}/o {
 
     function cardsVerified() {
       return request.auth != null && request.auth.token.email_verified == true;
     }
+    function canView(uid) {
+      return request.auth.uid == uid
+        || (request.auth.token.viewOf != null && request.auth.token.viewOf.hasAny([uid]));
+    }
 
     match /cards/{uid}/{allPaths=**} {
-      allow get: if cardsVerified() && request.auth.uid == uid;
+      allow get: if cardsVerified() && canView(uid);
 
-      // Writes must be images of a sane size, so a compromised session cannot be
-      // used to park arbitrary files in the bucket.
+      // Writes must be images of a sane size; only the owner can write or delete.
       allow write: if cardsVerified() && request.auth.uid == uid
                    && request.resource.size < 15 * 1024 * 1024
                    && request.resource.contentType.matches('image/.*');
-
       allow delete: if cardsVerified() && request.auth.uid == uid;
     }
 

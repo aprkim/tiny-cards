@@ -25,9 +25,8 @@ admin.initializeApp();
 // us-east1 matches the Storage bucket, so reads are same-region
 setGlobalOptions({region: 'us-east1', maxInstances: 10});
 
-// Access model: one shared space, owner decided by email — mirrors the rules
-const SPACE = 'family';
-const OWNER_EMAIL = 'aprkim@gmail.com';
+// Access model: each user owns tinyCards/{uid}. Read access to another user's
+// space is granted by a `viewOf` custom claim (see redeemInvite). Mirrors rules.
 
 const THUMB_MAX = 400;          // long edge; covers a 2x retina grid tile
 const THUMB_QUALITY = 78;
@@ -233,51 +232,70 @@ exports.exportAll = onRequest({memory: '512MiB', timeoutSeconds: 3600}, async (r
  * three run with the Admin SDK, so they bypass rules and are the only writers of
  * the invites / cardViewers collections.
  */
-function requireOwner(auth) {
+// Per-space sharing: a viewer's `viewOf` custom claim lists the owner uids whose
+// archives they may read. Both the Firestore and Storage rules check it. This
+// helper mutates that array while preserving the user's other custom claims.
+async function setViewOf(uid, mutate) {
+  const u = await admin.auth().getUser(uid);
+  const claims = u.customClaims || {};
+  const set = new Set(claims.viewOf || []);
+  mutate(set);
+  await admin.auth().setCustomUserClaims(uid, Object.assign({}, claims, {viewOf: Array.from(set)}));
+}
+function requireVerified(auth) {
   if (!auth) throw new HttpsError('unauthenticated', 'Sign in first.');
   if (!auth.token.email_verified) throw new HttpsError('permission-denied', 'Verified email required.');
-  if (auth.token.email !== OWNER_EMAIL) throw new HttpsError('permission-denied', 'Only the archive owner can do this.');
 }
 
+// Any signed-in user can create a reusable invite to THEIR own archive.
 exports.createInvite = onCall(async (req) => {
-  requireOwner(req.auth);
+  requireVerified(req.auth);
   const code = crypto.randomBytes(9).toString('base64url');   // ~12 url-safe chars
   await admin.firestore().collection('invites').doc(code).set({
+    ownerUid: req.auth.uid,
     active: true,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    createdBy: req.auth.uid,
   });
   return {code};
 });
 
 exports.redeemInvite = onCall(async (req) => {
   const auth = req.auth;
-  if (!auth) throw new HttpsError('unauthenticated', 'Sign in first.');
-  if (!auth.token.email_verified) throw new HttpsError('permission-denied', 'Use a verified Google account.');
+  requireVerified(auth);
   const code = String((req.data && req.data.code) || '').trim();
   if (!code) throw new HttpsError('invalid-argument', 'Missing invite code.');
-  if (auth.token.email === OWNER_EMAIL) return {ok: true, owner: true};   // owner already has access
-
   const snap = await admin.firestore().collection('invites').doc(code).get();
   if (!snap.exists || snap.data().active !== true) {
     throw new HttpsError('not-found', 'This invite link is not valid or has been turned off.');
   }
-  await admin.auth().setCustomUserClaims(auth.uid, {cardsViewer: true});
-  await admin.firestore().collection('cardViewers').doc(auth.uid).set({
-    email: auth.token.email || '',
-    redeemedAt: admin.firestore.FieldValue.serverTimestamp(),
-    invite: code,
+  const ownerUid = snap.data().ownerUid;
+  if (ownerUid === auth.uid) return {ok: true, ownerUid, self: true};   // your own space
+
+  await setViewOf(auth.uid, (s) => s.add(ownerUid));   // grant read access
+  const db = admin.firestore();
+  const owner = await admin.auth().getUser(ownerUid).catch(() => null);
+  const ownerEmail = (owner && owner.email) || '';
+  const viewerEmail = auth.token.email || '';
+  // Rosters: the owner sees who can view (cardViewers); the viewer sees whose
+  // archives they can open, with a label (sharedWithMe).
+  await db.doc('cardViewers/' + ownerUid + '/viewers/' + auth.uid).set({
+    email: viewerEmail, redeemedAt: admin.firestore.FieldValue.serverTimestamp(), invite: code,
   });
-  // The client must refresh its ID token to pick up the new claim.
-  return {ok: true};
+  await db.doc('sharedWithMe/' + auth.uid + '/spaces/' + ownerUid).set({
+    ownerEmail, at: admin.firestore.FieldValue.serverTimestamp(),
+  });
+  return {ok: true, ownerUid, ownerEmail};   // client must getIdToken(true) to pick up the claim
 });
 
 exports.revokeViewer = onCall(async (req) => {
-  requireOwner(req.auth);
-  const uid = String((req.data && req.data.uid) || '').trim();
-  if (!uid) throw new HttpsError('invalid-argument', 'Missing uid.');
-  await admin.auth().setCustomUserClaims(uid, {cardsViewer: false});
-  await admin.firestore().collection('cardViewers').doc(uid).delete();
+  const auth = req.auth;
+  requireVerified(auth);
+  const viewerUid = String((req.data && req.data.viewerUid) || '').trim();
+  if (!viewerUid) throw new HttpsError('invalid-argument', 'Missing viewerUid.');
+  await setViewOf(viewerUid, (s) => s.delete(auth.uid));   // remove MY space from their access
+  const db = admin.firestore();
+  await db.doc('cardViewers/' + auth.uid + '/viewers/' + viewerUid).delete().catch(() => {});
+  await db.doc('sharedWithMe/' + viewerUid + '/spaces/' + auth.uid).delete().catch(() => {});
   return {ok: true};
 });
 

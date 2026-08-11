@@ -86,6 +86,12 @@
     color:var(--ink);-webkit-appearance:none;appearance:none;
   }
   input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  .switcher{
+    width:100%;font:inherit;font-size:16px;padding:11px 14px;margin-bottom:10px;
+    border:1px solid var(--rule);border-radius:10px;background:var(--field);
+    color:var(--ink);-webkit-appearance:none;appearance:none;
+  }
+  .switcher:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
   .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
   .chip{
     font:inherit;font-size:13px;padding:6px 13px;border-radius:100px;
@@ -425,6 +431,7 @@
   </section>
 
   <section id="view" class="hidden">
+    <select id="spaceSwitcher" class="switcher hidden" aria-label="Choose an archive"></select>
     <input type="search" id="q" placeholder="Search a name or occasion" autocomplete="off">
     <div class="chips" id="people"></div>
     <div class="metarow">
@@ -570,7 +577,7 @@
       <div class="set-sep hidden" id="ownerSep"></div>
       <button type="button" class="signout" id="setSignOut">Sign out</button>
     </div>
-    <p class="setver">v2026.08.11.1</p>
+    <p class="setver">v2026.08.11.2</p>
   </div>
 </div>
 
@@ -614,8 +621,9 @@
     messagingSenderId:"497477643272",
     appId:"1:497477643272:web:9f8e43fbffd18003e5f5bd"
   };
-  var SPACE=null;   // set to the signed-in user's uid (their own archive) after auth
-  function isOwner(){return !!authUser;}   // every user owns their own space
+  var SPACE=null;   // the space being VIEWED right now (own uid, or a shared owner's uid)
+  var myUid=null;   // the signed-in user's own uid
+  function isOwner(){return !!(authUser&&SPACE===myUid);}   // owner only while viewing your own space
   // Everyone owns their own archive, so the Scan tab is always available.
   function paintScanTab(){var e=$('tabScan');if(e)e.style.display='';}
   // The tab bar parses after this script, so re-apply once the DOM is ready
@@ -674,7 +682,7 @@
   function openSettings(){
     $('setEmail').textContent=(authUser&&authUser.email)||'Signed in';
     var owner=isOwner();
-    $('setShare').classList.add('hidden');                           // sharing deferred to Phase 2
+    $('setShare').classList.toggle('hidden',!owner);                 // share only your own space
     $('ownerSep').classList.toggle('hidden',!owner);
     $('setExport').disabled=false;
     // The native app can't stream a browser download (WKWebView has no download
@@ -729,15 +737,16 @@
     openCardId=null;
     try{history.replaceState({},'',location.pathname);}catch(e){}
   }
-  // Arriving via an invite (and not the owner): redeem it, then refresh the token
-  // so the new viewer claim is in effect before we read the archive.
+  // Arriving via an invite: redeem it, then force-refresh the token so the new
+  // viewOf claim is in effect before we read the archive. Returns the redeem
+  // result ({ownerUid,ownerEmail,...}) so the caller can open that shared space.
   function ensureAccess(){
-    if(inviteCode&&authUser&&!isOwner()){
-      return fns().httpsCallable('redeemInvite')({code:inviteCode})
-        .then(function(){return authUser.getIdToken(true);})
-        .then(cleanInviteURL);
-    }
-    return Promise.resolve();
+    if(!inviteCode||!authUser)return Promise.resolve(null);
+    var code=inviteCode;inviteCode=null;
+    return fns().httpsCallable('redeemInvite')({code:code})
+      .then(function(r){
+        return authUser.getIdToken(true).then(function(){cleanInviteURL();return (r&&r.data)||null;});
+      });
   }
 
   function openShare(){
@@ -768,7 +777,7 @@
   };
   function loadViewers(){
     var list=$('shareList');list.innerHTML='<div class="share-empty">Loading…</div>';
-    fbDb.collection('cardViewers').get().then(function(qs){
+    fbDb.collection('cardViewers').doc(myUid).collection('viewers').get().then(function(qs){
       list.innerHTML='';
       if(qs.empty){list.innerHTML='<div class="share-empty">No one yet.</div>';return;}
       qs.forEach(function(doc){
@@ -778,7 +787,7 @@
         var rm=document.createElement('button');rm.type='button';rm.textContent='Remove';
         rm.onclick=function(){
           rm.disabled=true;rm.textContent='…';
-          fns().httpsCallable('revokeViewer')({uid:doc.id}).then(loadViewers)
+          fns().httpsCallable('revokeViewer')({viewerUid:doc.id}).then(loadViewers)
             .catch(function(e){rm.disabled=false;rm.textContent='Remove';openAlert('Could not remove that person. Please try again.','Viewers');if(window.console)console.warn(e);});
         };
         row.appendChild(who);row.appendChild(rm);list.appendChild(row);
@@ -789,7 +798,8 @@
   $('setSignOut').onclick=function(){closeSettings();doSignOut()};
   function doSignOut(){
     var reset=function(){
-      authUser=null;cards=[];filter=null;
+      authUser=null;myUid=null;SPACE=null;cards=[];filter=null;
+      var sw=$('spaceSwitcher');if(sw){sw.classList.add('hidden');sw.innerHTML='';}
       $('gearBtn').classList.add('hidden');
       $('view').classList.add('hidden');
       $('start').classList.remove('hidden');
@@ -931,10 +941,15 @@
       return u || signIn();
     }).then(function(u){
       if(!u)return null;                 // redirect flow: we return later
-      authUser=u;SPACE=u.uid;cloudCode=SPACE;
+      authUser=u;myUid=u.uid;if(!SPACE)SPACE=u.uid;cloudCode=SPACE;
       paintCloudButton();
       $('gearBtn').classList.remove('hidden');   // signed in → settings reachable
       paintScanTab();
+      return ensureAccess();                     // redeem an invite link, if present
+    }).then(function(redeemed){
+      if(!authUser)return null;
+      if(redeemed&&redeemed.ownerUid)SPACE=redeemed.ownerUid;   // open the space just shared with me
+      cloudCode=SPACE;
       return fbDb.collection('tinyCards').doc(SPACE).get();
     }).then(function(doc){
       if(!doc)return;
@@ -946,8 +961,8 @@
         $('view').classList.remove('hidden');
         $('people').innerHTML='';$('meta').textContent='';
         $('wipe').classList.add('hidden');
-        $('groups').innerHTML='<p class="empty">No cards yet — scan your first from the home screen.</p>';
-        return;
+        $('groups').innerHTML='<p class="empty">'+(isOwner()?'No cards yet — scan your first from the home screen.':'No cards in this shared archive yet.')+'</p>';
+        loadSpaces();return;
       }
       // Resolve each page to a full URL (lightbox/download) and a thumbnail URL
       // (grid). The grid loads the small _thumb.jpg the Cloud Function wrote, so
@@ -981,7 +996,7 @@
         });
         $('start').classList.add('hidden');
         $('view').classList.remove('hidden');
-        people();render();
+        people();render();loadSpaces();
         openCardFromURL();
       });
     }).catch(function(e){
@@ -1001,6 +1016,30 @@
       }
       if(window.console)console.warn(e);
     });
+  }
+
+  // ---- space switcher ----
+  // Lists the archives shared with me (from sharedWithMe/{myUid}/spaces) plus my
+  // own. Hidden entirely when nothing is shared with me, so solo users see no UI.
+  function loadSpaces(){
+    if(!myUid)return;
+    fbDb.collection('sharedWithMe').doc(myUid).collection('spaces').get().then(function(qs){
+      var shared=[];qs.forEach(function(d){shared.push({uid:d.id,email:(d.data()||{}).ownerEmail||'Shared archive'});});
+      renderSwitcher(shared);
+    }).catch(function(){renderSwitcher([]);});
+  }
+  function renderSwitcher(shared){
+    var sel=$('spaceSwitcher');if(!sel)return;
+    if(!shared.length){sel.classList.add('hidden');sel.innerHTML='';return;}
+    var html='<option value="'+esc(myUid)+'">My cards</option>';
+    shared.forEach(function(s){
+      html+='<option value="'+esc(s.uid)+'">'+esc(s.email)+'</option>';
+    });
+    sel.innerHTML=html;sel.value=SPACE;sel.classList.remove('hidden');
+    sel.onchange=function(){
+      SPACE=sel.value;$('groups').innerHTML='';$('q').value='';filter=null;
+      $('cloudSub').textContent='Opening…';loadCloud();
+    };
   }
 
   /* Folder mode — reading exported files off disk — moved to viewer.html,
