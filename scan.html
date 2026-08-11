@@ -305,19 +305,19 @@
   }
   button.skip:hover{border-color:var(--ink);color:var(--ink)}
 
-  /* Crop screen: "Crop" and "Keep Original" as two equal dark-filled buttons —
-     the same weight as our safe-action buttons (e.g. "Keep Card"), so they read
-     heavier than the outlined Rotate. Equal size, side by side. Scoped to #crop
-     so the meta form's Save button keeps its own filled-accent .go style. */
+  /* Crop screen: "Crop" (crimson filled, primary) + "Keep Original" (light
+     outline, secondary), equal size side by side. Scoped to #crop so the meta
+     form's Save button keeps its own .go style. */
   #crop .actions .go,
   #crop .actions .skip{
     flex:1 1 0;font:inherit;font-size:15.5px;font-weight:600;padding:15px;
-    border:none;border-radius:12px;
-    background:var(--ink);color:#fff;cursor:pointer;
+    border:1px solid transparent;border-radius:12px;cursor:pointer;
   }
-  #crop .actions .go:hover,
-  #crop .actions .skip:hover{background:#000}
+  #crop .actions .go{background:var(--accent);color:#fff}
+  #crop .actions .go:hover{background:#8E1340}
   #crop .actions .go:disabled{background:var(--rule);color:var(--muted);cursor:progress}
+  #crop .actions .skip{border-color:var(--rule);background:var(--field);color:var(--muted)}
+  #crop .actions .skip:hover{border-color:var(--ink);color:var(--ink)}
 
   /* Captured pages: a horizontal, scrollable row of fixed-height thumbnails.
      The form is this screen's primary job, so photos stay compact reference —
@@ -859,7 +859,7 @@
         <span>Delete All Cards</span>
       </button>
     </div>
-    <p class="setver">v2026.08.11.26</p>
+    <p class="setver">v2026.08.11.27</p>
   </div>
 </div>
 
