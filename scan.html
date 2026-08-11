@@ -107,12 +107,12 @@
     min-height:calc(100dvh - env(safe-area-inset-top) - var(--barh));
     padding-bottom:16px;
   }
-  /* Take Photos + tip + Choose Photos, evenly spaced (no divider), centred */
+  /* Action pair sits just under the title (no vertical centring, no top gap). */
   #start{
-    display:flex;flex-direction:column;gap:16px;
-    flex:1 1 auto;justify-content:center;
-    padding-bottom:24px;        /* optical: true centre reads a touch low */
+    display:flex;flex-direction:column;gap:16px;margin-top:28px;
   }
+  /* Take Photos + its tip, grouped tightly so the tip reads as belonging to it. */
+  .camgroup{display:flex;flex-direction:column;gap:8px}
   /* Shooting tip, sits just below the Take Photos button */
   .tip{text-align:center;font-size:12.5px;color:var(--muted)}
 
@@ -617,13 +617,14 @@
   </section>
 
   <section id="start" class="hidden">
-    <div class="drop cam" id="camzone" tabindex="0" role="button">
-      <strong>Take Photos</strong>
-      <span>Photos won&rsquo;t show up in your photo library</span>
+    <div class="camgroup">
+      <div class="drop cam" id="camzone" tabindex="0" role="button">
+        <strong>Take Photos</strong>
+        <span>Photos won&rsquo;t show up in your photo library</span>
+      </div>
+      <input type="file" id="camera" accept="image/*" capture="environment" class="hidden">
+      <p class="tip">Tip: a dark surface makes the card edges easy to detect.</p>
     </div>
-    <input type="file" id="camera" accept="image/*" capture="environment" class="hidden">
-
-    <p class="tip">Tip: a dark surface makes the card edges easy to detect.</p>
 
     <div class="drop" id="dropzone" tabindex="0" role="button">
       <strong>Choose Photos</strong>
@@ -808,7 +809,7 @@
       <div class="set-sep hidden" id="ownerSep"></div>
       <button type="button" class="signout" id="setSignOut">Sign out</button>
     </div>
-    <p class="setver">v2026.08.11.7</p>
+    <p class="setver">v2026.08.11.8</p>
   </div>
 </div>
 

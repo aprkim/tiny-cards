@@ -143,7 +143,7 @@
   .group h2 span{font-weight:500;color:var(--muted);margin-left:8px;font-size:13px}
 
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:14px}
-  .card{cursor:pointer;border:none;background:none;padding:0;font:inherit;text-align:left;position:relative}
+  .card{cursor:pointer;border:none;background:none;padding:0;font:inherit;color:var(--ink);text-align:left;position:relative}
   .card img{
     width:100%;aspect-ratio:3/4;object-fit:cover;background:var(--field);
     border:1px solid var(--rule);border-radius:10px;display:block;
@@ -153,7 +153,7 @@
     position:absolute;top:7px;right:7px;background:rgba(22,22,29,.82);color:#fff;
     font-size:11px;font-weight:600;padding:2px 8px;border-radius:100px;
   }
-  .card p{font-size:13.5px;font-weight:600;margin-top:8px;letter-spacing:-.01em}
+  .card p{font-size:13.5px;font-weight:500;color:var(--ink);margin-top:8px;letter-spacing:-.01em}
   .card small{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
 
   .empty{text-align:center;padding:48px 20px;color:var(--muted);font-size:14px}
@@ -608,7 +608,7 @@
         <span>Delete All Cards</span>
       </button>
     </div>
-    <p class="setver">v2026.08.11.7</p>
+    <p class="setver">v2026.08.11.8</p>
   </div>
 </div>
 
@@ -1083,6 +1083,15 @@
 
   function esc(t){var d=document.createElement('div');d.textContent=t;return d.innerHTML}
 
+  // Card meta shows "Jul 20" (no year — the section header already carries it).
+  // Storage stays 'YYYY-MM-DD'; this is display-only. Falls back to the raw
+  // string if it's ever not a full ISO date.
+  function fmtCardDate(d){
+    var m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(d||'');
+    if(!m)return d||'';
+    return (DP_MONTHS[parseInt(m[2],10)-1]||'')+' '+parseInt(m[3],10);
+  }
+
   var showAllPeople=false;
   var yearFilter=null;
 
@@ -1165,7 +1174,7 @@
       buckets[k].forEach(function(x){
         var b=document.createElement('button');b.className='card';b.type='button';
         var badge=x.pages.length>1?'<span class="n">'+x.pages.length+'</span>':'';
-        var sub=(x.date||'no date')+(x.recipient?' · to '+x.recipient:'');
+        var sub=(x.date?fmtCardDate(x.date):'no date')+(x.recipient?' · to '+x.recipient:'');
         b.innerHTML='<img loading="lazy" src="'+(x.pages[0].thumb||x.pages[0].url)+'" alt="'+esc(x.person)+'">'+badge+
                     '<p>'+esc(x.person)+'</p><small>'+esc(sub)+'</small>';
         b.onclick=function(){show(x,0)};
