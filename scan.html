@@ -219,6 +219,18 @@
   .hint b{color:var(--ink);font-weight:600}
 
   .bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+  /* The crop screen has its own top bar (X / card / label), so the main
+     "Add a Card" header is hidden while cropping to give the photo full height. */
+  body.cropping header{display:none}
+  /* Cancel (X) — a way out of the crop screen */
+  .cropx{
+    width:32px;height:32px;padding:0;margin:-4px 8px -4px -6px;flex-shrink:0;
+    border:none;background:none;color:var(--muted);cursor:pointer;
+    display:flex;align-items:center;justify-content:center;border-radius:8px;
+  }
+  .cropx:hover,.cropx:focus-visible{color:var(--ink);background:rgba(0,0,0,.05);outline:none}
+  .cropx svg{width:20px;height:20px;display:block}
+  .bar .count{margin-right:auto}   /* keep the tag pushed to the far right */
   .count{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
   .count b{color:var(--ink);font-weight:700;font-size:15px}
   .tag{
@@ -228,11 +240,17 @@
   .track{height:3px;background:var(--rule);border-radius:2px;overflow:hidden;margin-bottom:16px}
   .track i{display:block;height:100%;background:var(--accent);width:0;transition:width .25s ease}
 
+  /* The stage is a dark viewer area that fills the space between the progress bar
+     and the controls; the photo (cbox) is fitted to both width and height and
+     centred inside it. Its height is constant, so rotating only changes the photo
+     inside — the controls below never move, and nothing scrolls. */
   .stage{
     position:relative;background:#26262E;border-radius:14px;
     overflow:hidden;margin-bottom:14px;user-select:none;-webkit-user-select:none;
+    flex:1 1 auto;min-height:0;display:flex;align-items:center;justify-content:center;
   }
-  .stage canvas{display:block;width:100%;height:auto}
+  .cbox{position:relative;flex:0 0 auto}   /* sized to the fitted photo; holds the dots */
+  .stage canvas{display:block;width:100%;height:100%}
   .stage svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
   .stage polygon{fill:rgba(176,24,79,.14);stroke:var(--accent);stroke-width:2}
   .handle{position:absolute;width:44px;height:44px;margin:-22px 0 0 -22px;touch-action:none;cursor:grab}
@@ -277,7 +295,6 @@
     display:flex;flex-direction:column;
     min-height:calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 40px);
   }
-  #crop .tools{margin-top:auto}    /* push tools (hint + Rotate) + actions to the bottom */
   button.go{
     flex:1;font:inherit;font-size:15.5px;font-weight:600;padding:15px;
     border:none;border-radius:12px;background:var(--accent);color:#fff;cursor:pointer;
@@ -609,18 +626,23 @@
 
   <section id="crop" class="hidden">
     <div class="bar">
+      <button type="button" class="cropx" id="cropCancel" aria-label="Cancel">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
       <span class="count">Card <b id="cardNo">1</b> / <span id="cardTot">1</span></span>
       <span class="tag" id="pageTag">front</span>
     </div>
     <div class="track"><i id="fill"></i></div>
 
     <div class="stage" id="stage">
-      <canvas id="cv"></canvas>
-      <svg><polygon id="poly" points=""/></svg>
-      <div class="handle" id="h0" tabindex="0" role="slider" aria-label="Top-left corner (arrow keys to move)"></div>
-      <div class="handle" id="h1" tabindex="0" role="slider" aria-label="Top-right corner (arrow keys to move)"></div>
-      <div class="handle" id="h2" tabindex="0" role="slider" aria-label="Bottom-right corner (arrow keys to move)"></div>
-      <div class="handle" id="h3" tabindex="0" role="slider" aria-label="Bottom-left corner (arrow keys to move)"></div>
+      <div class="cbox" id="cbox">
+        <canvas id="cv"></canvas>
+        <svg><polygon id="poly" points=""/></svg>
+        <div class="handle" id="h0" tabindex="0" role="slider" aria-label="Top-left corner (arrow keys to move)"></div>
+        <div class="handle" id="h1" tabindex="0" role="slider" aria-label="Top-right corner (arrow keys to move)"></div>
+        <div class="handle" id="h2" tabindex="0" role="slider" aria-label="Bottom-right corner (arrow keys to move)"></div>
+        <div class="handle" id="h3" tabindex="0" role="slider" aria-label="Bottom-left corner (arrow keys to move)"></div>
+      </div>
     </div>
     <div class="tools">
       <p class="stagehint">Drag the dots to the card&rsquo;s corners.</p>
@@ -775,7 +797,7 @@
       <div class="set-sep hidden" id="ownerSep"></div>
       <button type="button" class="signout" id="setSignOut">Sign out</button>
     </div>
-    <p class="setver">v2026.08.10.18</p>
+    <p class="setver">v2026.08.10.19</p>
   </div>
 </div>
 
@@ -1416,7 +1438,7 @@
     $('start').classList.add('hidden');
     $('finish').classList.add('hidden');
     $('meta').classList.add('hidden');
-    $('crop').classList.remove('hidden');document.body.classList.add('scanning');
+    $('crop').classList.remove('hidden');document.body.classList.add('scanning');document.body.classList.add('cropping');
     $('cardNo').textContent=cardNo;
     $('cardTot').textContent=cardNo;
     $('pageTag').textContent=nextLabel();
@@ -1531,7 +1553,7 @@
   function loadPage(){
     if(pageIdx>=pageCount)return toMeta();
     $('meta').classList.add('hidden');
-    $('crop').classList.remove('hidden');document.body.classList.add('scanning');
+    $('crop').classList.remove('hidden');document.body.classList.add('scanning');document.body.classList.add('cropping');
     $('pageTag').textContent=nextLabel();
     $('fill').style.width=(cursor/files.length*100)+'%';
 
@@ -1549,13 +1571,16 @@
   }
 
   function drawStage(){
-    var cv=$('cv');
-    var maxW=$('stage').clientWidth||360;
-    scale=Math.min(1,maxW/img.naturalWidth);
-    cv.width=Math.round(img.naturalWidth*scale);
-    cv.height=Math.round(img.naturalHeight*scale);
-    cv.getContext('2d').drawImage(img,0,0,cv.width,cv.height);
-    var svg=$('stage').querySelector('svg');
+    var cv=$('cv'),box=$('cbox'),stage=$('stage');
+    // Fit the photo inside the dark stage area on BOTH axes (never upscale), so
+    // it's fully visible without scrolling and rotating just re-fits it.
+    var availW=stage.clientWidth||360,availH=stage.clientHeight||availW;
+    scale=Math.min(1,availW/img.naturalWidth,availH/img.naturalHeight);
+    var dw=Math.max(1,Math.round(img.naturalWidth*scale)),dh=Math.max(1,Math.round(img.naturalHeight*scale));
+    box.style.width=dw+'px';box.style.height=dh+'px';   // cbox == displayed photo, so the dots line up
+    cv.width=dw;cv.height=dh;
+    cv.getContext('2d').drawImage(img,0,0,dw,dh);
+    var svg=box.querySelector('svg');
     svg.setAttribute('viewBox','0 0 '+img.naturalWidth+' '+img.naturalHeight);
     svg.setAttribute('preserveAspectRatio','none');
   }
@@ -1579,7 +1604,7 @@
     h.addEventListener('pointerdown',function(e){
       e.preventDefault();h.setPointerCapture(e.pointerId);h.classList.add('drag');
       var move=function(ev){
-        var r=$('stage').getBoundingClientRect();
+        var r=$('cbox').getBoundingClientRect();   // cbox == displayed photo
         var x=(ev.clientX-r.left)/r.width*img.naturalWidth;
         var y=(ev.clientY-r.top)/r.height*img.naturalHeight;
         corners[i].x=Math.max(0,Math.min(img.naturalWidth,x));
@@ -1755,6 +1780,24 @@
 
   $('noCrop').onclick=function(){acceptPage(curSource||files[cursor])};
 
+  // A way out of the crop screen. If the card already has captured pages (or we're
+  // re-cropping an existing one), go back to naming and keep the card; otherwise
+  // nothing has been saved yet, so return to the start screen.
+  function cancelCrop(){
+    redoIndex=-1;
+    if(pages.length>0){toMeta();return;}
+    $('crop').classList.add('hidden');document.body.classList.remove('cropping');
+    $('meta').classList.add('hidden');
+    $('finish').classList.add('hidden');
+    $('start').classList.remove('hidden');
+    document.body.classList.remove('scanning');
+    window.scrollTo(0,0);
+  }
+  $('cropCancel').onclick=cancelCrop;
+  document.addEventListener('keydown',function(e){
+    if(e.key==='Escape'&&!$('crop').classList.contains('hidden'))cancelCrop();
+  });
+
   function acceptPage(blob){
     if(redoIndex>-1){                       // re-cropping an existing page
       pages[redoIndex]=blob;
@@ -1786,7 +1829,7 @@
     redoIndex=i;
     curSource=src;
     $('meta').classList.add('hidden');
-    $('crop').classList.remove('hidden');document.body.classList.add('scanning');
+    $('crop').classList.remove('hidden');document.body.classList.add('scanning');document.body.classList.add('cropping');
     $('pageTag').textContent=(pageLabels[i]||('p'+(i+1)))+' · redo';
     $('applyCrop').textContent='Recrop';
 
@@ -1806,7 +1849,7 @@
   }
 
   function toMeta(){
-    $('crop').classList.add('hidden');
+    $('crop').classList.add('hidden');document.body.classList.remove('cropping');
     $('meta').classList.remove('hidden');document.body.classList.add('scanning');
     thumbURLs.forEach(URL.revokeObjectURL);thumbURLs=[];
     var t=$('thumbs');t.innerHTML='';
@@ -2015,7 +2058,7 @@
   }
 
   function finish(){
-    $('crop').classList.add('hidden');
+    $('crop').classList.add('hidden');document.body.classList.remove('cropping');
     $('meta').classList.add('hidden');
     $('finish').classList.remove('hidden');document.body.classList.remove('scanning');
     var where=[];
