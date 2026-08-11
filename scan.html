@@ -38,7 +38,7 @@
     padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
     -webkit-font-smoothing:antialiased;touch-action:manipulation;
   }
-  .wrap{max-width:760px;margin:0 auto;padding:24px 18px calc(44px + var(--barh))}
+  .wrap{max-width:760px;margin:0 auto;padding:26px 18px calc(44px + var(--barh))}
   header{margin-bottom:22px}
 
   /* Fixed bottom nav — Scan and View, on every page. Its own safe-area padding
@@ -544,7 +544,14 @@
   }
   button.set-row:hover,button.set-row:focus-visible{color:var(--accent)}
   button.set-row:focus-visible{outline:none}
+  button.set-row.danger{color:var(--accent)}
   .set-hint{color:var(--muted);font-weight:400;font-size:13px}
+  .modal-input{
+    width:100%;font:inherit;font-size:16px;padding:11px 13px;margin:-8px 0 20px;
+    border:1px solid var(--rule);border-radius:10px;background:var(--field);color:var(--ink);
+    -webkit-appearance:none;appearance:none;
+  }
+  .modal-input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
   /* Build stamp — bumped every deploy so it's obvious whether the live page is
      the current version. */
   .setver{margin-top:16px;text-align:center;font-size:10px;color:#9A9AA2;letter-spacing:.02em}
@@ -779,6 +786,7 @@
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="modalTitle" aria-describedby="modalBody">
     <h2 id="modalTitle">Confirm</h2>
     <p id="modalBody"></p>
+    <input type="text" id="modalInput" class="modal-input hidden" autocomplete="off" autocapitalize="characters">
     <div class="sheet-acts">
       <button type="button" id="modalCancel">Cancel</button>
       <button type="button" id="modalConfirm">OK</button>
@@ -808,8 +816,16 @@
       </button>
       <div class="set-sep hidden" id="ownerSep"></div>
       <button type="button" class="signout" id="setSignOut">Sign out</button>
+      <div class="set-sep hidden" id="wipeSep"></div>
+      <div class="set-row hidden" id="setStatsRow">
+        <span class="set-k">Library</span>
+        <span class="set-v" id="setLibStats"></span>
+      </div>
+      <button type="button" class="set-row danger hidden" id="setWipe">
+        <span>Delete All Cards</span>
+      </button>
     </div>
-    <p class="setver">v2026.08.11.9</p>
+    <p class="setver">v2026.08.11.10</p>
   </div>
 </div>
 
@@ -1118,9 +1134,11 @@
   var onConfirm=null;
   function openConfirm(opts){
     opts=opts||{};
-    var t=$('modalTitle'),bd=$('modalBody'),c=$('modalConfirm'),x=$('modalCancel');
+    var t=$('modalTitle'),bd=$('modalBody'),inp=$('modalInput'),c=$('modalConfirm'),x=$('modalCancel');
     t.textContent=opts.title||'';t.style.display=opts.title?'':'none';
     bd.textContent=opts.body||'';bd.style.display=opts.body?'':'none';
+    var needInput=!!opts.input,req=opts.requireText||null;
+    if(inp){inp.classList.toggle('hidden',!needInput);inp.value='';if(needInput)inp.placeholder=opts.placeholder||'';}
     c.textContent=opts.confirmText||'OK';
     c.classList.toggle('danger',!!opts.danger);
     x.textContent=opts.cancelText||'Cancel';
@@ -1128,8 +1146,11 @@
     // confirmTop: destructive action on top, safe default below (see .confirm-top CSS)
     $('modal').classList.toggle('confirm-top',!!opts.confirmTop);
     onConfirm=opts.onConfirm||null;
+    function sync(){c.disabled=!!(needInput&&req)&&(inp.value.trim().toUpperCase()!==req.toUpperCase());}
+    if(inp)inp.oninput=needInput?sync:null;
+    sync();
     $('modal').classList.remove('hidden');
-    (opts.alert?c:x).focus();
+    (needInput&&inp?inp:(opts.alert?c:x)).focus();
   }
   // Designed replacement for window.alert — one button, matches the app.
   function openAlert(body,title){openConfirm({title:title||'',body:body,confirmText:'OK',alert:true});}
@@ -1159,7 +1180,55 @@
       $('setExport').classList.toggle('hidden',!canExport());   // owner + desktop
       $('setExportHint').textContent='ZIP backup';
     }
+    // Library stats + Delete All — same sheet as the View tab. The scanner doesn't
+    // hold the archive in memory, so fetch it fresh when Settings opens.
+    $('setStatsRow').classList.add('hidden');
+    $('wipeSep').classList.add('hidden');
+    $('setWipe').classList.add('hidden');
+    if(owner)loadLibrary();
     $('settings').classList.remove('hidden');
+  }
+  var libRows=[];
+  function loadLibrary(){
+    if(!fbDb||!SPACE)return;
+    fbDb.collection('tinyCards').doc(SPACE).get().then(function(doc){
+      var rows=(doc.exists&&doc.data().cards)||[];libRows=rows;
+      if(!rows.length)return;
+      var photos=0,people={};
+      rows.forEach(function(r){photos+=(r.paths||[]).length;people[r.sender||'Unknown']=1;});
+      $('setLibStats').textContent=rows.length+' cards · '+photos+' photos · '+Object.keys(people).length+' people';
+      $('setStatsRow').classList.remove('hidden');
+      $('wipeSep').classList.remove('hidden');
+      $('setWipe').classList.remove('hidden');
+    }).catch(function(){});
+  }
+  // Delete All Cards — identical flow to the View tab (type-to-confirm).
+  $('setWipe').onclick=function(){
+    var n=libRows.length;
+    if(!n||!isOwner())return;
+    closeSettings();
+    openConfirm({
+      title:'Delete all '+n+' card'+(n===1?'':'s')+'?',
+      body:'This removes them from your archive on every device and cannot be undone. Exported files are not affected. Type DELETE to confirm.',
+      input:true,requireText:'DELETE',placeholder:'DELETE',
+      confirmText:'Delete all',danger:true,
+      onConfirm:doWipe
+    });
+  };
+  function doWipe(){
+    var paths=[];
+    libRows.forEach(function(r){if(r.paths)paths=paths.concat(r.paths);});
+    Promise.all(paths.map(function(p){
+      return fbStore.ref().child(p).delete().catch(function(){});
+    })).then(function(){
+      return fbDb.collection('tinyCards').doc(SPACE).delete();
+    }).then(function(){
+      libRows=[];
+      openAlert('All cards were deleted.','Done');
+    }).catch(function(e){
+      openAlert('Could not delete everything. Some cards may remain.','Delete failed');
+      if(window.console)console.warn(e);
+    });
   }
   function closeSettings(){$('settings').classList.add('hidden')}
   $('setClose').onclick=closeSettings;
