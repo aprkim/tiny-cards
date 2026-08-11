@@ -113,6 +113,8 @@
   @media (hover:hover){.chip:hover{border-color:var(--accent);color:var(--accent)}}
   .chip.on{background:var(--ink);border-color:var(--ink);color:#fff}
   .chip b{font-weight:500;opacity:.5;margin-left:5px}
+  /* "+N more" indicator (last chip when senders overflow the two lines). */
+  .morechip{color:var(--muted);cursor:default;pointer-events:none}
   /* Year filter is the first chip: a native <select> dressed as a pill so it keeps
      the OS dropdown picker. Extra right padding leaves room for the caret. */
   .yearchip{
@@ -227,7 +229,7 @@
   .sheetx:hover,.sheetx:focus-visible{color:var(--ink);background:rgba(0,0,0,.05);outline:none}
   .sheetx svg{width:20px;height:20px;display:block}
   .sheet h2{font-size:18px;font-weight:700;letter-spacing:-.01em;margin-bottom:8px}
-  #modalTitle{padding-right:30px}   /* clear the corner X */
+  .modal-inlabel{font-weight:500;font-size:14px;color:var(--ink);margin:2px 0 8px}
   .sheet p{font-size:14px;color:var(--muted);line-height:1.55;margin-bottom:22px}
   .sheet-acts{display:flex;flex-direction:column;gap:10px}
   /* Same geometry as the home Scan/View buttons. */
@@ -253,7 +255,7 @@
   #modal.confirm-top #modalConfirm.danger:hover,#modal.confirm-top #modalConfirm.danger:focus-visible{background:var(--accent-soft)}
   /* Text input inside the dialog (e.g. type-to-confirm for Delete All). */
   .modal-input{
-    width:100%;font:inherit;font-size:16px;padding:11px 13px;margin:-8px 0 20px;
+    width:100%;font:inherit;font-size:16px;padding:11px 13px;margin:0 0 20px;
     border:1px solid var(--rule);border-radius:10px;background:var(--field);color:var(--ink);
     -webkit-appearance:none;appearance:none;
   }
@@ -591,11 +593,9 @@
      cancel, never confirm. Driven by openConfirm() below. -->
 <div class="scrim hidden" id="modal">
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="modalTitle" aria-describedby="modalBody">
-    <button type="button" class="sheetx" id="modalClose" aria-label="Close">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
-    </button>
     <h2 id="modalTitle">Confirm</h2>
     <p id="modalBody"></p>
+    <p id="modalInputLabel" class="modal-inlabel hidden"></p>
     <input type="text" id="modalInput" class="modal-input hidden" autocomplete="off" autocapitalize="characters">
     <div class="sheet-acts">
       <button type="button" id="modalCancel">Cancel</button>
@@ -636,7 +636,7 @@
         <span>Delete All Cards</span>
       </button>
     </div>
-    <p class="setver">v2026.08.11.17</p>
+    <p class="setver">v2026.08.11.18</p>
   </div>
 </div>
 
@@ -716,7 +716,9 @@
     t.textContent=opts.title||'';t.style.display=opts.title?'':'none';
     bd.textContent=opts.body||'';bd.style.display=opts.body?'':'none';
     var needInput=!!opts.input,req=opts.requireText||null;
-    if(inp){inp.classList.toggle('hidden',!needInput);inp.value='';if(needInput)inp.placeholder=opts.placeholder||'';}
+    if(inp){inp.classList.toggle('hidden',!needInput);inp.value='';inp.placeholder=needInput?(opts.placeholder||''):'';}
+    var lab=$('modalInputLabel');
+    if(lab){var showLab=needInput&&opts.inputLabel;lab.textContent=showLab?opts.inputLabel:'';lab.classList.toggle('hidden',!showLab);}
     c.textContent=opts.confirmText||'OK';
     c.classList.toggle('danger',!!opts.danger);
     x.textContent=opts.cancelText||'Cancel';
@@ -733,8 +735,7 @@
   // Designed replacement for window.alert — one button, matches the app.
   function openAlert(body,title){openConfirm({title:title||'',body:body,confirmText:'OK',alert:true});}
   function closeConfirm(){$('modal').classList.add('hidden');onConfirm=null;var c=$('modalConfirm');if(c)c.disabled=false;}
-  $('modalCancel').onclick=closeConfirm;
-  $('modalClose').onclick=closeConfirm;   // corner X = cancel (never confirms)
+  $('modalCancel').onclick=closeConfirm;   // Cancel = close (no separate X)
   $('modalConfirm').onclick=function(){var fn=onConfirm;closeConfirm();if(fn)fn()};
   // Click-outside cancels; it must never trigger the destructive action
   $('modal').onclick=function(e){if(e.target===$('modal'))closeConfirm()};
@@ -1181,7 +1182,8 @@
   }
 
   // Fixed 2-line strip: the year chip first, then senders by card count (desc).
-  // CSS wraps + clips to two rows, so only the top senders that fit are shown.
+  // Renders all, then truncates to two rows with a "+N more" chip in the last
+  // slot for whatever didn't fit (no scroll, no full list — search finds the rest).
   function people(){
     var c={},box=$('people');box.innerHTML='';
     var yc=buildYearChip();if(yc)box.appendChild(yc);   // year filter sits first
@@ -1194,6 +1196,28 @@
       b.onclick=function(){filter=(filter===n?null:n);people();render()};
       box.appendChild(b);
     });
+    truncateChips(box,names.length);
+  }
+  // Keep only what fits in two rows; if senders were cut, add a "+N more" chip
+  // (informational) as the last chip. N counts the senders that aren't shown.
+  function truncateChips(box,totalSenders){
+    if(!box.getClientRects().length)return;                 // not laid out yet
+    var limit=box.getBoundingClientRect().top+parseFloat(getComputedStyle(box).maxHeight||'0');
+    if(!limit)return;
+    function over(el){return el.getBoundingClientRect().bottom>limit+0.5;}
+    var chips=[].slice.call(box.children),firstOver=-1;
+    for(var i=0;i<chips.length;i++){if(over(chips[i])){firstOver=i;break;}}
+    if(firstOver<0)return;                                   // everything fits
+    while(box.children.length>firstOver)box.removeChild(box.lastChild);
+    var shown=box.querySelectorAll('.chip:not(.yearchip)').length;
+    var hidden=totalSenders-shown;
+    var more=document.createElement('span');more.className='chip morechip';more.textContent='+'+hidden+' more';
+    box.appendChild(more);
+    while(over(more)){                                       // make room for the +N chip
+      var prev=more.previousElementSibling;
+      if(!prev||prev.classList.contains('yearchip')){box.removeChild(more);break;}
+      box.removeChild(prev);hidden++;more.textContent='+'+hidden+' more';
+    }
   }
 
   function render(){
@@ -1497,8 +1521,8 @@
     closeSettings();
     openConfirm({
       title:'Delete all '+n+' card'+(n===1?'':'s')+'?',
-      body:'This removes them from your archive on every device and cannot be undone. Exported files are not affected. Type DELETE to confirm.',
-      input:true,requireText:'DELETE',placeholder:'DELETE',
+      body:'This deletes all cards from every device and cannot be undone. Exported files are not affected.',
+      input:true,requireText:'DELETE',inputLabel:'Type DELETE to confirm.',
       confirmText:'Delete all',danger:true,
       onConfirm:doWipe
     });
