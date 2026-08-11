@@ -265,6 +265,7 @@
   };
 
   function esc(t){var d=document.createElement('div');d.textContent=t;return d.innerHTML}
+  function plur(n,s,p){return n+' '+(n===1?s:(p||s+'s'));}
 
   function people(){
     var c={},box=$('people');box.innerHTML='';
@@ -301,7 +302,7 @@
 
     var who={},shots=0;
     list.forEach(function(x){who[x.person]=1;shots+=x.pages.length});
-    $('meta').textContent=list.length+' cards · '+shots+' photos · '+Object.keys(who).length+' people';
+    $('meta').textContent=plur(list.length,'card')+' · '+plur(shots,'photo')+' · '+plur(Object.keys(who).length,'person','people');
 
     var buckets={},order=[];
     list.forEach(function(x){
@@ -316,7 +317,7 @@
     order.forEach(function(k){
       var sec=document.createElement('div');sec.className='group';
       var h=document.createElement('h2');
-      h.innerHTML=esc(k)+'<span>'+buckets[k].length+' cards</span>';
+      h.innerHTML=esc(k)+'<span>'+plur(buckets[k].length,'card')+'</span>';
       sec.appendChild(h);
       var g=document.createElement('div');g.className='grid';
       buckets[k].forEach(function(x){

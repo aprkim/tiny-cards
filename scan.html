@@ -845,7 +845,7 @@
         <span>Delete All Cards</span>
       </button>
     </div>
-    <p class="setver">v2026.08.11.15</p>
+    <p class="setver">v2026.08.11.16</p>
   </div>
 </div>
 
@@ -1231,7 +1231,7 @@
       if(!rows.length){$('setLibStats').textContent='';return;}
       var photos=0,people={};
       rows.forEach(function(r){photos+=(r.paths||[]).length;people[r.sender||'Unknown']=1;});
-      $('setLibStats').textContent=rows.length+' cards · '+photos+' photos · '+Object.keys(people).length+' people';
+      $('setLibStats').textContent=plur(rows.length,'card')+' · '+plur(photos,'photo')+' · '+plur(Object.keys(people).length,'person','people');
       $('wipeSep').classList.remove('hidden');
       $('setWipe').classList.remove('hidden');
     }).catch(function(){});
@@ -2072,6 +2072,8 @@
   }
 
   function esc(t){var d=document.createElement('div');d.textContent=t;return d.innerHTML}
+  // "1 card" / "3 cards" — pass an irregular plural (e.g. person/people) as 3rd arg.
+  function plur(n,s,p){return n+' '+(n===1?s:(p||s+'s'));}
 
   function paintName(){
     var s=clean($('sender').value);

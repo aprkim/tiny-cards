@@ -644,7 +644,7 @@
         <span>Delete All Cards</span>
       </button>
     </div>
-    <p class="setver">v2026.08.11.15</p>
+    <p class="setver">v2026.08.11.16</p>
   </div>
 </div>
 
@@ -779,7 +779,7 @@
     }
     // Library summary as a subtext under the email (whole archive, not filtered).
     var photos=0,ppl={};cards.forEach(function(x){photos+=x.pages.length;ppl[x.person]=1;});
-    $('meta').textContent=cards.length?(cards.length+' cards · '+photos+' photos · '+Object.keys(ppl).length+' people'):'';
+    $('meta').textContent=cards.length?(plur(cards.length,'card')+' · '+plur(photos,'photo')+' · '+plur(Object.keys(ppl).length,'person','people')):'';
     var hasCards=fromCloud&&cards.length>0;
     $('wipeSep').classList.toggle('hidden',!(owner&&hasCards));
     $('setWipe').classList.toggle('hidden',!(owner&&hasCards));
@@ -1157,6 +1157,8 @@
      live there now. This page only reads the cloud archive. */
 
   function esc(t){var d=document.createElement('div');d.textContent=t;return d.innerHTML}
+  // "1 card" / "3 cards" — pass an irregular plural (e.g. person/people) as 3rd arg.
+  function plur(n,s,p){return n+' '+(n===1?s:(p||s+'s'));}
 
   // Card meta shows "Jul 20" (no year — the section header already carries it).
   // Storage stays 'YYYY-MM-DD'; this is display-only. Falls back to the raw
@@ -1243,7 +1245,7 @@
     order.forEach(function(k){
       var sec=document.createElement('div');sec.className='group';
       var h=document.createElement('h2');
-      h.innerHTML=esc(k)+'<span>'+buckets[k].length+' cards</span>';
+      h.innerHTML=esc(k)+'<span>'+plur(buckets[k].length,'card')+'</span>';
       sec.appendChild(h);
       var g=document.createElement('div');g.className='grid';
       buckets[k].forEach(function(x){
