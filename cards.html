@@ -97,19 +97,20 @@
      padding (matching the page margin), so chips line up with the content at
      rest, the next chip peeks at the edge to hint scrolling, and the last chip
      clears the edge instead of being cut mid-text. */
+  /* One horizontal-scroll container holding two flex rows. Chips are dealt into
+     the rows in order (1st→row 1, 2nd→row 2, 3rd→row 1 …); each chip is only as
+     wide as its content (no column alignment). Right padding keeps the last chip
+     from being clipped at the scroll end. */
   .chips{
-    display:grid;grid-auto-flow:column;grid-template-rows:repeat(2,auto);
-    grid-auto-columns:max-content;justify-items:start;align-items:center;gap:8px;
+    display:flex;flex-direction:column;align-items:flex-start;gap:8px;
     width:calc(100% + 36px);margin:12px -18px 20px;padding:6px 18px;
     overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;
   }
   .chips::-webkit-scrollbar{display:none}
-  /* Odd pill count leaves the last pill alone atop a new column with an empty
-     cell beneath — looks detached. When that happens, span it across both rows
-     and center it so it reads as a deliberate end pill, not a stray one. */
-  .chips > :last-child:nth-child(odd){grid-row:1 / span 2}
+  .chiprow{display:flex;flex-wrap:nowrap;gap:8px;width:max-content}
+  .chiprow:empty{display:none}
   .chip{
-    font:inherit;font-size:13px;padding:6px 13px;border-radius:100px;white-space:nowrap;
+    flex:0 0 auto;font:inherit;font-size:13px;padding:6px 13px;border-radius:100px;white-space:nowrap;
     border:1px solid var(--rule);background:var(--field);color:var(--ink);cursor:pointer;
   }
   /* hover:hover only, so a tap on touch doesn't leave a sticky accent border */
@@ -293,6 +294,9 @@
   button.set-row:hover,button.set-row:focus-visible{color:var(--accent)}
   button.set-row:focus-visible{outline:none}
   button.set-row.danger{color:var(--accent)}
+  /* Disclosure chevron: marks a row that opens another screen (Share), so its
+     right-side text isn't mistaken for a separate button. */
+  .set-chev{color:var(--muted);font-size:20px;line-height:1;font-weight:400}
   .set-hint{color:var(--muted);font-weight:400;font-size:13px}
   /* Build stamp — bumped every deploy so it's obvious whether the live page is
      the current version. */
@@ -468,7 +472,10 @@
   <section id="view" class="hidden">
     <select id="spaceSwitcher" class="switcher hidden" aria-label="Choose an archive"></select>
     <input type="search" id="q" placeholder="Search a name or occasion" autocomplete="off">
-    <div class="chips" id="people"></div>
+    <div class="chips" id="people">
+      <div class="chiprow" id="peopleR1"></div>
+      <div class="chiprow" id="peopleR2"></div>
+    </div>
     <div id="groups"></div>
   </section>
 
@@ -600,23 +607,23 @@
       </div>
       <div class="set-sep"></div>
       <button type="button" class="set-row hidden" id="setShare">
-        <span>Share &amp; viewers</span><span class="set-hint">Invite family</span>
+        <span>Share &amp; viewers</span><span class="set-chev" aria-hidden="true">&rsaquo;</span>
       </button>
       <button type="button" class="set-row hidden" id="setExport">
         <span>Export all</span><span class="set-hint" id="setExportHint">ZIP backup</span>
       </button>
-      <div class="set-sep hidden" id="ownerSep"></div>
-      <button type="button" class="signout" id="setSignOut">Sign out</button>
-      <div class="set-sep hidden" id="wipeSep"></div>
       <div class="set-row hidden" id="setStatsRow">
         <span class="set-k">Library</span>
         <span class="set-v" id="meta"></span>
       </div>
+      <div class="set-sep"></div>
+      <button type="button" class="set-row" id="setSignOut"><span>Sign out</span></button>
+      <div class="set-sep hidden" id="wipeSep"></div>
       <button type="button" class="set-row danger hidden" id="setWipe">
         <span>Delete All Cards</span>
       </button>
     </div>
-    <p class="setver">v2026.08.11.11</p>
+    <p class="setver">v2026.08.11.12</p>
   </div>
 </div>
 
@@ -722,7 +729,6 @@
     $('setEmail').textContent=(authUser&&authUser.email)||'Signed in';
     var owner=isOwner();
     $('setShare').classList.toggle('hidden',!owner);                 // share only your own space
-    $('ownerSep').classList.toggle('hidden',!owner);
     $('setExport').disabled=false;
     // The native app can't stream a browser download (WKWebView has no download
     // manager), so rather than a broken button, owners see a note pointing them
@@ -1003,7 +1009,7 @@
         cards=[];fromCloud=true;
         $('start').classList.add('hidden');
         $('view').classList.remove('hidden');
-        $('people').innerHTML='';$('meta').textContent='';
+        $('peopleR1').innerHTML='';$('peopleR2').innerHTML='';$('meta').textContent='';
         $('groups').innerHTML='<p class="empty">'+(isOwner()?'No cards yet — scan your first from the home screen.':'No cards in this shared archive yet.')+'</p>';
         loadSpaces();return;
       }
@@ -1121,8 +1127,10 @@
   }
 
   function people(){
-    var c={},box=$('people');box.innerHTML='';
-    var yc=buildYearChip();if(yc)box.appendChild(yc);   // year filter sits first
+    var c={},r1=$('peopleR1'),r2=$('peopleR2');
+    r1.innerHTML='';r2.innerHTML='';
+    var items=[];                                       // built in order, then dealt into 2 rows
+    var yc=buildYearChip();if(yc)items.push(yc);        // year filter sits first
     cards.forEach(function(x){if(x.ok)c[x.person]=(c[x.person]||0)+1});
     var names=Object.keys(c).sort(function(a,b){return c[b]-c[a]||a.localeCompare(b)});
 
@@ -1136,7 +1144,7 @@
       b.className='chip'+(filter===n?' on':'');b.type='button';
       b.innerHTML=esc(n)+'<b>'+c[n]+'</b>';
       b.onclick=function(){filter=(filter===n?null:n);people();render()};
-      box.appendChild(b);
+      items.push(b);
     });
 
     if(names.length>LIMIT){
@@ -1144,8 +1152,11 @@
       more.className='chip';more.type='button';
       more.textContent=showAllPeople?'Show fewer':'+'+(names.length-LIMIT)+' more';
       more.onclick=function(){showAllPeople=!showAllPeople;people()};
-      box.appendChild(more);
+      items.push(more);
     }
+
+    // Deal alternately: 1st→row 1, 2nd→row 2, 3rd→row 1 … (content-width chips).
+    items.forEach(function(el,i){(i%2===0?r1:r2).appendChild(el);});
   }
 
   function render(){

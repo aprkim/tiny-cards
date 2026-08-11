@@ -545,6 +545,9 @@
   button.set-row:hover,button.set-row:focus-visible{color:var(--accent)}
   button.set-row:focus-visible{outline:none}
   button.set-row.danger{color:var(--accent)}
+  /* Disclosure chevron: marks a row that opens another screen (Share), so its
+     right-side text isn't mistaken for a separate button. */
+  .set-chev{color:var(--muted);font-size:20px;line-height:1;font-weight:400}
   .set-hint{color:var(--muted);font-weight:400;font-size:13px}
   .modal-input{
     width:100%;font:inherit;font-size:16px;padding:11px 13px;margin:-8px 0 20px;
@@ -809,23 +812,23 @@
       </div>
       <div class="set-sep"></div>
       <button type="button" class="set-row hidden" id="setShare">
-        <span>Share &amp; viewers</span><span class="set-hint">Invite family</span>
+        <span>Share &amp; viewers</span><span class="set-chev" aria-hidden="true">&rsaquo;</span>
       </button>
       <button type="button" class="set-row hidden" id="setExport">
         <span>Export all</span><span class="set-hint" id="setExportHint">ZIP backup</span>
       </button>
-      <div class="set-sep hidden" id="ownerSep"></div>
-      <button type="button" class="signout" id="setSignOut">Sign out</button>
-      <div class="set-sep hidden" id="wipeSep"></div>
       <div class="set-row hidden" id="setStatsRow">
         <span class="set-k">Library</span>
         <span class="set-v" id="setLibStats"></span>
       </div>
+      <div class="set-sep"></div>
+      <button type="button" class="set-row" id="setSignOut"><span>Sign out</span></button>
+      <div class="set-sep hidden" id="wipeSep"></div>
       <button type="button" class="set-row danger hidden" id="setWipe">
         <span>Delete All Cards</span>
       </button>
     </div>
-    <p class="setver">v2026.08.11.11</p>
+    <p class="setver">v2026.08.11.12</p>
   </div>
 </div>
 
@@ -1168,7 +1171,6 @@
     $('setEmail').textContent=(authUser&&authUser.email)||'Signed in';
     var owner=isOwner();
     $('setShare').classList.toggle('hidden',!owner);             // share your own space
-    $('ownerSep').classList.toggle('hidden',!owner);
     $('setExport').disabled=false;
     // Native app can't stream a browser download (no WKWebView download manager),
     // so owners see a note pointing them to the computer instead of a broken
