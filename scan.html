@@ -548,6 +548,18 @@
   /* Disclosure chevron: marks a row that opens another screen (Share), so its
      right-side text isn't mistaken for a separate button. */
   .set-chev{color:var(--muted);font-size:20px;line-height:1;font-weight:400}
+  .set-row.set-acc{align-items:flex-start}
+  .set-accv{display:flex;flex-direction:column;align-items:flex-end;gap:4px;min-width:0}
+  .set-stats{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;text-align:right}
+  .set-stats:empty{display:none}
+  .set-end{display:flex;align-items:center;gap:8px}
+  .set-count{font-size:14px;color:var(--muted)}
+  .set-count.invite{color:var(--accent);font-weight:500}
+  .share-hero{text-align:center;padding:10px 6px 2px}
+  .share-heroicon{width:52px;height:52px;margin:0 auto 12px;color:var(--accent)}
+  .share-heroicon svg{width:100%;height:100%;display:block}
+  .share-hero h3{font-size:17px;font-weight:700;letter-spacing:-.01em;margin-bottom:6px}
+  .share-hero p{font-size:13.5px;color:var(--muted)}
   .set-hint{color:var(--muted);font-weight:400;font-size:13px}
   .modal-input{
     width:100%;font:inherit;font-size:16px;padding:11px 13px;margin:-8px 0 20px;
@@ -563,7 +575,8 @@
   .share-linkrow{display:flex;gap:8px;margin-bottom:12px}
   .share-linkrow input{flex:1;min-width:0;font:inherit;font-size:13px;padding:10px 12px;border:1px solid var(--rule);border-radius:10px;background:var(--field);color:var(--ink)}
   #shareCopy{font:inherit;font-size:14px;font-weight:600;padding:0 16px;border-radius:10px;border:1px solid var(--rule);background:var(--field);color:var(--ink);cursor:pointer;flex-shrink:0}
-  #shareNew{width:100%;font:inherit;font-size:15px;font-weight:600;padding:12px;border-radius:12px;border:1.5px solid var(--accent);background:var(--accent-soft);color:var(--accent);cursor:pointer;margin-bottom:18px}
+  #shareNew{width:100%;font:inherit;font-size:15px;font-weight:600;padding:13px;border-radius:12px;border:none;background:var(--accent);color:#fff;cursor:pointer;margin:16px 0 6px}
+  #shareNew:hover{background:#8E1340}
   #shareNew:disabled{opacity:.6;cursor:progress}
   .share-people-h{font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px}
   .share-list{display:flex;flex-direction:column;gap:8px;margin-bottom:18px;max-height:180px;overflow-y:auto}
@@ -806,21 +819,21 @@
     </button>
     <h2 id="setTitle">Settings</h2>
     <div class="set-list">
-      <div class="set-row">
+      <div class="set-row set-acc">
         <span class="set-k">Account</span>
-        <span class="set-v" id="setEmail">Signed in</span>
+        <span class="set-accv">
+          <span class="set-v" id="setEmail">Signed in</span>
+          <span class="set-stats" id="setLibStats"></span>
+        </span>
       </div>
       <div class="set-sep"></div>
       <button type="button" class="set-row hidden" id="setShare">
-        <span>Share &amp; viewers</span><span class="set-chev" aria-hidden="true">&rsaquo;</span>
+        <span>Family viewers</span>
+        <span class="set-end"><span class="set-count" id="setShareCount"></span><span class="set-chev" aria-hidden="true">&rsaquo;</span></span>
       </button>
       <button type="button" class="set-row hidden" id="setExport">
         <span>Export all</span><span class="set-hint" id="setExportHint">ZIP backup</span>
       </button>
-      <div class="set-row hidden" id="setStatsRow">
-        <span class="set-k">Library</span>
-        <span class="set-v" id="setLibStats"></span>
-      </div>
       <div class="set-sep"></div>
       <button type="button" class="set-row" id="setSignOut"><span>Sign out</span></button>
       <div class="set-sep hidden" id="wipeSep"></div>
@@ -828,24 +841,38 @@
         <span>Delete All Cards</span>
       </button>
     </div>
-    <p class="setver">v2026.08.11.13</p>
+    <p class="setver">v2026.08.11.14</p>
   </div>
 </div>
 
 <!-- Owner-only sharing: create a reusable invite link and manage who can view. -->
 <div class="scrim hidden" id="share">
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="shareTitle">
-    <h2 id="shareTitle">Share your cards</h2>
-    <p class="share-sub">Send this link to a family member — they sign in with Google to view (read-only). You can remove access anytime.</p>
+    <h2 id="shareTitle">Family viewers</h2>
+
+    <div id="shareHero" class="share-hero hidden">
+      <div class="share-heroicon" aria-hidden="true">
+        <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="6.5" y="11" width="27" height="20" rx="3.5" stroke="currentColor" stroke-width="2.4"/>
+          <line x1="6.5" y1="18" x2="33.5" y2="18" stroke="currentColor" stroke-width="2.4"/>
+          <path d="M35 42c-4.6-3.2-7.6-5.8-7.6-9.4 0-2.1 1.6-3.7 3.7-3.7 1.5 0 2.9.9 3.9 2.3 1-1.4 2.4-2.3 3.9-2.3 2.1 0 3.7 1.6 3.7 3.7 0 3.6-3 6.2-7.6 9.4z" fill="currentColor"/>
+        </svg>
+      </div>
+      <h3>Share your cards with family</h3>
+      <p>They can view — never edit or delete.</p>
+    </div>
+
+    <div id="shareListWrap" class="hidden">
+      <div class="share-people-h">People with access</div>
+      <div id="shareList" class="share-list"></div>
+    </div>
+
     <div class="share-linkrow hidden" id="shareLinkRow">
       <input type="text" id="shareLink" readonly>
       <button type="button" id="shareCopy">Copy</button>
     </div>
-    <button type="button" id="shareNew">Create invite link</button>
-    <div class="share-people">
-      <div class="share-people-h">People with access</div>
-      <div id="shareList" class="share-list"></div>
-    </div>
+
+    <button type="button" class="share-primary" id="shareNew">Invite by email</button>
     <div class="sheet-acts"><button type="button" id="shareClose">Done</button></div>
   </div>
 </div>
@@ -1182,12 +1209,13 @@
       $('setExport').classList.toggle('hidden',!canExport());   // owner + desktop
       $('setExportHint').textContent='ZIP backup';
     }
-    // Library stats + Delete All — same sheet as the View tab. The scanner doesn't
-    // hold the archive in memory, so fetch it fresh when Settings opens.
-    $('setStatsRow').classList.add('hidden');
+    // Library summary (subtext under email) + Delete All + viewer count — same
+    // sheet as the View tab. The scanner doesn't hold the archive in memory, so
+    // fetch it fresh when Settings opens.
+    $('setLibStats').textContent='';
     $('wipeSep').classList.add('hidden');
     $('setWipe').classList.add('hidden');
-    if(owner)loadLibrary();
+    if(owner){loadLibrary();loadViewerCount();}
     $('settings').classList.remove('hidden');
   }
   var libRows=[];
@@ -1195,13 +1223,20 @@
     if(!fbDb||!SPACE)return;
     fbDb.collection('tinyCards').doc(SPACE).get().then(function(doc){
       var rows=(doc.exists&&doc.data().cards)||[];libRows=rows;
-      if(!rows.length)return;
+      if(!rows.length){$('setLibStats').textContent='';return;}
       var photos=0,people={};
       rows.forEach(function(r){photos+=(r.paths||[]).length;people[r.sender||'Unknown']=1;});
       $('setLibStats').textContent=rows.length+' cards · '+photos+' photos · '+Object.keys(people).length+' people';
-      $('setStatsRow').classList.remove('hidden');
       $('wipeSep').classList.remove('hidden');
       $('setWipe').classList.remove('hidden');
+    }).catch(function(){});
+  }
+  // Family viewers count for the Settings row.
+  function loadViewerCount(){
+    var el=$('setShareCount');if(!el)return;el.textContent='';el.classList.remove('invite');
+    fbDb.collection('cardViewers').doc(SPACE).collection('viewers').get().then(function(qs){
+      if(qs.size>0){el.textContent=String(qs.size);el.classList.remove('invite');}
+      else{el.textContent='Invite';el.classList.add('invite');}
     }).catch(function(){});
   }
   // Delete All Cards — identical flow to the View tab (type-to-confirm).
@@ -1241,33 +1276,44 @@
   function openShare(){
     closeSettings();
     $('shareLinkRow').classList.add('hidden');
-    $('shareNew').textContent='Create invite link';$('shareNew').disabled=false;
+    $('shareNew').disabled=false;
     $('share').classList.remove('hidden');
-    loadViewers();
+    loadViewers();      // picks the empty hero vs the viewer list + button label
   }
   function closeShare(){$('share').classList.add('hidden');}
   $('setShare').onclick=openShare;
   $('shareClose').onclick=closeShare;
   $('share').onclick=function(e){if(e.target===$('share'))closeShare();};
+  // Invite by email: mint a reusable invite link, reveal it (copy fallback), and
+  // open the user's mail app with the link prefilled.
   $('shareNew').onclick=function(){
-    var b=$('shareNew');b.disabled=true;b.textContent='Creating…';
+    var b=$('shareNew'),old=b.textContent;b.disabled=true;b.textContent='Creating…';
     fns().httpsCallable('createInvite')({}).then(function(r){
       var code=(r&&r.data&&r.data.code)||'';
-      $('shareLink').value='https://cards.tinywins.space/cards.html?invite='+code;
-      $('shareLinkRow').classList.remove('hidden');
-      b.textContent='Create another link';b.disabled=false;$('shareLink').focus();$('shareLink').select();
-    }).catch(function(e){b.textContent='Create invite link';b.disabled=false;openAlert('Could not create an invite link. Please try again.','Invite');if(window.console)console.warn(e);});
+      var link='https://cards.tinywins.space/cards.html?invite='+code;
+      $('shareLink').value=link;$('shareLinkRow').classList.remove('hidden');
+      b.disabled=false;b.textContent=old;
+      emailInvite(link);
+    }).catch(function(e){b.disabled=false;b.textContent=old;openAlert('Could not create an invite. Please try again.','Invite');if(window.console)console.warn(e);});
   };
+  function emailInvite(link){
+    var subj=encodeURIComponent('View my cards on Tiny Cards');
+    var body=encodeURIComponent('I’d like to share my greeting-card archive with you — view only.\n\nOpen this link and sign in with Google:\n'+link);
+    try{var a=document.createElement('a');a.href='mailto:?subject='+subj+'&body='+body;a.style.display='none';document.body.appendChild(a);a.click();document.body.removeChild(a);}catch(e){}
+  }
   $('shareCopy').onclick=function(){
     var v=$('shareLink').value,done=function(){$('shareCopy').textContent='Copied';setTimeout(function(){$('shareCopy').textContent='Copy';},1500);};
     if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(v).then(done,function(){$('shareLink').select();document.execCommand('copy');done();});}
     else{$('shareLink').select();document.execCommand('copy');done();}
   };
   function loadViewers(){
-    var list=$('shareList');list.innerHTML='<div class="share-empty">Loading…</div>';
+    var list=$('shareList');list.innerHTML='';
     fbDb.collection('cardViewers').doc(SPACE).collection('viewers').get().then(function(qs){
-      list.innerHTML='';
-      if(qs.empty){list.innerHTML='<div class="share-empty">No one yet.</div>';return;}
+      var has=qs.size>0;
+      $('shareHero').classList.toggle('hidden',has);       // hero only when no viewers
+      $('shareListWrap').classList.toggle('hidden',!has);
+      $('shareNew').textContent=has?'Invite another':'Invite by email';
+      if(!has)return;
       qs.forEach(function(doc){
         var d=doc.data()||{};
         var row=document.createElement('div');row.className='share-row';
@@ -1280,7 +1326,11 @@
         };
         row.appendChild(who);row.appendChild(rm);list.appendChild(row);
       });
-    }).catch(function(e){list.innerHTML='<div class="share-empty">Couldn’t load the list.</div>';if(window.console)console.warn(e);});
+    }).catch(function(e){
+      $('shareHero').classList.remove('hidden');$('shareListWrap').classList.add('hidden');
+      $('shareNew').textContent='Invite by email';
+      if(window.console)console.warn(e);
+    });
   }
   $('setExport').onclick=function(){
     if(!isOwner())return;
