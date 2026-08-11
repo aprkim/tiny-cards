@@ -97,21 +97,16 @@
      padding (matching the page margin), so chips line up with the content at
      rest, the next chip peeks at the edge to hint scrolling, and the last chip
      clears the edge instead of being cut mid-text. */
-  /* One horizontal-scroll container holding two flex rows. Chips are dealt into
-     the rows in order (1st→row 1, 2nd→row 2, 3rd→row 1 …); each chip is only as
-     wide as its content (no column alignment). Stays within the content width
-     (aligned with the search box); right padding keeps the last chip from being
-     clipped at the scroll end. */
+  /* Fixed 2-line filter strip (no scroll): the "All years" chip first, then the
+     top senders by card count. Wraps and clips to two rows via max-height; any
+     chips that don't fit are hidden. */
   .chips{
-    display:flex;flex-direction:column;align-items:flex-start;gap:8px;
-    margin:12px 0 20px;padding:6px 14px 6px 0;
-    overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;
+    display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 20px;
+    max-height:74px;overflow:hidden;      /* two 32px rows + 8px gap, with a cushion */
   }
-  .chips::-webkit-scrollbar{display:none}
-  .chiprow{display:flex;flex-wrap:nowrap;gap:8px;width:max-content}
-  .chiprow:empty{display:none}
   .chip{
-    flex:0 0 auto;font:inherit;font-size:13px;padding:6px 13px;border-radius:100px;white-space:nowrap;
+    flex:0 0 auto;font:inherit;font-size:13px;height:32px;line-height:30px;padding:0 13px;
+    border-radius:100px;white-space:nowrap;box-sizing:border-box;
     border:1px solid var(--rule);background:var(--field);color:var(--ink);cursor:pointer;
   }
   /* hover:hover only, so a tap on touch doesn't leave a sticky accent border */
@@ -490,10 +485,7 @@
   <section id="view" class="hidden">
     <select id="spaceSwitcher" class="switcher hidden" aria-label="Choose an archive"></select>
     <input type="search" id="q" placeholder="Search a name or occasion" autocomplete="off">
-    <div class="chips" id="people">
-      <div class="chiprow" id="peopleR1"></div>
-      <div class="chiprow" id="peopleR2"></div>
-    </div>
+    <div class="chips" id="people"></div>
     <div id="groups"></div>
   </section>
 
@@ -644,7 +636,7 @@
         <span>Delete All Cards</span>
       </button>
     </div>
-    <p class="setver">v2026.08.11.16</p>
+    <p class="setver">v2026.08.11.17</p>
   </div>
 </div>
 
@@ -1070,7 +1062,7 @@
         cards=[];fromCloud=true;
         $('start').classList.add('hidden');
         $('view').classList.remove('hidden');
-        $('peopleR1').innerHTML='';$('peopleR2').innerHTML='';$('meta').textContent='';
+        $('people').innerHTML='';$('meta').textContent='';
         $('groups').innerHTML='<p class="empty">'+(isOwner()?'No cards yet — scan your first from the home screen.':'No cards in this shared archive yet.')+'</p>';
         loadSpaces();return;
       }
@@ -1169,7 +1161,6 @@
     return (DP_MONTHS[parseInt(m[2],10)-1]||'')+' '+parseInt(m[3],10);
   }
 
-  var showAllPeople=false;
   var yearFilter=null;
 
   // Year filter, rendered as the first chip in the sender strip: a native <select>
@@ -1189,37 +1180,20 @@
     return sel;
   }
 
+  // Fixed 2-line strip: the year chip first, then senders by card count (desc).
+  // CSS wraps + clips to two rows, so only the top senders that fit are shown.
   function people(){
-    var c={},r1=$('peopleR1'),r2=$('peopleR2');
-    r1.innerHTML='';r2.innerHTML='';
-    var items=[];                                       // built in order, then dealt into 2 rows
-    var yc=buildYearChip();if(yc)items.push(yc);        // year filter sits first
+    var c={},box=$('people');box.innerHTML='';
+    var yc=buildYearChip();if(yc)box.appendChild(yc);   // year filter sits first
     cards.forEach(function(x){if(x.ok)c[x.person]=(c[x.person]||0)+1});
     var names=Object.keys(c).sort(function(a,b){return c[b]-c[a]||a.localeCompare(b)});
-
-    // Previously this silently cut off at 14, so senders beyond that simply
-    // did not appear and nothing said so. Now the rest are one tap away.
-    var LIMIT=7;
-    var shown=(showAllPeople||names.length<=LIMIT)?names:names.slice(0,LIMIT);
-
-    shown.forEach(function(n){
+    names.forEach(function(n){
       var b=document.createElement('button');
       b.className='chip'+(filter===n?' on':'');b.type='button';
       b.innerHTML=esc(n)+'<b>'+c[n]+'</b>';
       b.onclick=function(){filter=(filter===n?null:n);people();render()};
-      items.push(b);
+      box.appendChild(b);
     });
-
-    if(names.length>LIMIT){
-      var more=document.createElement('button');
-      more.className='chip';more.type='button';
-      more.textContent=showAllPeople?'Show fewer':'+'+(names.length-LIMIT)+' more';
-      more.onclick=function(){showAllPeople=!showAllPeople;people()};
-      items.push(more);
-    }
-
-    // Deal alternately: 1st→row 1, 2nd→row 2, 3rd→row 1 … (content-width chips).
-    items.forEach(function(el,i){(i%2===0?r1:r2).appendChild(el);});
   }
 
   function render(){
