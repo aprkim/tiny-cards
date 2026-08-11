@@ -104,6 +104,7 @@
     display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 20px;
     max-height:74px;overflow:hidden;      /* two 32px rows + 8px gap, with a cushion */
   }
+  .chips.expanded{max-height:none;overflow:visible}   /* "+N more" tapped: show all */
   .chip{
     flex:0 0 auto;font:inherit;font-size:13px;height:32px;line-height:30px;padding:0 13px;
     border-radius:100px;white-space:nowrap;box-sizing:border-box;
@@ -113,8 +114,8 @@
   @media (hover:hover){.chip:hover{border-color:var(--accent);color:var(--accent)}}
   .chip.on{background:var(--ink);border-color:var(--ink);color:#fff}
   .chip b{font-weight:500;opacity:.5;margin-left:5px}
-  /* "+N more" indicator (last chip when senders overflow the two lines). */
-  .morechip{color:var(--muted);cursor:default;pointer-events:none}
+  /* "+N more" / "Show less" — tappable chip to expand/collapse the strip. */
+  .morechip{color:var(--muted)}
   /* Year filter is the first chip: a native <select> dressed as a pill so it keeps
      the OS dropdown picker. Extra right padding leaves room for the caret. */
   .yearchip{
@@ -636,7 +637,7 @@
         <span>Delete All Cards</span>
       </button>
     </div>
-    <p class="setver">v2026.08.11.18</p>
+    <p class="setver">v2026.08.11.19</p>
   </div>
 </div>
 
@@ -903,7 +904,7 @@
   $('setSignOut').onclick=function(){closeSettings();doSignOut()};
   function doSignOut(){
     var reset=function(){
-      authUser=null;myUid=null;SPACE=null;cards=[];filter=null;yearFilter=null;
+      authUser=null;myUid=null;SPACE=null;cards=[];filter=null;yearFilter=null;showAllPeople=false;
       var sw=$('spaceSwitcher');if(sw){sw.classList.add('hidden');sw.innerHTML='';}
       $('gearBtn').classList.add('hidden');
       $('view').classList.add('hidden');
@@ -1140,7 +1141,7 @@
     });
     sel.innerHTML=html;sel.value=SPACE;sel.classList.remove('hidden');
     sel.onchange=function(){
-      SPACE=sel.value;$('groups').innerHTML='';$('q').value='';filter=null;yearFilter=null;
+      SPACE=sel.value;$('groups').innerHTML='';$('q').value='';filter=null;yearFilter=null;showAllPeople=false;
       $('cloudSub').textContent='Opening…';loadCloud();
     };
   }
@@ -1163,6 +1164,7 @@
   }
 
   var yearFilter=null;
+  var showAllPeople=false;   // tapping "+N more" expands the strip to show every sender
 
   // Year filter, rendered as the first chip in the sender strip: a native <select>
   // styled as a pill (keeps the OS picker). Built from all cards in the space, so
@@ -1181,11 +1183,12 @@
     return sel;
   }
 
-  // Fixed 2-line strip: the year chip first, then senders by card count (desc).
-  // Renders all, then truncates to two rows with a "+N more" chip in the last
-  // slot for whatever didn't fit (no scroll, no full list — search finds the rest).
+  // Filter strip: the year chip first, then senders by card count (desc).
+  // Collapsed (default): clipped to two rows with a tappable "+N more" chip.
+  // Expanded (after tapping it): all senders shown, with a "Show less" chip.
   function people(){
     var c={},box=$('people');box.innerHTML='';
+    box.classList.toggle('expanded',showAllPeople);
     var yc=buildYearChip();if(yc)box.appendChild(yc);   // year filter sits first
     cards.forEach(function(x){if(x.ok)c[x.person]=(c[x.person]||0)+1});
     var names=Object.keys(c).sort(function(a,b){return c[b]-c[a]||a.localeCompare(b)});
@@ -1196,10 +1199,18 @@
       b.onclick=function(){filter=(filter===n?null:n);people();render()};
       box.appendChild(b);
     });
-    truncateChips(box,names.length);
+    if(showAllPeople){
+      if(names.length)box.appendChild(moreChip('Show less',function(){showAllPeople=false;people();}));
+    }else{
+      truncateChips(box,names.length);
+    }
   }
-  // Keep only what fits in two rows; if senders were cut, add a "+N more" chip
-  // (informational) as the last chip. N counts the senders that aren't shown.
+  function moreChip(text,onclick){
+    var b=document.createElement('button');b.type='button';b.className='chip morechip';b.textContent=text;b.onclick=onclick;
+    return b;
+  }
+  // Keep only what fits in two rows; if senders were cut, add a tappable "+N more"
+  // chip (expands to show all) as the last chip. N counts the senders not shown.
   function truncateChips(box,totalSenders){
     if(!box.getClientRects().length)return;                 // not laid out yet
     var limit=box.getBoundingClientRect().top+parseFloat(getComputedStyle(box).maxHeight||'0');
@@ -1211,7 +1222,7 @@
     while(box.children.length>firstOver)box.removeChild(box.lastChild);
     var shown=box.querySelectorAll('.chip:not(.yearchip)').length;
     var hidden=totalSenders-shown;
-    var more=document.createElement('span');more.className='chip morechip';more.textContent='+'+hidden+' more';
+    var more=moreChip('+'+hidden+' more',function(){showAllPeople=true;people();});
     box.appendChild(more);
     while(over(more)){                                       // make room for the +N chip
       var prev=more.previousElementSibling;
