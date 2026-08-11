@@ -399,7 +399,7 @@
   /* Year / Month / Day dropdowns share one row */
   .datesel{display:flex;gap:8px}
   .datesel select{flex:1;min-width:0}
-  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .chips{display:flex;flex-wrap:nowrap;overflow:hidden;gap:6px;margin-top:8px}
   .chip{
     font:inherit;font-size:13px;padding:5px 12px;border-radius:100px;
     border:1px solid var(--rule);background:var(--field);color:var(--ink);cursor:pointer;
@@ -750,6 +750,7 @@
           </optgroup>
           <option value="__other">Other&hellip;</option>
         </select>
+        <div class="chips" id="occChips"></div>
       </div>
     <div class="field">
         <label for="dateY">Date</label>
@@ -844,7 +845,7 @@
         <span>Delete All Cards</span>
       </button>
     </div>
-    <p class="setver">v2026.08.11.23</p>
+    <p class="setver">v2026.08.11.24</p>
   </div>
 </div>
 
@@ -1407,6 +1408,7 @@
     authUser=u;
     SPACE=u.uid;
     enterScanner();
+    loadSuggestions();
   }
   currentUser().then(function(u){
     if(u){afterAuth(u);return}
@@ -2097,19 +2099,46 @@
     $('preview').innerHTML=s?html:'<em>'+html+'</em>';
   }
 
-  function chipRow(box,list,input){
+  // Quick-pick suggestions, derived from the 10 most recently added cards.
+  // Each field is computed independently: deduped, most-recent-first, top 3.
+  var sugFrom=[],sugTo=[],sugOcc=[];
+  function uniq3(arr){
+    var out=[],seenv={};
+    arr.forEach(function(v){if(v&&!seenv[v]){seenv[v]=1;out.push(v);}});
+    return out.slice(0,3);
+  }
+  function loadSuggestions(){
+    if(!fbDb||!SPACE)return;
+    fbDb.collection('tinyCards').doc(SPACE).get().then(function(doc){
+      var rows=(doc.exists&&doc.data().cards)||[];
+      var recent=rows.slice(-10).reverse();          // 10 most recently added, newest first
+      sugFrom=uniq3(recent.map(function(r){return clean(r.sender)}));
+      sugTo  =uniq3(recent.map(function(r){return clean(r.recipient)}));
+      sugOcc =uniq3(recent.map(function(r){return clean(r.occasion)}));
+      chips();                                        // re-render if the form is visible
+    }).catch(function(){});
+  }
+  function sugRow(box,list,onpick){
+    if(!box)return;
     box.innerHTML='';
-    list.slice(-6).reverse().forEach(function(n){
+    list.forEach(function(v){
       var b=document.createElement('button');
-      b.className='chip';b.type='button';b.textContent=n;
-      b.onclick=function(){input.value=n;paintName()};
+      b.className='chip';b.type='button';b.textContent=v;
+      b.onclick=function(){onpick(v)};
       box.appendChild(b);
     });
   }
-
+  function pickOccasion(v){                            // fill the dropdown (or Other… + custom)
+    var sel=$('event');
+    var preset=[].some.call(sel.options,function(o){return o.value===v;});
+    if(preset){sel.value=v;$('otherWrap').classList.add('hidden');}
+    else{sel.value='__other';$('otherWrap').classList.remove('hidden');$('eventOther').value=v;}
+    paintName();
+  }
   function chips(){
-    chipRow($('chips'),seen,$('sender'));
-    chipRow($('toChips'),seenTo,$('recipient'));
+    sugRow($('chips'),   sugFrom, function(v){$('sender').value=v;paintName()});
+    sugRow($('toChips'), sugTo,   function(v){$('recipient').value=v;paintName()});
+    sugRow($('occChips'),sugOcc,  pickOccasion);
   }
 
   ['sender','recipient','event','eventOther'].forEach(function(id){
