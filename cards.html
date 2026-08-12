@@ -390,6 +390,7 @@
   #shareOff{display:block;margin:6px auto 0;font:inherit;font-size:13px;background:none;border:none;color:var(--muted);cursor:pointer;text-decoration:underline;text-underline-offset:2px}
   #shareOff:hover{color:var(--ink)}
   #shareOff:disabled{opacity:.6;cursor:progress;text-decoration:none}
+  .share-busy{min-height:180px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:14px}
   .share-people-h{font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px}
   .share-list{display:flex;flex-direction:column;gap:8px;margin-bottom:18px;max-height:180px;overflow-y:auto}
   .share-row{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:14px}
@@ -455,10 +456,6 @@
   /* Year / Month / Day dropdowns share one row */
   .edit .datesel{display:flex;gap:8px}
   .edit .datesel select{flex:1;min-width:0}
-  .edit .epages{display:flex;flex-direction:column;gap:8px}
-  .edit .epagerow{display:flex;align-items:center;gap:10px}
-  .edit .epagerow img{width:40px;height:52px;flex:0 0 auto;object-fit:cover;border-radius:6px;border:1px solid var(--rule);background:var(--field)}
-  .edit select.elabel{width:auto;flex:1;font-size:14px;padding:8px 30px 8px 10px;text-transform:capitalize}
   .edit .act{display:flex;gap:8px;margin-top:14px}
   .edit .act button{
     flex:1;font:inherit;font-size:14px;font-weight:600;padding:11px;border-radius:9px;
@@ -556,7 +553,7 @@
   </section>
 
   <section id="view" class="hidden">
-    <select id="spaceSwitcher" class="switcher hidden" aria-label="Choose a collection"></select>
+    <select id="spaceSwitcher" class="switcher hidden" aria-label="Choose whose cards to view"></select>
     <input type="search" id="q" placeholder="Search a name or occasion" autocomplete="off">
     <div class="chips" id="people"></div>
     <div id="groups"></div>
@@ -628,9 +625,6 @@
       </div>
     </div>
     <div class="f hidden" id="eOtherWrap"><label for="eEventOther">Occasion name</label><input type="text" id="eEventOther" autocomplete="off" placeholder="Baptism"></div>
-    <div class="f" id="ePagesWrap"><label>Pages</label>
-      <div class="epages" id="ePages"></div>
-    </div>
     <div class="act">
       <button type="button" id="eSave">Save</button>
       <button type="button" class="sec" id="eCancel">Cancel</button>
@@ -711,7 +705,7 @@
         <span>Delete All Cards</span>
       </button>
     </div>
-    <p class="setver">v2026.08.12.2</p>
+    <p class="setver">v2026.08.12.3</p>
   </div>
 </div>
 
@@ -723,6 +717,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
     </button>
     <h2 id="shareTitle">Family viewers</h2>
+    <div id="shareBusy" class="share-busy hidden">Loading…</div>
 
     <div id="shareHero" class="share-hero hidden">
       <div class="share-heroicon" aria-hidden="true">
@@ -942,15 +937,21 @@
   }
   function openShare(){
     closeSettings();
-    $('shareLinkRow').classList.add('hidden');$('shareOff').classList.add('hidden');
-    $('shareNew').disabled=true;
+    // Open straight into a stable loading state, then render the real content once
+    // BOTH lookups (viewers + current invite link) resolve — so the sheet appears
+    // in its final layout instead of flashing a stale frame and jumping twice.
+    ['shareHero','shareListWrap','shareLinkRow','shareOff','shareNew'].forEach(function(id){$(id).classList.add('hidden');});
+    $('shareBusy').classList.remove('hidden');
     $('share').classList.remove('hidden');
-    loadViewers();                          // empty hero vs viewer list
-    // Show the CURRENT active link (one at a time, 7-day) — don't mint a new one
-    // just by opening the sheet; creating/turning off are explicit actions.
-    fns().httpsCallable('getInvite')({}).then(function(r){
-      paintInvite((r&&r.data&&r.data.code)||'');$('shareNew').disabled=false;
-    }).catch(function(){paintInvite('');$('shareNew').disabled=false;});
+    Promise.all([
+      fns().httpsCallable('getInvite')({}).then(function(r){return (r&&r.data&&r.data.code)||'';},function(){return '';}),
+      fetchViewers().catch(function(){return null;})   // null → empty-hero fallback
+    ]).then(function(res){
+      $('shareBusy').classList.add('hidden');
+      $('shareNew').classList.remove('hidden');$('shareNew').disabled=false;
+      renderViewers(res[1]);
+      paintInvite(res[0]);
+    });
   }
   function closeShare(){$('share').classList.add('hidden');}
   $('setShare').onclick=openShare;
@@ -984,31 +985,32 @@
     else{sel();}
   }
   $('shareCopy').onclick=copyInvite;
-  function loadViewers(){
-    var list=$('shareList');list.innerHTML='';
-    fbDb.collection('cardViewers').doc(myUid).collection('viewers').get().then(function(qs){
-      var has=qs.size>0;
-      $('shareHero').classList.toggle('hidden',has);       // hero only when no viewers
-      $('shareListWrap').classList.toggle('hidden',!has);
-      if(!has)return;
-      qs.forEach(function(doc){
-        var d=doc.data()||{};
-        var row=document.createElement('div');row.className='share-row';
-        var who=document.createElement('span');who.className='who';who.textContent=d.email||doc.id;
-        var rm=document.createElement('button');rm.type='button';rm.textContent='Remove';
-        rm.onclick=function(){
-          rm.disabled=true;rm.textContent='…';
-          fns().httpsCallable('revokeViewer')({viewerUid:doc.id}).then(loadViewers)
-            .catch(function(e){rm.disabled=false;rm.textContent='Remove';openAlert('Could not remove that person. Please try again.','Viewers');if(window.console)console.warn(e);});
-        };
-        row.appendChild(who);row.appendChild(rm);list.appendChild(row);
-      });
-    }).catch(function(e){
-      // Fall back to the hero so the invite action stays reachable.
-      $('shareHero').classList.remove('hidden');$('shareListWrap').classList.add('hidden');
-      if(window.console)console.warn(e);
+  function fetchViewers(){
+    return fbDb.collection('cardViewers').doc(myUid).collection('viewers').get().then(function(qs){
+      var arr=[];qs.forEach(function(doc){arr.push({uid:doc.id,email:(doc.data()||{}).email});});return arr;
     });
   }
+  // Paint the viewer list (or the empty hero). null = fetch failed → hero fallback.
+  function renderViewers(viewers){
+    var list=$('shareList');list.innerHTML='';
+    var has=!!(viewers&&viewers.length);
+    $('shareHero').classList.toggle('hidden',has);       // hero only when no viewers
+    $('shareListWrap').classList.toggle('hidden',!has);
+    if(!has)return;
+    viewers.forEach(function(v){
+      var row=document.createElement('div');row.className='share-row';
+      var who=document.createElement('span');who.className='who';who.textContent=v.email||v.uid;
+      var rm=document.createElement('button');rm.type='button';rm.textContent='Remove';
+      rm.onclick=function(){
+        rm.disabled=true;rm.textContent='…';
+        fns().httpsCallable('revokeViewer')({viewerUid:v.uid}).then(loadViewers)
+          .catch(function(e){rm.disabled=false;rm.textContent='Remove';openAlert('Could not remove that person. Please try again.','Viewers');if(window.console)console.warn(e);});
+      };
+      row.appendChild(who);row.appendChild(rm);list.appendChild(row);
+    });
+  }
+  // Refresh the list in place (used after removing a viewer).
+  function loadViewers(){return fetchViewers().then(renderViewers,function(){renderViewers(null);});}
   // Signs out on the first tap — no confirm step.
   $('setSignOut').onclick=function(){closeSettings();doSignOut()};
   function doSignOut(){
@@ -1184,7 +1186,7 @@
         $('start').classList.add('hidden');
         $('view').classList.remove('hidden');
         $('people').innerHTML='';$('meta').textContent='';
-        $('groups').innerHTML='<p class="empty">'+(isOwner()?'No cards yet — scan your first from the home screen.':'No cards in this shared collection yet.')+'</p>';
+        $('groups').innerHTML='<p class="empty">'+(isOwner()?'No cards yet — scan your first from the home screen.':'No cards shared with you yet.')+'</p>';
         loadSpaces();return;
       }
       // Resolve each page to a full URL (lightbox/download) and a thumbnail URL
@@ -1254,7 +1256,7 @@
   function loadSpaces(){
     if(!myUid)return;
     fbDb.collection('sharedWithMe').doc(myUid).collection('spaces').get().then(function(qs){
-      var shared=[];qs.forEach(function(d){shared.push({uid:d.id,email:(d.data()||{}).ownerEmail||'Shared collection'});});
+      var shared=[];qs.forEach(function(d){shared.push({uid:d.id,email:(d.data()||{}).ownerEmail||'Shared cards'});});
       renderSwitcher(shared);
     }).catch(function(){renderSwitcher([]);});
   }
@@ -1515,18 +1517,6 @@
     $('eRecipient').value=openCard.recipient||'';
     setEventSelect(openCard.event==='Unsorted'?'':openCard.event);
     setDateVal('eDateY','eDateM','eDateD',openCard.date||'');
-    // One row per displayed page: thumbnail + its label. Rebuilt each open, so
-    // Cancel discards unsaved label changes (nothing is written until Save).
-    var ep=$('ePages');ep.innerHTML='';
-    (openCard.pages||[]).forEach(function(pg){
-      var row=document.createElement('div');row.className='epagerow';
-      var img=document.createElement('img');img.src=pg.thumb||pg.url||'';img.alt='';
-      var sel=document.createElement('select');sel.className='elabel';
-      var cur=pg.label||'',opts=['front','inside','back','extra'];
-      if(opts.indexOf(cur)===-1){var o0=document.createElement('option');o0.value=cur;o0.textContent=cur||'—';o0.selected=true;sel.appendChild(o0);}
-      opts.forEach(function(o){var op=document.createElement('option');op.value=o;op.textContent=o;if(o===cur)op.selected=true;sel.appendChild(op);});
-      row.appendChild(img);row.appendChild(sel);ep.appendChild(row);
-    });
     var hidden=$('boxForm').classList.toggle('hidden');
     $('box').classList.toggle('editing',!hidden);
   };
@@ -1543,24 +1533,12 @@
     row.recipient=$('eRecipient').value.trim();
     row.occasion=readEventValue()||'Unsorted';
     row.date=getDateVal('eDateY','eDateM','eDateD');
-    // Page labels: read each select, mirror onto the displayed page object, and
-    // write into labels[] at the page's own paths[] index. Storage/paths untouched.
-    var selects=$('ePages').querySelectorAll('select.elabel'),paths=row.paths||[];
-    var newLabels=paths.map(function(p,idx){return (row.labels&&row.labels[idx])||'';});
-    (openCard.pages||[]).forEach(function(pg,i){
-      var val=selects[i]?selects[i].value:(pg.label||'');
-      pg.label=val;
-      var pi=paths.indexOf(pg.path);
-      if(pi>-1)newLabels[pi]=val;
-    });
-    row.labels=newLabels;
 
     cloudMutate(function(rows){
       return rows.map(function(x){
         if(x.id!==row.id)return x;
         x.sender=row.sender;x.recipient=row.recipient;
         x.occasion=row.occasion;x.date=row.date;
-        x.labels=row.labels;
         return x;
       });
     }).then(function(){

@@ -347,12 +347,18 @@
   }
   .pgredo:hover img,.pgredo:focus-visible img{border-color:var(--accent)}
   .pgredo:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:12px}
-  /* Label badge, bottom-left of each thumbnail (display only) */
+  /* Label badge, bottom-left of each thumbnail — a tap-to-change <select> styled as
+     the pill (opens the native picker). Same look as before + a small chevron. */
   .pgbadge{
-    position:absolute;left:6px;bottom:6px;pointer-events:none;
-    background:rgba(22,22,29,.82);color:#fff;font-size:10px;font-weight:600;
-    padding:2px 8px;border-radius:100px;text-transform:uppercase;letter-spacing:.04em;
+    position:absolute;left:6px;bottom:6px;z-index:2;cursor:pointer;
+    font:inherit;font-size:10px;font-weight:600;line-height:1.4;
+    color:#fff;background:rgba(22,22,29,.82);border:none;
+    padding:2px 17px 2px 8px;border-radius:100px;text-transform:uppercase;letter-spacing:.04em;
+    -webkit-appearance:none;appearance:none;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='8' height='6' viewBox='0 0 10 7'><path d='M1 1l4 4 4-4' fill='none' stroke='%23fff' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+    background-repeat:no-repeat;background-position:right 6px center;
   }
+  .pgbadge:focus-visible{outline:2px solid #fff;outline-offset:1px}
   /* "+ Add a photo" as the last tile in the row */
   .pgadd{
     flex:0 0 auto;height:120px;width:96px;border:1.5px dashed var(--rule);border-radius:10px;
@@ -885,7 +891,7 @@
         <span>Delete All Cards</span>
       </button>
     </div>
-    <p class="setver">v2026.08.12.2</p>
+    <p class="setver">v2026.08.12.3</p>
   </div>
 </div>
 
@@ -1133,13 +1139,13 @@
     if(n)n.textContent=exportFiles
       ? (useCloud?'Also opens the share sheet after each upload.'
                  :'Opens the share sheet so you can file each card yourself.')
-      : 'Off — cards go straight to your collection, no share sheet.';
+      : 'Off — saved straight to your cards, no share sheet.';
   }
 
   if($('expToggle')){
     $('expToggle').onclick=function(){
       if(exportFiles&&!useCloud){
-        openAlert('Turn on sending to your collection first — otherwise saving a card would do nothing.');
+        openAlert('Turn on sending to your cards first — otherwise saving a card would do nothing.');
         return;
       }
       exportFiles=!exportFiles;exportExplicit=true;
@@ -1161,7 +1167,7 @@
       : '—';
     var n=$('cloudNote');
     if(n)n.textContent=on
-      ? 'Cards upload to your collection. Sign in on any device to see them.'
+      ? 'Cards upload automatically. Sign in on any device to see them.'
       : 'Not connected — cards leave only as the files you export.';
     useCloud=on;
     if(!exportExplicit)exportFiles=!on;   // follow the sensible default
@@ -1529,9 +1535,9 @@
           recordCreated=true;
           return ref.set({cards:rows,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
         });
-      }).then(function(){pendingSync=false;upProgress('Saved to your collection',100);setTimeout(upHide,900);return true});
+      }).then(function(){pendingSync=false;upProgress('Saved to your cards',100);setTimeout(upHide,900);return true});
     }).catch(function(e){
-      upProgress('Could not reach your collection — it will retry when you save.',100,true);
+      upProgress('Could not reach your cards — it will retry when you save.',100,true);
       if(window.console)console.warn('saveCard failed',e);
       return false;
     });
@@ -2101,9 +2107,14 @@
       };
       holder.appendChild(im);
 
-      // Label badge, bottom-left (display only — change it inside the viewer)
-      var badge=document.createElement('span');
-      badge.className='pgbadge';badge.textContent=lbl;
+      // Label badge doubles as a tap-to-change control: a styled <select> of the
+      // four LABELS. Changing it updates this photo's label + the filename at once.
+      var badge=document.createElement('select');
+      badge.className='pgbadge';badge.setAttribute('aria-label','Label for photo '+(i+1));
+      var cur=pageLabels[i]||'';
+      if(LABELS.indexOf(cur)===-1){var o0=document.createElement('option');o0.value=cur;o0.textContent=lbl.toUpperCase();o0.selected=true;badge.appendChild(o0);}
+      LABELS.forEach(function(o){var op=document.createElement('option');op.value=o;op.textContent=o.toUpperCase();if(o===cur)op.selected=true;badge.appendChild(op);});
+      badge.onchange=function(){setLabel(i,badge.value);};
       d.appendChild(badge);
 
       t.appendChild(d);
@@ -2318,7 +2329,7 @@
     $('meta').classList.add('hidden');
     $('finish').classList.remove('hidden');document.body.classList.remove('scanning');
     var where=[];
-    if(useCloud)where.push(cloudFailed?'your collection could not be reached':'sent to your collection');
+    if(useCloud)where.push(cloudFailed?'your cards could not be reached':'sent to your cards');
     if(!where.length)where.push('nothing was kept on this device');
     $('tally').textContent=savedCards+' card'+(savedCards===1?'':'s')+' saved so far'+
       (savedFiles?' ('+savedFiles+' files)':'')+' — '+where.join(', ')+'.'+
