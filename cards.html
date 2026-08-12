@@ -638,7 +638,7 @@
         <span>Delete All Cards</span>
       </button>
     </div>
-    <p class="setver">v2026.08.11.30</p>
+    <p class="setver">v2026.08.11.31</p>
   </div>
 </div>
 
@@ -1029,18 +1029,28 @@
     if(u){
       authUser=u;
       openArchive();
-    }else{
+    }else if(inviteCode){
+      // Invite link, signed out: keep the in-page "You’re invited" sign-in —
+      // redirecting to home would drop the ?invite= code and break the share.
       paintCloudButton();
-      if(inviteCode){                    // arrived via an invite link, signed out
-        $('cloudTitle').textContent='You’re invited';
-        $('cloudSub').textContent='Sign in with Google to view the shared cards';
-      }
+      $('cloudTitle').textContent='You’re invited';
+      $('cloudSub').textContent='Sign in with Google to view the shared cards';
       $('start').classList.remove('hidden');
       if(fbReady){
         firebase.auth().getRedirectResult().then(function(r){
           if(r&&r.user){authUser=r.user;openArchive()}
         }).catch(function(){});
       }
+    }else{
+      // Normal signed-out visit: go to the home sign-in page, same as the Scan
+      // tab. Resolve any pending redirect sign-in first, then bounce home.
+      var goHome=function(){location.replace('./')};
+      if(fbReady){
+        firebase.auth().getRedirectResult().then(function(r){
+          if(r&&r.user){authUser=r.user;openArchive();return}
+          goHome();
+        }).catch(goHome);
+      }else{goHome();}
     }
   });
 

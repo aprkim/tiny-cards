@@ -403,14 +403,15 @@
   }
   .warn b{font-weight:600}
 
+  /* Filename preview: plain muted text (matches the From/To/Occasion labels),
+     no pill background/border. */
   .name{
-    background:var(--ink);border-radius:12px;padding:14px 16px;
-    margin-bottom:20px;font-weight:500;letter-spacing:0;
-    font-variant-numeric:tabular-nums;overflow-wrap:anywhere;line-height:1.7;
+    background:none;padding:0;margin:6px 0 14px;
+    font-variant-numeric:tabular-nums;overflow-wrap:anywhere;line-height:1.5;text-align:left;
   }
-  .name i{display:block;font-style:normal;font-size:13.5px;color:#fff}
-  .name i+i{margin-top:3px}
-  .name em i{color:rgba(255,255,255,.72)}
+  .name i{display:block;font-style:normal;font-size:13px;color:var(--muted)}
+  .name i+i{margin-top:2px}
+  .name em i{color:var(--muted);opacity:.6}
 
   label{display:block;font-size:12.5px;font-weight:600;color:var(--muted);margin-bottom:6px}
   .field{margin-bottom:16px}
@@ -884,7 +885,7 @@
         <span>Delete All Cards</span>
       </button>
     </div>
-    <p class="setver">v2026.08.11.30</p>
+    <p class="setver">v2026.08.11.31</p>
   </div>
 </div>
 
