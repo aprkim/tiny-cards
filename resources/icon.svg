@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <rect width="1024" height="1024" fill="#FAF9F6"/>
+  <g transform="translate(512,512) scale(4.8) translate(-60,-75)">
+    <!-- back card, rotated (accent-soft fill) -->
+    <g transform="rotate(-9 52 75)">
+      <rect x="0" y="12" width="104" height="126" rx="12" fill="#FBEDF2" stroke="#B0184F" stroke-width="2.5"/>
+    </g>
+    <!-- front card (white) -->
+    <rect x="24" y="0" width="102" height="150" rx="12" fill="#ffffff" stroke="#B0184F" stroke-width="2.5"/>
+    <!-- heart (62px from 24x24 viewBox, centered on front card) -->
+    <g transform="translate(44,44) scale(2.58333)">
+      <path d="M12 20.5l-6.9-6.6C2.6 11.5 3.4 7.6 6.6 6.4c1.9-.7 4 .1 5.4 1.8 1.4-1.7 3.5-2.5 5.4-1.8 3.2 1.2 4 5.1 1.5 7.5L12 20.5z" fill="#B0184F"/>
+    </g>
+  </g>
+</svg>
