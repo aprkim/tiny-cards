@@ -14,6 +14,7 @@
 const {onObjectFinalized} = require('firebase-functions/v2/storage');
 const {onCall, onRequest, HttpsError} = require('firebase-functions/v2/https');
 const {setGlobalOptions} = require('firebase-functions/v2');
+const {defineSecret} = require('firebase-functions/params');
 const logger = require('firebase-functions/logger');
 const admin = require('firebase-admin');
 const sharp = require('sharp');
@@ -24,6 +25,10 @@ admin.initializeApp();
 
 // us-east1 matches the Storage bucket, so reads are same-region
 setGlobalOptions({region: 'us-east1', maxInstances: 10});
+
+// Anthropic API key for handwriting transcription (see transcribeCard).
+// Set with: firebase functions:secrets:set ANTHROPIC_API_KEY
+const ANTHROPIC_API_KEY = defineSecret('ANTHROPIC_API_KEY');
 
 // Access model: each user owns tinyCards/{uid}. Read access to another user's
 // space is granted by a `viewOf` custom claim (see redeemInvite). Mirrors rules.
@@ -301,3 +306,112 @@ exports.revokeViewer = onCall(async (req) => {
 
 // (The one-off `migrateFamily` function was removed after the family → per-uid
 // migration completed; the original `family` data is kept as a backup.)
+
+/**
+ * On-demand handwriting transcription. Owner-only: the callable wrapper verifies
+ * the Firebase ID token (same guarantee as the export function) and we only ever
+ * read/write the caller's own tinyCards/{uid}. Fetches the card's inside image
+ * from Storage, sends it to Claude, and auto-saves the text onto the card before
+ * any edit. A silent lifetime cap guards against runaway API cost.
+ */
+const TRANSCRIBE_CAP = 300;          // lifetime transcriptions per user
+const TRANSCRIBE_MAX_PX = 1.5e6;     // downscale bigger images to control token cost
+const TRANSCRIBE_PROMPT =
+  'Transcribe this handwritten card message exactly as written. Preserve line ' +
+  'breaks. Output only the transcription, no commentary.';
+
+exports.transcribeCard = onCall(
+  {secrets: [ANTHROPIC_API_KEY], memory: '1GiB', timeoutSeconds: 120},
+  async (req) => {
+    const auth = req.auth;
+    requireVerified(auth);                                   // verified owner only
+    const uid = auth.uid;
+    const cardId = String((req.data && req.data.cardId) || '').trim();
+    const path = String((req.data && req.data.path) || '').trim();
+    if (!cardId || !path) throw new HttpsError('invalid-argument', 'Missing cardId or path.');
+
+    const db = admin.firestore();
+    const usageRef = db.collection('transcriptions').doc(uid);
+    const cardsRef = db.collection('tinyCards').doc(uid);
+
+    // 1) Usage cap — read the counter (missing doc = 0). Enforced before any API call.
+    const usageSnap = await usageRef.get();
+    const count = (usageSnap.exists && Number(usageSnap.data().count)) || 0;
+    if (count >= TRANSCRIBE_CAP) throw new HttpsError('resource-exhausted', 'limit-reached');
+
+    // 2) Load the card from the caller's own space and verify the supplied path
+    //    actually belongs to it — never trust a client Storage path on its own.
+    const cardsSnap = await cardsRef.get();
+    const rows = (cardsSnap.exists && cardsSnap.data().cards) || [];
+    const card = rows.find((c) => c && c.id === cardId);
+    if (!card) throw new HttpsError('not-found', 'Card not found.');
+    if (!Array.isArray(card.paths) || card.paths.indexOf(path) === -1) {
+      throw new HttpsError('permission-denied', 'That image is not part of this card.');
+    }
+
+    // 3) Fetch + downscale the image (EXIF-rotated, JPEG, <=~1.5 MP).
+    let b64;
+    try {
+      const [buf] = await admin.storage().bucket().file(path).download();
+      let img = sharp(buf).rotate();
+      const meta = await img.metadata();
+      const px = (meta.width || 0) * (meta.height || 0);
+      if (px > TRANSCRIBE_MAX_PX && meta.width) {
+        img = img.resize({width: Math.round(meta.width * Math.sqrt(TRANSCRIBE_MAX_PX / px))});
+      }
+      b64 = (await img.jpeg({quality: 82}).toBuffer()).toString('base64');
+    } catch (e) {
+      logger.error('transcribe: image load failed', e);
+      throw new HttpsError('unavailable', 'transcription-failed');
+    }
+
+    // 4) Claude — transcribe exactly. Any failure here must NOT touch the counter.
+    let text;
+    try {
+      const resp = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'anthropic-version': '2023-06-01',
+          'x-api-key': ANTHROPIC_API_KEY.value(),
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 1024,
+          messages: [{
+            role: 'user',
+            content: [
+              {type: 'image', source: {type: 'base64', media_type: 'image/jpeg', data: b64}},
+              {type: 'text', text: TRANSCRIBE_PROMPT},
+            ],
+          }],
+        }),
+      });
+      if (!resp.ok) {
+        logger.error('transcribe: API ' + resp.status + ' ' + (await resp.text().catch(() => '')));
+        throw new Error('api ' + resp.status);
+      }
+      const data = await resp.json();
+      text = (data.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('').trim();
+      if (!text) throw new Error('empty transcription');
+    } catch (e) {
+      logger.error('transcribe: API failed', e);
+      throw new HttpsError('unavailable', 'transcription-failed');
+    }
+
+    // 5) Success — atomically save the text onto the card AND bump the counter, so
+    //    a concurrent client edit can't be clobbered and usage only rises on success.
+    await db.runTransaction(async (tx) => {
+      const s = await tx.get(cardsRef);
+      const cur = (s.exists && s.data().cards) || [];
+      const i = cur.findIndex((c) => c && c.id === cardId);
+      if (i < 0) throw new HttpsError('not-found', 'Card not found.');
+      cur[i] = Object.assign({}, cur[i], {transcription: text});
+      tx.set(cardsRef, {cards: cur, updatedAt: admin.firestore.FieldValue.serverTimestamp()}, {merge: true});
+      tx.set(usageRef, {count: admin.firestore.FieldValue.increment(1),
+                        updatedAt: admin.firestore.FieldValue.serverTimestamp()}, {merge: true});
+    });
+
+    return {text};
+  }
+);
