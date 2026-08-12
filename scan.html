@@ -110,10 +110,23 @@
   /* Entry buttons centred in the space below the header, biased slightly low for
      thumb reach. Take Photos + its tip stay grouped as one block. */
   #start{
+    position:relative;
     flex:1 1 auto;
     display:flex;flex-direction:column;justify-content:center;gap:20px;
     padding-top:24vh;  /* shift the group down so Take Photos sits ~vertical centre */
   }
+  /* Brand mark + card count filling the empty space above the buttons. Absolutely
+     positioned so it never shifts the (thumb-placed) capture buttons. */
+  .scanhero{
+    position:absolute;left:0;right:0;top:7vh;pointer-events:none;
+    display:flex;flex-direction:column;align-items:center;gap:8px;
+  }
+  .scanhero .heroart{position:relative;width:78px;height:92px;margin:0}
+  .scanhero .heroart span{position:absolute;border-radius:8px;background:#fff;border:2px solid var(--accent)}
+  .scanhero .heroart .c1{inset:7px 14px 7px 0;transform:rotate(-9deg);background:var(--accent-soft)}
+  .scanhero .heroart .c2{inset:0 0 0 15px;display:flex;align-items:center;justify-content:center}
+  .scanhero .heroart svg{width:28px;height:28px;fill:var(--accent)}
+  .scancount{margin:0;font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums}
   /* Take Photos + its tip, grouped tightly so the tip reads as attached to it. */
   .camgroup{display:flex;flex-direction:column;gap:6px}
   /* Shooting tip, sits just below the Take Photos button */
@@ -659,6 +672,15 @@
   </section>
 
   <section id="start" class="hidden">
+    <div class="scanhero" aria-hidden="true">
+      <div class="heroart">
+        <span class="c1"></span>
+        <span class="c2">
+          <svg viewBox="0 0 24 24"><path d="M12 20.5l-6.9-6.6C2.6 11.5 3.4 7.6 6.6 6.4c1.9-.7 4 .1 5.4 1.8 1.4-1.7 3.5-2.5 5.4-1.8 3.2 1.2 4 5.1 1.5 7.5L12 20.5z"/></svg>
+        </span>
+      </div>
+      <p class="scancount" id="scanCount"></p>
+    </div>
     <div class="camgroup">
       <div class="drop cam" id="camzone" tabindex="0" role="button">
         <strong>Take Photos</strong>
@@ -862,7 +884,7 @@
         <span>Delete All Cards</span>
       </button>
     </div>
-    <p class="setver">v2026.08.11.29</p>
+    <p class="setver">v2026.08.11.30</p>
   </div>
 </div>
 
@@ -2128,6 +2150,7 @@
     if(!fbDb||!SPACE)return;
     fbDb.collection('tinyCards').doc(SPACE).get().then(function(doc){
       var rows=(doc.exists&&doc.data().cards)||[];
+      var sc=$('scanCount');if(sc)sc.textContent=rows.length?plur(rows.length,'card')+' saved':'';
       var recent=rows.slice(-10).reverse();          // 10 most recently added, newest first
       sugFrom=uniq3(recent.map(function(r){return clean(r.sender)}));
       sugTo  =uniq3(recent.map(function(r){return clean(r.recipient)}));
