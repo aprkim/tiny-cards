@@ -127,6 +127,12 @@
   .scanhero .heroart .c2{inset:0 0 0 15px;display:flex;align-items:center;justify-content:center}
   .scanhero .heroart svg{width:28px;height:28px;fill:var(--accent)}
   .scancount{margin:0;font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .scanhero-link{
+    pointer-events:auto;cursor:pointer;text-decoration:none;color:inherit;
+    display:flex;flex-direction:column;align-items:center;gap:8px;padding:6px 10px;border-radius:14px;
+  }
+  @media (hover:hover){.scanhero-link:hover{opacity:.85}}
+  .scanhero-link:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   /* Take Photos + its tip, grouped tightly so the tip reads as attached to it. */
   .camgroup{display:flex;flex-direction:column;gap:6px}
   /* Shooting tip, sits just below the Take Photos button */
@@ -679,14 +685,16 @@
   </section>
 
   <section id="start" class="hidden">
-    <div class="scanhero" aria-hidden="true">
-      <div class="heroart">
-        <span class="c1"></span>
-        <span class="c2">
-          <svg viewBox="0 0 24 24"><path d="M12 20.5l-6.9-6.6C2.6 11.5 3.4 7.6 6.6 6.4c1.9-.7 4 .1 5.4 1.8 1.4-1.7 3.5-2.5 5.4-1.8 3.2 1.2 4 5.1 1.5 7.5L12 20.5z"/></svg>
-        </span>
-      </div>
-      <p class="scancount" id="scanCount"></p>
+    <div class="scanhero">
+      <a href="cards.html" class="scanhero-link" aria-label="View your cards">
+        <div class="heroart" aria-hidden="true">
+          <span class="c1"></span>
+          <span class="c2">
+            <svg viewBox="0 0 24 24"><path d="M12 20.5l-6.9-6.6C2.6 11.5 3.4 7.6 6.6 6.4c1.9-.7 4 .1 5.4 1.8 1.4-1.7 3.5-2.5 5.4-1.8 3.2 1.2 4 5.1 1.5 7.5L12 20.5z"/></svg>
+          </span>
+        </div>
+        <p class="scancount" id="scanCount"></p>
+      </a>
     </div>
     <div class="camgroup">
       <div class="drop cam" id="camzone" tabindex="0" role="button">
@@ -891,7 +899,7 @@
         <span>Delete All Cards</span>
       </button>
     </div>
-    <p class="setver">v2026.08.12.3</p>
+    <p class="setver">v2026.08.12.4</p>
   </div>
 </div>
 
