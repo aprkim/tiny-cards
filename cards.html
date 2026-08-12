@@ -206,6 +206,68 @@
   }
   .box button.boxx:hover{background:rgba(255,255,255,.16)}
   .box button.boxx svg{width:20px;height:20px;display:block}
+  /* "Read handwriting" / "View transcription" entry link — a plain muted text
+     link on the dark overlay, not a pill. Overrides the .box button pill styles. */
+  .box button.boxread{
+    border:none;background:none;padding:2px 4px;border-radius:0;text-transform:none;
+    font-size:13.5px;color:rgba(255,255,255,.55);
+    text-decoration:underline;text-underline-offset:3px;text-decoration-color:rgba(255,255,255,.28);
+  }
+  .box button.boxread:hover{background:none;color:#fff;text-decoration-color:rgba(255,255,255,.6)}
+
+  /* ---- transcription bottom sheet (dark, draggable) ----------------------------
+     A new sheet component — deliberately NOT the light static Settings/Share sheet.
+     Two detents (half ~45vh default, full ~90vh) + drag-down-to-dismiss. Kept
+     simple: no velocity/rubber-band physics. */
+  .tsheet-scrim{
+    position:fixed;inset:0;z-index:70;background:rgba(0,0,0,.5);
+    display:flex;align-items:flex-end;justify-content:center;
+  }
+  .tsheet{
+    width:100%;max-width:560px;background:#26262E;color:#fff;
+    border-radius:18px 18px 0 0;box-shadow:0 -12px 40px rgba(0,0,0,.45);
+    display:flex;flex-direction:column;height:45vh;max-height:92vh;
+    padding-bottom:env(safe-area-inset-bottom);overflow:hidden;
+    transition:height .28s cubic-bezier(.4,0,.2,1), transform .28s cubic-bezier(.4,0,.2,1);
+  }
+  .tsheet.full{height:90vh}
+  .tsheet-grip{flex:0 0 auto;height:28px;display:flex;align-items:center;justify-content:center;cursor:grab;touch-action:none}
+  .tsheet-grip::before{content:'';width:38px;height:5px;border-radius:3px;background:rgba(255,255,255,.28)}
+  .tsheet-content{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+
+  .ts-center{flex:1 1 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:20px 22px}
+  .ts-spinner{width:26px;height:26px;border-radius:50%;border:2.5px solid rgba(255,255,255,.25);border-top-color:#fff;animation:tspin .8s linear infinite}
+  @keyframes tspin{to{transform:rotate(360deg)}}
+  .ts-loadtext{color:rgba(255,255,255,.75);font-size:14.5px}
+
+  .ts-head{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;padding:2px 20px 12px}
+  .ts-title{font-size:16px;font-weight:700;color:#fff}
+  .ts-editlink{font:inherit;font-size:14px;background:none;border:none;color:rgba(255,255,255,.6);cursor:pointer;padding:4px}
+  .ts-editlink:hover{color:#fff}
+  .ts-scroll{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 20px}
+  .ts-text{white-space:pre-wrap;font-size:15px;line-height:1.6;color:rgba(255,255,255,.9)}
+  .ts-foot{flex:0 0 auto;text-align:center;font-size:12.5px;color:rgba(255,255,255,.4);padding:12px 20px 16px}
+
+  .ts-head-edit{justify-content:flex-start;position:relative}
+  .ts-cancel{font:inherit;font-size:15px;background:none;border:none;color:#FF6B85;cursor:pointer;padding:4px 0}
+  .ts-title-center{position:absolute;left:0;right:0;text-align:center;pointer-events:none}
+  .ts-editbody{flex:1 1 auto;min-height:0;display:flex;padding:0 20px}
+  .ts-textarea{
+    width:100%;height:100%;min-height:120px;resize:none;box-sizing:border-box;font:inherit;font-size:15px;line-height:1.6;
+    color:#fff;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);border-radius:12px;padding:12px 14px;
+    -webkit-appearance:none;appearance:none;
+  }
+  .ts-textarea:focus{outline:none;border-color:rgba(255,255,255,.4)}
+  .ts-savebar{flex:0 0 auto;padding:14px 20px 16px}
+  .ts-save{
+    width:100%;font:inherit;font-size:15.5px;font-weight:600;padding:15px;border-radius:12px;
+    background:var(--ink);color:#fff;border:1px solid rgba(255,255,255,.16);cursor:pointer;
+  }
+  .ts-save:hover{background:#0f0f14}
+
+  .ts-errmsg{color:rgba(255,255,255,.85);font-size:14.5px;text-align:center;line-height:1.55}
+  .ts-retry{font:inherit;font-size:14px;padding:9px 20px;border-radius:100px;border:1px solid rgba(255,255,255,.3);background:none;color:#fff;cursor:pointer}
+  .ts-retry:hover{background:rgba(255,255,255,.12)}
 
   /* ---- confirm dialog ----
      Reusable across delete, sign-out, bulk actions and export. Cream surface
@@ -504,6 +566,7 @@
     <strong id="boxName"></strong>
     <small id="boxSub"></small>
   </div>
+  <button id="boxRead" class="boxread hidden" type="button">Read handwriting</button>
   <div class="nav" id="boxNav"></div>
   <div class="rowbtns hidden" id="boxTools">
     <button class="minibtn" id="boxEdit">Edit</button>
@@ -638,7 +701,7 @@
         <span>Delete All Cards</span>
       </button>
     </div>
-    <p class="setver">v2026.08.11.32</p>
+    <p class="setver">v2026.08.12.1</p>
   </div>
 </div>
 
@@ -673,6 +736,15 @@
     </div>
 
     <button type="button" class="share-primary" id="shareNew">Invite by email</button>
+  </div>
+</div>
+
+<!-- Transcription bottom sheet: dark, draggable (half/full/dismiss). Content is
+     mock-driven for now; wired to the card + transcribeCard in later tasks. -->
+<div class="tsheet-scrim hidden" id="tScrim">
+  <div class="tsheet" id="tSheet" role="dialog" aria-modal="true" aria-label="Transcription">
+    <div class="tsheet-grip" id="tHandle" aria-hidden="true"></div>
+    <div class="tsheet-content" id="tContent"></div>
   </div>
 </div>
 
@@ -1106,7 +1178,7 @@
           return Promise.all([
             fbStore.ref().child(p).getDownloadURL().catch(function(){return null}),
             fbStore.ref().child(tp).getDownloadURL().catch(function(){return null})
-          ]).then(function(a){return {url:a[0],thumb:a[1]||a[0],label:labels[i]||''};});
+          ]).then(function(a){return {url:a[0],thumb:a[1]||a[0],label:labels[i]||'',path:p};});
         })).then(function(pgs){
           return {row:row,pages:pgs.filter(function(pg){return !!pg.url;})};
         });
@@ -1317,6 +1389,18 @@
     // read-only, so those controls must not even render for them. Download
     // stays available to anyone who can see the card.
     var owner=fromCloud&&isOwner();
+    // "Read handwriting" / "View transcription": only on the Inside page of a real
+    // cloud card. Re-evaluated here because show() re-runs on every page switch.
+    // Owners can always transcribe; viewers of a shared space are read-only — the
+    // link shows only if a transcription already exists, and opens without Edit.
+    var hasT=!!(card.raw&&card.raw.transcription);
+    var canRead=fromCloud&&p&&p.label==='inside'&&(owner||hasT);
+    var rd=$('boxRead');
+    rd.classList.toggle('hidden',!canRead);
+    if(canRead){
+      rd.textContent=hasT?'View transcription':'Read handwriting';
+      rd.onclick=function(e){e.stopPropagation();openTranscription(card,!owner);};
+    }
     $('boxTools').classList.toggle('hidden',!fromCloud);
     $('boxEdit').classList.toggle('hidden',!owner);
     $('boxCrop').classList.toggle('hidden',!owner);
@@ -1824,6 +1908,89 @@
   $('cropov').addEventListener('keydown',function(e){
     if(e.key==='Escape'&&!cbusy)closeCrop();
   });
+
+  /* ---- transcription bottom sheet ----
+     Bound to the card whose "Read handwriting"/"View transcription" link was tapped.
+     The transcript lives on card.raw.transcription: the transcribeCard function
+     auto-saves it server-side on first read; edits are persisted here via cloudMutate. */
+  var tDetent='half',tsCard=null,tsPath='',tsReadonly=false;
+  function tText(){return (tsCard&&tsCard.raw&&tsCard.raw.transcription)||'';}
+
+  function tSetDetent(d){tDetent=d;$('tSheet').classList.toggle('full',d==='full');}
+  function openSheet(state){$('tScrim').classList.remove('hidden');tSetDetent(state==='edit'?'full':'half');tRender(state);}
+  function dismissSheet(){$('tScrim').classList.add('hidden');}
+
+  // Entry point from the overlay link. Existing transcription → View; otherwise fetch.
+  function openTranscription(card,readOnly){
+    tsCard=card;tsReadonly=!!readOnly;tsPath=(card.pages[openPage]||{}).path||'';
+    if(tText())openSheet('view');            // read-only viewers only ever reach here
+    else if(!readOnly)runTranscribe();
+  }
+  function runTranscribe(){
+    openSheet('loading');
+    fns().httpsCallable('transcribeCard')({cardId:tsCard.id,path:tsPath}).then(function(r){
+      if(tsCard&&tsCard.raw)tsCard.raw.transcription=(r.data&&r.data.text)||'';
+      updateReadLink();openSheet('view');
+    }).catch(function(e){
+      openSheet((e&&e.code==='resource-exhausted')?'limit':'error');   // cap vs transient
+    });
+  }
+  function saveTranscription(text){
+    if(tsCard&&tsCard.raw)tsCard.raw.transcription=text;     // local cache
+    tSetDetent('half');tRender('view');updateReadLink();
+    var id=tsCard&&tsCard.id;
+    cloudMutate(function(rows){return rows.map(function(r){if(r&&r.id===id)r.transcription=text;return r;});})
+      .catch(function(e){if(window.console)console.warn('save transcription failed',e);});
+  }
+  // Keep the overlay link label in sync once a transcription exists.
+  function updateReadLink(){if(openCard&&openCard.raw&&openCard.raw.transcription&&!$('boxRead').classList.contains('hidden'))$('boxRead').textContent='View transcription';}
+
+  function tRender(state){
+    var c=$('tContent');
+    if(state==='loading'){
+      c.innerHTML='<div class="ts-center"><div class="ts-spinner"></div><p class="ts-loadtext">Reading handwriting…</p></div>';
+    }else if(state==='view'){
+      c.innerHTML='<div class="ts-head"><span class="ts-title">Transcription</span>'
+        +(tsReadonly?'':'<button type="button" class="ts-editlink" id="tEdit">Edit</button>')+'</div>'
+        +'<div class="ts-scroll"><div class="ts-text"></div></div>'
+        +'<p class="ts-foot">'+(tsReadonly?'Swipe down to close':'Saved · Swipe down to close')+'</p>';
+      c.querySelector('.ts-text').textContent=tText();
+      if(!tsReadonly)$('tEdit').onclick=function(){openSheet('edit');};
+    }else if(state==='edit'){
+      c.innerHTML='<div class="ts-head ts-head-edit"><button type="button" class="ts-cancel" id="tCancel">Cancel</button><span class="ts-title ts-title-center">Edit transcription</span></div>'
+        +'<div class="ts-editbody"><textarea class="ts-textarea" id="tArea"></textarea></div>'
+        +'<div class="ts-savebar"><button type="button" class="ts-save" id="tSave">Save</button></div>';
+      $('tArea').value=tText();
+      $('tCancel').onclick=function(){tSetDetent('half');tRender('view');};              // discard edits
+      $('tSave').onclick=function(){saveTranscription($('tArea').value);};
+      setTimeout(function(){try{$('tArea').focus();}catch(e){}},50);
+    }else{  // 'error' | 'limit'
+      var limit=state==='limit';
+      var msg=limit?'Transcription limit reached — contact support':'Couldn’t read this card. Check your connection and try again.';
+      c.innerHTML='<div class="ts-center"><p class="ts-errmsg"></p>'+(limit?'':'<button type="button" class="ts-retry" id="tRetry">Retry</button>')+'</div>';
+      c.querySelector('.ts-errmsg').textContent=msg;
+      if(!limit)$('tRetry').onclick=function(){runTranscribe();};
+    }
+  }
+
+  // Scrim tap dismisses.
+  $('tScrim').onclick=function(e){if(e.target===$('tScrim'))dismissSheet();};
+
+  // Grip drag: simple three-state snap (half / full / dismissed), no physics.
+  (function(){
+    var sheet=$('tSheet'),grip=$('tHandle'),dragging=false,startY=0,dy=0;
+    function end(){
+      if(!dragging)return;dragging=false;
+      sheet.style.transition='';sheet.style.transform='';
+      if(tDetent==='half'){ if(dy>90)return dismissSheet(); if(dy<-40)tSetDetent('full'); }
+      else{ if(dy>90)tSetDetent('half'); }
+    }
+    grip.addEventListener('pointerdown',function(e){dragging=true;startY=e.clientY;dy=0;sheet.style.transition='none';try{grip.setPointerCapture(e.pointerId);}catch(_){}});
+    grip.addEventListener('pointermove',function(e){if(!dragging)return;dy=e.clientY-startY;sheet.style.transform='translateY('+(dy>0?dy:Math.max(dy,-40))+'px)';});
+    grip.addEventListener('pointerup',end);
+    grip.addEventListener('pointercancel',end);
+  })();
+
 })();
 </script>
 
