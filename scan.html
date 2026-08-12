@@ -885,7 +885,7 @@
         <span>Delete All Cards</span>
       </button>
     </div>
-    <p class="setver">v2026.08.11.31</p>
+    <p class="setver">v2026.08.11.32</p>
   </div>
 </div>
 
@@ -1535,6 +1535,37 @@
       if(window.console)console.warn('saveCard failed',e);
       return false;
     });
+  }
+
+  /* ---- discard (undo the draft) ----
+     Photos are auto-saved the moment they're captured, so discarding a card must
+     also remove that draft from the cloud, or it lingers in the archive/View.
+     Chained on the same syncChain so it runs after any in-flight save (deleting
+     the final written record + files). */
+  function discardDraft(){
+    if(!useCloud)return Promise.resolve();
+    var id=curCardId;
+    if(!id)return Promise.resolve();
+    syncChain=syncChain.then(function(){return removeDraft(id)},function(){return removeDraft(id)});
+    return syncChain;
+  }
+  function removeDraft(id){
+    return currentUser().then(function(user){
+      if(!user)return;
+      var ref=fbDb.collection('tinyCards').doc(SPACE);
+      return ref.get().then(function(doc){
+        if(!doc.exists)return;
+        var rows=doc.data().cards||[],rec=null,rest=[];
+        rows.forEach(function(x){if(x&&x.id===id)rec=x;else rest.push(x)});
+        var paths=(rec&&rec.paths)||[],dels=[];
+        paths.filter(Boolean).forEach(function(p){
+          dels.push(fbStore.ref().child(p).delete().catch(function(){}));                    // photo
+          dels.push(fbStore.ref().child(p.replace(/\.[^.]+$/,'')+'_thumb.jpg').delete().catch(function(){}));  // its thumbnail
+        });
+        if(rec)dels.push(ref.set({cards:rest,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true}));
+        return Promise.all(dels);
+      });
+    }).catch(function(e){if(window.console)console.warn('discardDraft failed',e)});
   }
 
   /* ---- capture mode ----
@@ -2209,6 +2240,7 @@
       body:'The photos you just took won’t be saved.',
       confirmText:'Discard',cancelText:'Keep Editing',danger:true,confirmTop:true,
       onConfirm:function(){
+        discardDraft();                        // remove the auto-saved draft from the cloud
         pages=[];pageLabels=[];sources=[];cornerSets=[];redoIndex=-1;pageIdx=0;
         if(mode==='capture')return finish();   // tally; continue from there
         startCard();
