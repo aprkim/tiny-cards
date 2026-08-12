@@ -255,13 +255,48 @@ function requireVerified(auth) {
 // Any signed-in user can create a reusable invite to THEIR own archive.
 exports.createInvite = onCall(async (req) => {
   requireVerified(req.auth);
+  const uid = req.auth.uid;
+  const db = admin.firestore();
+  // One active link at a time: deactivate any existing codes for this owner.
+  const prior = await db.collection('invites').where('ownerUid', '==', uid).get();
+  const batch = db.batch(); let deactivated = 0;
+  prior.forEach((d) => { if (d.data().active) { batch.update(d.ref, {active: false}); deactivated++; } });
+  if (deactivated) await batch.commit();
+
   const code = crypto.randomBytes(9).toString('base64url');   // ~12 url-safe chars
-  await admin.firestore().collection('invites').doc(code).set({
-    ownerUid: req.auth.uid,
+  await db.collection('invites').doc(code).set({
+    ownerUid: uid,
     active: true,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    expiresAt: admin.firestore.Timestamp.fromMillis(Date.now() + 7 * 24 * 60 * 60 * 1000),  // 7 days
   });
   return {code};
+});
+
+// The owner's current active, non-expired invite code (or null). Read-only — the
+// share UI uses this to show the existing link instead of minting a new one.
+exports.getInvite = onCall(async (req) => {
+  requireVerified(req.auth);
+  const snap = await admin.firestore().collection('invites').where('ownerUid', '==', req.auth.uid).get();
+  const now = Date.now();
+  let code = null;
+  snap.forEach((d) => {
+    const v = d.data();
+    if (v.active === true && (!v.expiresAt || v.expiresAt.toMillis() > now)) code = d.id;
+  });
+  return {code};
+});
+
+// Turn off sharing: deactivate all of the owner's invite codes so a leaked/old
+// link stops working (does not affect already-redeemed viewers — revoke those).
+exports.revokeInvite = onCall(async (req) => {
+  requireVerified(req.auth);
+  const db = admin.firestore();
+  const snap = await db.collection('invites').where('ownerUid', '==', req.auth.uid).get();
+  const batch = db.batch(); let n = 0;
+  snap.forEach((d) => { if (d.data().active) { batch.update(d.ref, {active: false}); n++; } });
+  if (n) await batch.commit();
+  return {ok: true};
 });
 
 exports.redeemInvite = onCall(async (req) => {
@@ -270,10 +305,12 @@ exports.redeemInvite = onCall(async (req) => {
   const code = String((req.data && req.data.code) || '').trim();
   if (!code) throw new HttpsError('invalid-argument', 'Missing invite code.');
   const snap = await admin.firestore().collection('invites').doc(code).get();
-  if (!snap.exists || snap.data().active !== true) {
-    throw new HttpsError('not-found', 'This invite link is not valid or has been turned off.');
+  const v = snap.exists ? snap.data() : null;
+  const expired = !!(v && v.expiresAt && v.expiresAt.toMillis() < Date.now());
+  if (!v || v.active !== true || expired) {
+    throw new HttpsError('failed-precondition', 'This invite link is no longer active — ask for a new one.');
   }
-  const ownerUid = snap.data().ownerUid;
+  const ownerUid = v.ownerUid;
   if (ownerUid === auth.uid) return {ok: true, ownerUid, self: true};   // your own space
 
   await setViewOf(auth.uid, (s) => s.add(ownerUid));   // grant read access
