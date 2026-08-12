@@ -885,7 +885,7 @@
         <span>Delete All Cards</span>
       </button>
     </div>
-    <p class="setver">v2026.08.11.32</p>
+    <p class="setver">v2026.08.12.2</p>
   </div>
 </div>
 
@@ -1133,13 +1133,13 @@
     if(n)n.textContent=exportFiles
       ? (useCloud?'Also opens the share sheet after each upload.'
                  :'Opens the share sheet so you can file each card yourself.')
-      : 'Off — cards go straight to your archive, no share sheet.';
+      : 'Off — cards go straight to your collection, no share sheet.';
   }
 
   if($('expToggle')){
     $('expToggle').onclick=function(){
       if(exportFiles&&!useCloud){
-        openAlert('Turn on sending to your archive first — otherwise saving a card would do nothing.');
+        openAlert('Turn on sending to your collection first — otherwise saving a card would do nothing.');
         return;
       }
       exportFiles=!exportFiles;exportExplicit=true;
@@ -1161,7 +1161,7 @@
       : '—';
     var n=$('cloudNote');
     if(n)n.textContent=on
-      ? 'Cards upload to your archive. Sign in on any device to see them.'
+      ? 'Cards upload to your collection. Sign in on any device to see them.'
       : 'Not connected — cards leave only as the files you export.';
     useCloud=on;
     if(!exportExplicit)exportFiles=!on;   // follow the sensible default
@@ -1529,9 +1529,9 @@
           recordCreated=true;
           return ref.set({cards:rows,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
         });
-      }).then(function(){pendingSync=false;upProgress('Saved to your archive',100);setTimeout(upHide,900);return true});
+      }).then(function(){pendingSync=false;upProgress('Saved to your collection',100);setTimeout(upHide,900);return true});
     }).catch(function(e){
-      upProgress('Could not reach the archive — it will retry when you save.',100,true);
+      upProgress('Could not reach your collection — it will retry when you save.',100,true);
       if(window.console)console.warn('saveCard failed',e);
       return false;
     });
@@ -2318,7 +2318,7 @@
     $('meta').classList.add('hidden');
     $('finish').classList.remove('hidden');document.body.classList.remove('scanning');
     var where=[];
-    if(useCloud)where.push(cloudFailed?'the archive could not be reached':'sent to your archive');
+    if(useCloud)where.push(cloudFailed?'your collection could not be reached':'sent to your collection');
     if(!where.length)where.push('nothing was kept on this device');
     $('tally').textContent=savedCards+' card'+(savedCards===1?'':'s')+' saved so far'+
       (savedFiles?' ('+savedFiles+' files)':'')+' — '+where.join(', ')+'.'+

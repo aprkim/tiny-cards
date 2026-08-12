@@ -8,13 +8,13 @@
 <title>View Cards</title>
 <meta name="description" content="Browse your scanned greeting cards by sender, occasion, and year.">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
-<meta property="og:title" content="Tiny Cards — Archive">
+<meta property="og:title" content="Tiny Cards — Your Cards">
 <meta property="og:description" content="Browse your scanned greeting cards by sender, occasion, and year.">
 <meta property="og:image" content="https://cards.tinywins.space/og-image.png">
 <meta property="og:url" content="https://cards.tinywins.space/cards.html">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Tiny Cards — Archive">
+<meta name="twitter:title" content="Tiny Cards — Your Cards">
 <meta name="twitter:description" content="Browse your scanned greeting cards by sender, occasion, and year.">
 <meta name="twitter:image" content="https://cards.tinywins.space/og-image.png">
 <style>
@@ -387,6 +387,9 @@
   #shareNew{width:100%;font:inherit;font-size:15px;font-weight:600;padding:13px;border-radius:12px;border:none;background:var(--accent);color:#fff;cursor:pointer;margin:16px 0 6px}
   #shareNew:hover{background:#8E1340}
   #shareNew:disabled{opacity:.6;cursor:progress}
+  #shareOff{display:block;margin:6px auto 0;font:inherit;font-size:13px;background:none;border:none;color:var(--muted);cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+  #shareOff:hover{color:var(--ink)}
+  #shareOff:disabled{opacity:.6;cursor:progress;text-decoration:none}
   .share-people-h{font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px}
   .share-list{display:flex;flex-direction:column;gap:8px;margin-bottom:18px;max-height:180px;overflow-y:auto}
   .share-row{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:14px}
@@ -452,6 +455,10 @@
   /* Year / Month / Day dropdowns share one row */
   .edit .datesel{display:flex;gap:8px}
   .edit .datesel select{flex:1;min-width:0}
+  .edit .epages{display:flex;flex-direction:column;gap:8px}
+  .edit .epagerow{display:flex;align-items:center;gap:10px}
+  .edit .epagerow img{width:40px;height:52px;flex:0 0 auto;object-fit:cover;border-radius:6px;border:1px solid var(--rule);background:var(--field)}
+  .edit select.elabel{width:auto;flex:1;font-size:14px;padding:8px 30px 8px 10px;text-transform:capitalize}
   .edit .act{display:flex;gap:8px;margin-top:14px}
   .edit .act button{
     flex:1;font:inherit;font-size:14px;font-weight:600;padding:11px;border-radius:9px;
@@ -549,7 +556,7 @@
   </section>
 
   <section id="view" class="hidden">
-    <select id="spaceSwitcher" class="switcher hidden" aria-label="Choose an archive"></select>
+    <select id="spaceSwitcher" class="switcher hidden" aria-label="Choose a collection"></select>
     <input type="search" id="q" placeholder="Search a name or occasion" autocomplete="off">
     <div class="chips" id="people"></div>
     <div id="groups"></div>
@@ -621,6 +628,9 @@
       </div>
     </div>
     <div class="f hidden" id="eOtherWrap"><label for="eEventOther">Occasion name</label><input type="text" id="eEventOther" autocomplete="off" placeholder="Baptism"></div>
+    <div class="f" id="ePagesWrap"><label>Pages</label>
+      <div class="epages" id="ePages"></div>
+    </div>
     <div class="act">
       <button type="button" id="eSave">Save</button>
       <button type="button" class="sec" id="eCancel">Cancel</button>
@@ -701,7 +711,7 @@
         <span>Delete All Cards</span>
       </button>
     </div>
-    <p class="setver">v2026.08.12.1</p>
+    <p class="setver">v2026.08.12.2</p>
   </div>
 </div>
 
@@ -735,7 +745,8 @@
       <button type="button" id="shareCopy">Copy</button>
     </div>
 
-    <button type="button" class="share-primary" id="shareNew">Invite by email</button>
+    <button type="button" class="share-primary" id="shareNew">Create invite link</button>
+    <button type="button" class="share-off hidden" id="shareOff">Turn off invite link</button>
   </div>
 </div>
 
@@ -914,41 +925,52 @@
       });
   }
 
-  var inviteLink='';   // cached reusable invite link for this owner/session
-  function ensureInvite(){
-    if(inviteLink)return Promise.resolve(inviteLink);
-    return fns().httpsCallable('createInvite')({}).then(function(r){
-      var code=(r&&r.data&&r.data.code)||'';
+  var inviteLink='';   // the current active invite link for this owner/session
+
+  // Paint the share sheet's link area from the current active code (or none).
+  function paintInvite(code){
+    if(code){
       inviteLink='https://cards.tinywins.space/cards.html?invite='+code;
       $('shareLink').value=inviteLink;
-      return inviteLink;
-    });
+      $('shareLinkRow').classList.remove('hidden');$('shareOff').classList.remove('hidden');
+      $('shareNew').textContent='Share invite link';
+    }else{
+      inviteLink='';$('shareLink').value='';
+      $('shareLinkRow').classList.add('hidden');$('shareOff').classList.add('hidden');
+      $('shareNew').textContent='Create invite link';
+    }
   }
   function openShare(){
     closeSettings();
-    $('shareLinkRow').classList.add('hidden');
-    $('shareNew').disabled=false;
+    $('shareLinkRow').classList.add('hidden');$('shareOff').classList.add('hidden');
+    $('shareNew').disabled=true;
     $('share').classList.remove('hidden');
-    loadViewers();                          // empty hero vs viewer list + button label
-    // Mint the invite link and show it (with Copy) right away — no separate
-    // "tap to reveal" step. "Invite by email" then just opens the share sheet.
-    ensureInvite().then(function(){$('shareLinkRow').classList.remove('hidden');}).catch(function(){});
+    loadViewers();                          // empty hero vs viewer list
+    // Show the CURRENT active link (one at a time, 7-day) — don't mint a new one
+    // just by opening the sheet; creating/turning off are explicit actions.
+    fns().httpsCallable('getInvite')({}).then(function(r){
+      paintInvite((r&&r.data&&r.data.code)||'');$('shareNew').disabled=false;
+    }).catch(function(){paintInvite('');$('shareNew').disabled=false;});
   }
   function closeShare(){$('share').classList.add('hidden');}
   $('setShare').onclick=openShare;
   $('shareClose').onclick=closeShare;
   $('share').onclick=function(e){if(e.target===$('share'))closeShare();};
-  // Invite: open the native share sheet with the link (Mail, Messages, …). The
-  // link is pre-minted on open so this runs inside the tap gesture. Anything
-  // without Web Share (desktop) falls back to copying the visible link. (The old
-  // mailto: approach broke the iOS WebView, so it's gone.)
+  // Primary action: share the active link, or create one first (which deactivates
+  // any previous code — one active link at a time), then open the share sheet.
   $('shareNew').onclick=function(){
-    $('shareLinkRow').classList.remove('hidden');
     if(inviteLink){doShare(inviteLink);return;}
     var b=$('shareNew'),old=b.textContent;b.disabled=true;b.textContent='Preparing…';
-    ensureInvite().then(function(l){
-      b.disabled=false;b.textContent=old;$('shareLinkRow').classList.remove('hidden');doShare(l);
+    fns().httpsCallable('createInvite')({}).then(function(r){
+      b.disabled=false;paintInvite((r&&r.data&&r.data.code)||'');doShare(inviteLink);
     }).catch(function(e){b.disabled=false;b.textContent=old;openAlert('Could not create an invite. Please try again.','Invite');if(window.console)console.warn(e);});
+  };
+  // Turn off sharing: deactivate the link so a leaked URL stops working.
+  $('shareOff').onclick=function(){
+    var b=$('shareOff');b.disabled=true;b.textContent='Turning off…';
+    fns().httpsCallable('revokeInvite')({}).then(function(){
+      b.disabled=false;b.textContent='Turn off invite link';paintInvite('');
+    }).catch(function(e){b.disabled=false;b.textContent='Turn off invite link';openAlert('Could not turn off the link. Please try again.','Invite');if(window.console)console.warn(e);});
   };
   function doShare(link){
     if(navigator.share){navigator.share({title:'Tiny Cards',text:'View my cards on Tiny Cards — view only:',url:link}).catch(function(){});return;}
@@ -968,7 +990,6 @@
       var has=qs.size>0;
       $('shareHero').classList.toggle('hidden',has);       // hero only when no viewers
       $('shareListWrap').classList.toggle('hidden',!has);
-      $('shareNew').textContent=has?'Invite another':'Invite by email';
       if(!has)return;
       qs.forEach(function(doc){
         var d=doc.data()||{};
@@ -985,7 +1006,6 @@
     }).catch(function(e){
       // Fall back to the hero so the invite action stays reachable.
       $('shareHero').classList.remove('hidden');$('shareListWrap').classList.add('hidden');
-      $('shareNew').textContent='Invite by email';
       if(window.console)console.warn(e);
     });
   }
@@ -1087,7 +1107,7 @@
     var t=$('cloudTitle'),s=$('cloudSub');
     if(!t)return;
     if(authUser){
-      t.textContent='Open Your Archive';
+      t.textContent='Open Your Cards';
       s.textContent=(authUser.email||authUser.displayName||'Signed in')+' · tap to open';
     }else{
       t.textContent='Sign in to view your cards';
@@ -1164,7 +1184,7 @@
         $('start').classList.add('hidden');
         $('view').classList.remove('hidden');
         $('people').innerHTML='';$('meta').textContent='';
-        $('groups').innerHTML='<p class="empty">'+(isOwner()?'No cards yet — scan your first from the home screen.':'No cards in this shared archive yet.')+'</p>';
+        $('groups').innerHTML='<p class="empty">'+(isOwner()?'No cards yet — scan your first from the home screen.':'No cards in this shared collection yet.')+'</p>';
         loadSpaces();return;
       }
       // Resolve each page to a full URL (lightbox/download) and a thumbnail URL
@@ -1208,14 +1228,21 @@
         $('cloudSub').textContent='This site is not authorised for sign-in yet.';
       }else if(/popup-closed-by-user|cancelled-popup-request/.test(code)){
         paintCloudButton();               // user backed out; say nothing
+      }else if(/failed-precondition/.test(code)){
+        // Inactive or expired invite link — show the reason on the invite screen.
+        cleanInviteURL();
+        $('view').classList.add('hidden');
+        paintCloudButton();$('start').classList.remove('hidden');
+        $('cloudTitle').textContent='Invite link inactive';
+        $('cloudSub').textContent=(e&&e.message)||'This invite link is no longer active — ask for a new one.';
       }else if(/permission-denied|not-found|invalid-argument/.test(code)){
-        // Invalid/turned-off invite, or a viewer whose access was removed.
+        // A viewer whose access was removed, or a malformed invite.
         cleanInviteURL();
         $('view').classList.add('hidden');
         paintCloudButton();$('start').classList.remove('hidden');
         openAlert('This invite isn’t valid, or your access was removed. Ask the owner for a new link.','No access');
       }else{
-        $('cloudSub').textContent='Could not reach the archive.';
+        $('cloudSub').textContent='Could not load your cards.';
       }
       if(window.console)console.warn(e);
     });
@@ -1227,7 +1254,7 @@
   function loadSpaces(){
     if(!myUid)return;
     fbDb.collection('sharedWithMe').doc(myUid).collection('spaces').get().then(function(qs){
-      var shared=[];qs.forEach(function(d){shared.push({uid:d.id,email:(d.data()||{}).ownerEmail||'Shared archive'});});
+      var shared=[];qs.forEach(function(d){shared.push({uid:d.id,email:(d.data()||{}).ownerEmail||'Shared collection'});});
       renderSwitcher(shared);
     }).catch(function(){renderSwitcher([]);});
   }
@@ -1488,6 +1515,18 @@
     $('eRecipient').value=openCard.recipient||'';
     setEventSelect(openCard.event==='Unsorted'?'':openCard.event);
     setDateVal('eDateY','eDateM','eDateD',openCard.date||'');
+    // One row per displayed page: thumbnail + its label. Rebuilt each open, so
+    // Cancel discards unsaved label changes (nothing is written until Save).
+    var ep=$('ePages');ep.innerHTML='';
+    (openCard.pages||[]).forEach(function(pg){
+      var row=document.createElement('div');row.className='epagerow';
+      var img=document.createElement('img');img.src=pg.thumb||pg.url||'';img.alt='';
+      var sel=document.createElement('select');sel.className='elabel';
+      var cur=pg.label||'',opts=['front','inside','back','extra'];
+      if(opts.indexOf(cur)===-1){var o0=document.createElement('option');o0.value=cur;o0.textContent=cur||'—';o0.selected=true;sel.appendChild(o0);}
+      opts.forEach(function(o){var op=document.createElement('option');op.value=o;op.textContent=o;if(o===cur)op.selected=true;sel.appendChild(op);});
+      row.appendChild(img);row.appendChild(sel);ep.appendChild(row);
+    });
     var hidden=$('boxForm').classList.toggle('hidden');
     $('box').classList.toggle('editing',!hidden);
   };
@@ -1504,21 +1543,31 @@
     row.recipient=$('eRecipient').value.trim();
     row.occasion=readEventValue()||'Unsorted';
     row.date=getDateVal('eDateY','eDateM','eDateD');
+    // Page labels: read each select, mirror onto the displayed page object, and
+    // write into labels[] at the page's own paths[] index. Storage/paths untouched.
+    var selects=$('ePages').querySelectorAll('select.elabel'),paths=row.paths||[];
+    var newLabels=paths.map(function(p,idx){return (row.labels&&row.labels[idx])||'';});
+    (openCard.pages||[]).forEach(function(pg,i){
+      var val=selects[i]?selects[i].value:(pg.label||'');
+      pg.label=val;
+      var pi=paths.indexOf(pg.path);
+      if(pi>-1)newLabels[pi]=val;
+    });
+    row.labels=newLabels;
 
     cloudMutate(function(rows){
       return rows.map(function(x){
         if(x.id!==row.id)return x;
         x.sender=row.sender;x.recipient=row.recipient;
         x.occasion=row.occasion;x.date=row.date;
+        x.labels=row.labels;
         return x;
       });
     }).then(function(){
       openCard.person=row.sender;openCard.recipient=row.recipient;
       openCard.event=row.occasion;openCard.date=row.date;
-      openCard.year=row.date.slice(0,4);openCard.ok=!!row.date;
-      $('boxForm').classList.add('hidden');$('box').classList.remove('editing');
-      $('boxName').textContent=openCard.person+(openCard.recipient?' → '+openCard.recipient:'');
-      $('boxSub').textContent=(openCard.date?openCard.date+' · ':'')+openCard.event;
+      openCard.year=(row.date||'').slice(0,4);openCard.ok=!!row.date;
+      show(openCard,openPage);   // re-renders name, sub, Front/Inside toggle + Read link from updated labels
       filter=null;yearFilter=null;people();render();
     }).catch(function(e){
       openAlert('Could not save the change.','Save failed');
