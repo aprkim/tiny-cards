@@ -10,13 +10,13 @@
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <meta property="og:title" content="Tiny Cards — Your Cards">
 <meta property="og:description" content="Browse your scanned greeting cards by sender, occasion, and year.">
-<meta property="og:image" content="https://cards.tinywins.space/og-image.png">
-<meta property="og:url" content="https://cards.tinywins.space/cards.html">
+<meta property="og:image" content="https://kept.cards/og-image.png">
+<meta property="og:url" content="https://kept.cards/cards.html">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Tiny Cards — Your Cards">
 <meta name="twitter:description" content="Browse your scanned greeting cards by sender, occasion, and year.">
-<meta name="twitter:image" content="https://cards.tinywins.space/og-image.png">
+<meta name="twitter:image" content="https://kept.cards/og-image.png">
 <style>
   :root{
     --ink:#16161D;--paper:#FAF9F6;--accent:#B0184F;--accent-soft:#FBEDF2;
@@ -1025,7 +1025,7 @@
   // Paint the share sheet's link area from the current active code (or none).
   function paintInvite(code){
     if(code){
-      inviteLink='https://cards.tinywins.space/cards.html?invite='+code;
+      inviteLink='https://kept.cards/cards.html?invite='+code;
       $('shareLink').value=inviteLink;
       $('shareLinkRow').classList.remove('hidden');$('shareOff').classList.remove('hidden');
       $('shareNew').textContent='Share invite link';

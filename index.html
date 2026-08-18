@@ -9,13 +9,13 @@
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <meta property="og:title" content="Tiny Cards">
 <meta property="og:description" content="Scan greeting cards with your phone: straighten, name, and file them.">
-<meta property="og:image" content="https://cards.tinywins.space/og-image.png">
-<meta property="og:url" content="https://cards.tinywins.space/">
+<meta property="og:image" content="https://kept.cards/og-image.png">
+<meta property="og:url" content="https://kept.cards/">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Tiny Cards">
 <meta name="twitter:description" content="Scan greeting cards with your phone: straighten, name, and file them.">
-<meta name="twitter:image" content="https://cards.tinywins.space/og-image.png">
+<meta name="twitter:image" content="https://kept.cards/og-image.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#FAF9F6">
 <title>Tiny Cards</title>
@@ -628,7 +628,7 @@
     }).catch(function(e){
       var c=e&&e.code||'';
       if(/unauthorized-domain/.test(c)){
-        openAlert('This site isn’t authorised for sign-in yet. Add cards.tinywins.space in the Firebase console under Authentication → Settings → Authorized domains.','Sign-in not set up');
+        openAlert('This site isn’t authorised for sign-in yet. Add kept.cards in the Firebase console under Authentication → Settings → Authorized domains.','Sign-in not set up');
       }else if(!/popup-closed-by-user|cancelled-popup-request/.test(c)){
         openAlert('Could not sign in. Check your connection and try again.','Sign-in failed');
       }

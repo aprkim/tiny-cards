@@ -169,7 +169,7 @@ const README = [
   '                 filenames). Opens in any spreadsheet app.',
   '',
   'BROWSE IT OFFLINE',
-  '  Open  https://cards.tinywins.space/viewer.html  and choose this folder. It',
+  '  Open  https://kept.cards/viewer.html  and choose this folder. It',
   '  reads the filenames and shows your cards with their details — the images',
   '  themselves need no account or connection.',
   '',

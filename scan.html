@@ -9,13 +9,13 @@
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <meta property="og:title" content="Scan Cards">
 <meta property="og:description" content="Scan greeting cards with your phone: straighten, name, and file them.">
-<meta property="og:image" content="https://cards.tinywins.space/og-image.png">
-<meta property="og:url" content="https://cards.tinywins.space/scan.html">
+<meta property="og:image" content="https://kept.cards/og-image.png">
+<meta property="og:url" content="https://kept.cards/scan.html">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Scan Cards">
 <meta name="twitter:description" content="Scan greeting cards with your phone: straighten, name, and file them.">
-<meta name="twitter:image" content="https://cards.tinywins.space/og-image.png">
+<meta name="twitter:image" content="https://kept.cards/og-image.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#FAF9F6">
 <title>Scan Cards</title>
@@ -1196,7 +1196,7 @@
       paintCloud();
       var code=e&&e.code||'';
       if(/unauthorized-domain/.test(code)){
-        openAlert('This site isn’t authorised for sign-in yet. Add cards.tinywins.space in the Firebase console under Authentication → Settings → Authorized domains.','Sign-in not set up');
+        openAlert('This site isn’t authorised for sign-in yet. Add kept.cards in the Firebase console under Authentication → Settings → Authorized domains.','Sign-in not set up');
       }else if(!/popup-closed-by-user|cancelled-popup-request/.test(code)){
         openAlert('Could not sign in. Check your connection and try again.','Sign-in failed');
       }
@@ -1339,7 +1339,7 @@
     if(inviteLink)return Promise.resolve(inviteLink);
     return fns().httpsCallable('createInvite')({}).then(function(r){
       var code=(r&&r.data&&r.data.code)||'';
-      inviteLink='https://cards.tinywins.space/cards.html?invite='+code;
+      inviteLink='https://kept.cards/cards.html?invite='+code;
       $('shareLink').value=inviteLink;
       return inviteLink;
     });
@@ -1411,7 +1411,7 @@
   $('setExport').onclick=function(){
     if(!isOwner())return;
     if(isNativeApp()){
-      openAlert('A full backup is a large ZIP download. Open cards.tinywins.space on a computer and use Settings → Export all.','Back up on a computer');
+      openAlert('A full backup is a large ZIP download. Open kept.cards on a computer and use Settings → Export all.','Back up on a computer');
       return;
     }
     if(!canExport())return;
