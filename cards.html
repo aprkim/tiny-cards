@@ -403,8 +403,11 @@
   .share-row button{font:inherit;font-size:12.5px;padding:5px 12px;border-radius:100px;border:1px solid var(--rule);background:var(--field);color:var(--muted);cursor:pointer;flex-shrink:0}
   .share-row button:hover{border-color:#BF3143;color:#BF3143;background:#FEF2F2}
   /* Invite by email */
-  .share-invite{display:flex;gap:8px;margin-top:4px}
-  .share-invite input{flex:1;min-width:0;font:inherit;font-size:15px;padding:11px 12px;border:1px solid var(--rule);border-radius:10px;background:var(--field);color:var(--ink);-webkit-appearance:none;appearance:none}
+  .share-invite{display:flex;gap:8px;margin-top:4px;align-items:center}
+  /* width:0 + flex:1 1 0 is the WebKit fix: iOS ignores min-width:0 on a flex
+     <input> and lets its content width push the Invite button off-screen while
+     typing. An explicit zero base makes flex-grow (not the text) set the width. */
+  .share-invite input{flex:1 1 0;min-width:0;width:0;font:inherit;font-size:15px;padding:11px 12px;border:1px solid var(--rule);border-radius:10px;background:var(--field);color:var(--ink);-webkit-appearance:none;appearance:none}
   .share-invite input:focus{outline:none;border-color:var(--accent)}
   #inviteBtn{flex:0 0 auto;font:inherit;font-size:15px;font-weight:600;padding:11px 18px;border-radius:10px;border:none;background:var(--accent);color:#fff;cursor:pointer}
   #inviteBtn:hover{background:#8E1340}
@@ -725,7 +728,7 @@
         <span>Delete All Cards</span>
       </button>
     </div>
-    <p class="setver">v2026.08.19.1</p>
+    <p class="setver">v2026.08.19.2</p>
   </div>
 </div>
 
@@ -756,7 +759,7 @@
     </div>
 
     <div class="share-invite" id="shareInvite">
-      <input type="email" id="inviteEmail" placeholder="family@email.com" autocomplete="off" autocapitalize="none" spellcheck="false" aria-label="Email to invite">
+      <input type="email" id="inviteEmail" size="1" placeholder="family@email.com" autocomplete="off" autocapitalize="none" spellcheck="false" aria-label="Email to invite">
       <button type="button" id="inviteBtn">Invite</button>
     </div>
   </div>
