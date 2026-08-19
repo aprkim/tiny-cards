@@ -1,6 +1,6 @@
 {
   "appId": "space.tinywins.cards",
-  "appName": "Tiny Cards",
+  "appName": "Kept",
   "webDir": "www",
   "plugins": {
     "FirebaseAuthentication": {

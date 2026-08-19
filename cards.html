@@ -8,13 +8,13 @@
 <title>View Cards</title>
 <meta name="description" content="Browse your scanned greeting cards by sender, occasion, and year.">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
-<meta property="og:title" content="Tiny Cards — Your Cards">
+<meta property="og:title" content="Kept — Your Cards">
 <meta property="og:description" content="Browse your scanned greeting cards by sender, occasion, and year.">
 <meta property="og:image" content="https://kept.cards/og-image.png">
 <meta property="og:url" content="https://kept.cards/cards.html">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Tiny Cards — Your Cards">
+<meta name="twitter:title" content="Kept — Your Cards">
 <meta name="twitter:description" content="Browse your scanned greeting cards by sender, occasion, and year.">
 <meta name="twitter:image" content="https://kept.cards/og-image.png">
 <style>
@@ -395,16 +395,6 @@
      the current version. */
   .setver{margin-top:16px;text-align:center;font-size:10px;color:#9A9AA2;letter-spacing:.02em}
   /* ---- sharing modal (owner) ---- */
-  .share-sub{font-size:13.5px;color:var(--muted);line-height:1.55;margin:-2px 0 16px}
-  .share-linkrow{display:flex;gap:8px;margin-bottom:12px}
-  .share-linkrow input{flex:1;min-width:0;font:inherit;font-size:13px;padding:10px 12px;border:1px solid var(--rule);border-radius:10px;background:var(--field);color:var(--ink)}
-  #shareCopy{font:inherit;font-size:14px;font-weight:600;padding:0 16px;border-radius:10px;border:1px solid var(--rule);background:var(--field);color:var(--ink);cursor:pointer;flex-shrink:0}
-  #shareNew{width:100%;font:inherit;font-size:15px;font-weight:600;padding:13px;border-radius:12px;border:none;background:var(--accent);color:#fff;cursor:pointer;margin:16px 0 6px}
-  #shareNew:hover{background:#8E1340}
-  #shareNew:disabled{opacity:.6;cursor:progress}
-  #shareOff{display:block;margin:6px auto 0;font:inherit;font-size:13px;background:none;border:none;color:var(--muted);cursor:pointer;text-decoration:underline;text-underline-offset:2px}
-  #shareOff:hover{color:var(--ink)}
-  #shareOff:disabled{opacity:.6;cursor:progress;text-decoration:none}
   .share-busy{min-height:180px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:14px}
   .share-people-h{font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px}
   .share-list{display:flex;flex-direction:column;gap:8px;margin-bottom:18px;max-height:180px;overflow-y:auto}
@@ -412,17 +402,17 @@
   .share-row .who{overflow-wrap:anywhere}
   .share-row button{font:inherit;font-size:12.5px;padding:5px 12px;border-radius:100px;border:1px solid var(--rule);background:var(--field);color:var(--muted);cursor:pointer;flex-shrink:0}
   .share-row button:hover{border-color:#BF3143;color:#BF3143;background:#FEF2F2}
-  #sharePending{margin-bottom:16px}
-  .share-pending-h{font-size:12px;font-weight:600;color:var(--accent);margin-bottom:8px}
-  .share-req{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:14px;margin-bottom:8px}
-  .share-req .who{overflow-wrap:anywhere;flex:1;min-width:0}
-  .share-req .req-btns{display:flex;gap:6px;flex-shrink:0}
-  .share-req button{font:inherit;font-size:12.5px;padding:5px 12px;border-radius:100px;cursor:pointer;border:1px solid var(--rule)}
-  .req-approve{background:var(--accent);color:#fff;border-color:var(--accent)}
-  .req-approve:hover{background:#8E1340;border-color:#8E1340}
-  .req-deny{background:var(--field);color:var(--muted)}
-  .req-deny:hover{border-color:#BF3143;color:#BF3143;background:#FEF2F2}
-  .share-empty{font-size:13px;color:var(--muted)}
+  /* Invite by email */
+  .share-invite{display:flex;gap:8px;margin-top:4px}
+  .share-invite input{flex:1;min-width:0;font:inherit;font-size:15px;padding:11px 12px;border:1px solid var(--rule);border-radius:10px;background:var(--field);color:var(--ink);-webkit-appearance:none;appearance:none}
+  .share-invite input:focus{outline:none;border-color:var(--accent)}
+  #inviteBtn{flex:0 0 auto;font:inherit;font-size:15px;font-weight:600;padding:11px 18px;border-radius:10px;border:none;background:var(--accent);color:#fff;cursor:pointer}
+  #inviteBtn:hover{background:#8E1340}
+  #inviteBtn:disabled{opacity:.6;cursor:progress}
+  .share-rowr{display:flex;align-items:center;gap:10px;flex-shrink:0}
+  .share-status{font-size:11px;font-weight:600;padding:2px 8px;border-radius:100px}
+  .share-status.is-active{color:#1B7A43;background:#E7F5EC}
+  .share-status.is-invited{color:var(--muted);background:var(--paper);border:1px solid var(--rule)}
   /* Sign out reads as a real button and acts on the first tap (no confirm). */
   .signout{
     display:block;width:100%;font:inherit;font-size:15px;font-weight:600;
@@ -735,7 +725,7 @@
         <span>Delete All Cards</span>
       </button>
     </div>
-    <p class="setver">v2026.08.18.2</p>
+    <p class="setver">v2026.08.19.1</p>
   </div>
 </div>
 
@@ -760,23 +750,15 @@
       <p>They can view — never edit or delete.</p>
     </div>
 
-    <div id="sharePending" class="hidden">
-      <div class="share-pending-h">Requests to join</div>
-      <div id="pendingList"></div>
-    </div>
-
     <div id="shareListWrap" class="hidden">
       <div class="share-people-h">People with access</div>
       <div id="shareList" class="share-list"></div>
     </div>
 
-    <div class="share-linkrow hidden" id="shareLinkRow">
-      <input type="text" id="shareLink" readonly>
-      <button type="button" id="shareCopy">Copy</button>
+    <div class="share-invite" id="shareInvite">
+      <input type="email" id="inviteEmail" placeholder="family@email.com" autocomplete="off" autocapitalize="none" spellcheck="false" aria-label="Email to invite">
+      <button type="button" id="inviteBtn">Invite</button>
     </div>
-
-    <button type="button" class="share-primary" id="shareNew">Create invite link</button>
-    <button type="button" class="share-off hidden" id="shareOff">Turn off invite link</button>
   </div>
 </div>
 
@@ -902,7 +884,7 @@
   // Family viewers count for the Settings row (owner only).
   function loadViewerCount(){
     var el=$('setShareCount');if(!el)return;el.textContent='';el.classList.remove('invite');
-    fbDb.collection('cardViewers').doc(myUid).collection('viewers').get().then(function(qs){
+    fbDb.collection('viewerInvites').doc(myUid).collection('emails').get().then(function(qs){
       if(qs.size>0){el.textContent=String(qs.size);el.classList.remove('invite');}
       else{el.textContent='Invite';el.classList.add('invite');}
     }).catch(function(){});
@@ -990,10 +972,10 @@
       $('exportPct').textContent='Saving…';return blobToBase64(blob);
     }).then(function(b64){
       // Assembled fully in memory, so a cancel/failure never writes a partial file.
-      return Fs.writeFile({path:'tiny-cards-backup-'+new Date().toISOString().slice(0,10)+'.zip',data:b64,directory:'CACHE'});
+      return Fs.writeFile({path:'kept-backup-'+new Date().toISOString().slice(0,10)+'.zip',data:b64,directory:'CACHE'});
     }).then(function(w){
       if(total){$('exportFill').style.width='100%';$('exportPct').textContent='100%';}
-      return Share.share({title:'Tiny Cards backup',url:w.uri});
+      return Share.share({title:'Kept backup',url:w.uri});
     }).then(function(){
       persistLastSaved();exportReset();
       openAlert('Your cards were saved to Files.','Saved to Files');
@@ -1016,7 +998,7 @@
       if(total){$('exportFill').style.width='100%';}
       $('exportPct').textContent='Done';
       var url=URL.createObjectURL(blob);
-      var a=document.createElement('a');a.href=url;a.download='tiny-cards-backup-'+new Date().toISOString().slice(0,10)+'.zip';
+      var a=document.createElement('a');a.href=url;a.download='kept-backup-'+new Date().toISOString().slice(0,10)+'.zip';
       document.body.appendChild(a);a.click();a.remove();
       setTimeout(function(){URL.revokeObjectURL(url);},4000);
       $('exportProg').classList.add('hidden');$('setExport').classList.remove('hidden');
@@ -1030,12 +1012,10 @@
     });
   }
 
-  // ---- invites (secure sharing) ----
-  var inviteCode=(new URLSearchParams(location.search)).get('invite');
+  // ---- sharing by email ----
   // Deep link from the scanner's finish thumbnail: ?card=<id> opens that card.
   var openCardId=(new URLSearchParams(location.search)).get('card');
   function fns(){return firebase.app().functions('us-east1');}
-  function cleanInviteURL(){try{history.replaceState({},'',location.pathname);}catch(e){}}
   function openCardFromURL(){
     if(!openCardId)return;
     var c=cards.filter(function(x){return x.id===openCardId;})[0];
@@ -1043,156 +1023,74 @@
     openCardId=null;
     try{history.replaceState({},'',location.pathname);}catch(e){}
   }
-  // Arriving via an invite: redeem it, then force-refresh the token so the new
-  // viewOf claim is in effect before we read the archive. Returns the redeem
-  // result ({ownerUid,ownerEmail,...}) so the caller can open that shared space.
-  function ensureAccess(){
-    if(!inviteCode||!authUser)return Promise.resolve(null);
-    var code=inviteCode;inviteCode=null;
-    return fns().httpsCallable('redeemInvite')({code:code})
-      .then(function(r){
-        var data=(r&&r.data)||null;
-        return authUser.getIdToken(true).then(function(){
-          if(data&&data.ownerUid)cleanInviteURL();   // approved/self → drop the code; pending keeps it so a reload can re-check
-          return data;
-        });
-      });
-  }
-
-  var inviteLink='';   // the current active invite link for this owner/session
-
-  // Paint the share sheet's link area from the current active code (or none).
-  function paintInvite(code){
-    if(code){
-      inviteLink='https://kept.cards/cards.html?invite='+code;
-      $('shareLink').value=inviteLink;
-      $('shareLinkRow').classList.remove('hidden');$('shareOff').classList.remove('hidden');
-      $('shareNew').textContent='Share invite link';
-    }else{
-      inviteLink='';$('shareLink').value='';
-      $('shareLinkRow').classList.add('hidden');$('shareOff').classList.add('hidden');
-      $('shareNew').textContent='Create invite link';
-    }
-  }
   function openShare(){
     closeSettings();
-    // Open straight into a stable loading state, then render the real content once
-    // BOTH lookups (viewers + current invite link) resolve — so the sheet appears
-    // in its final layout instead of flashing a stale frame and jumping twice.
-    ['shareHero','sharePending','shareListWrap','shareLinkRow','shareOff','shareNew'].forEach(function(id){$(id).classList.add('hidden');});
+    ['shareHero','shareListWrap','shareInvite'].forEach(function(id){$(id).classList.add('hidden');});
     $('shareBusy').classList.remove('hidden');
+    $('inviteEmail').value='';
     $('share').classList.remove('hidden');
-    Promise.all([
-      fns().httpsCallable('getInvite')({}).then(function(r){return (r&&r.data&&r.data.code)||'';},function(){return '';}),
-      fetchViewers().catch(function(){return null;}),          // null → hero/empty fallback
-      fetchPending().catch(function(){return [];})
-    ]).then(function(res){
+    fetchInvites().catch(function(){return [];}).then(function(list){
       $('shareBusy').classList.add('hidden');
-      $('shareNew').classList.remove('hidden');$('shareNew').disabled=false;
-      renderPending(res[2]);
-      renderViewers(res[1]);
-      setShareHero(res[1],res[2]);
-      paintInvite(res[0]);
+      $('shareInvite').classList.remove('hidden');
+      renderInvites(list);
     });
   }
   function closeShare(){$('share').classList.add('hidden');}
   $('setShare').onclick=openShare;
   $('shareClose').onclick=closeShare;
   $('share').onclick=function(e){if(e.target===$('share'))closeShare();};
-  // Primary action: share the active link, or create one first (which deactivates
-  // any previous code — one active link at a time), then open the share sheet.
-  $('shareNew').onclick=function(){
-    if(inviteLink){doShare(inviteLink);return;}
-    var b=$('shareNew'),old=b.textContent;b.disabled=true;b.textContent='Preparing…';
-    fns().httpsCallable('createInvite')({}).then(function(r){
-      b.disabled=false;paintInvite((r&&r.data&&r.data.code)||'');doShare(inviteLink);
-    }).catch(function(e){b.disabled=false;b.textContent=old;openAlert('Could not create an invite. Please try again.','Invite');if(window.console)console.warn(e);});
-  };
-  // Turn off sharing: deactivate the link so a leaked URL stops working.
-  $('shareOff').onclick=function(){
-    var b=$('shareOff');b.disabled=true;b.textContent='Turning off…';
-    fns().httpsCallable('revokeInvite')({}).then(function(){
-      b.disabled=false;b.textContent='Turn off invite link';paintInvite('');
-    }).catch(function(e){b.disabled=false;b.textContent='Turn off invite link';openAlert('Could not turn off the link. Please try again.','Invite');if(window.console)console.warn(e);});
-  };
-  function doShare(link){
-    if(navigator.share){navigator.share({title:'Tiny Cards',text:'View my cards on Tiny Cards — view only:',url:link}).catch(function(){});return;}
-    copyInvite();
-  }
-  function copyInvite(){
-    var v=$('shareLink').value;
-    function flash(){$('shareCopy').textContent='Copied';setTimeout(function(){$('shareCopy').textContent='Copy';},1500);}
-    function sel(){try{$('shareLink').select();document.execCommand('copy');}catch(e){}flash();}
-    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(v).then(flash,sel);}
-    else{sel();}
-  }
-  $('shareCopy').onclick=copyInvite;
-  function fetchViewers(){
-    return fbDb.collection('cardViewers').doc(myUid).collection('viewers').get().then(function(qs){
-      var arr=[];qs.forEach(function(doc){arr.push({uid:doc.id,email:(doc.data()||{}).email});});return arr;
+
+  // The owner's shared-with list (email + invited/active status).
+  function fetchInvites(){
+    return fbDb.collection('viewerInvites').doc(myUid).collection('emails').get().then(function(qs){
+      var arr=[];qs.forEach(function(doc){var d=doc.data()||{};arr.push({email:d.email||doc.id,status:d.status||'invited'});});
+      arr.sort(function(a,b){return (a.email||'').localeCompare(b.email||'');});
+      return arr;
     });
   }
-  function fetchPending(){
-    return fbDb.collection('pendingViewers').doc(myUid).collection('requests').get().then(function(qs){
-      var arr=[];qs.forEach(function(doc){arr.push({uid:doc.id,email:(doc.data()||{}).email});});return arr;
-    });
-  }
-  // Hero shows only when there are neither pending requests nor viewers.
-  function setShareHero(viewers,pending){
-    $('shareHero').classList.toggle('hidden',!!((viewers&&viewers.length)||(pending&&pending.length)));
-  }
-  // Paint the approved-viewer list.
-  function renderViewers(viewers){
-    var list=$('shareList');list.innerHTML='';
-    var has=!!(viewers&&viewers.length);
+  function renderInvites(list){
+    var ul=$('shareList');ul.innerHTML='';
+    var has=!!(list&&list.length);
     $('shareListWrap').classList.toggle('hidden',!has);
+    $('shareHero').classList.toggle('hidden',has);   // hero only when nobody's shared with
     if(!has)return;
-    viewers.forEach(function(v){
+    list.forEach(function(v){
       var row=document.createElement('div');row.className='share-row';
-      var who=document.createElement('span');who.className='who';who.textContent=v.email||v.uid;
+      var who=document.createElement('span');who.className='who';who.textContent=v.email;
+      var right=document.createElement('div');right.className='share-rowr';
+      var tag=document.createElement('span');tag.className='share-status '+(v.status==='active'?'is-active':'is-invited');
+      tag.textContent=v.status==='active'?'Active':'Invited';
       var rm=document.createElement('button');rm.type='button';rm.textContent='Remove';
       rm.onclick=function(){
         rm.disabled=true;rm.textContent='…';
-        fns().httpsCallable('revokeViewer')({viewerUid:v.uid}).then(refreshShareLists)
+        fns().httpsCallable('revokeViewer')({email:v.email}).then(refreshInvites)
           .catch(function(e){rm.disabled=false;rm.textContent='Remove';openAlert('Could not remove that person. Please try again.','Family viewers');if(window.console)console.warn(e);});
       };
-      row.appendChild(who);row.appendChild(rm);list.appendChild(row);
+      right.appendChild(tag);right.appendChild(rm);
+      row.appendChild(who);row.appendChild(right);ul.appendChild(row);
     });
   }
-  // Paint the pending-request list (above the viewers), each with Approve / Deny.
-  function renderPending(reqs){
-    var list=$('pendingList');list.innerHTML='';
-    var has=!!(reqs&&reqs.length);
-    $('sharePending').classList.toggle('hidden',!has);
-    if(!has)return;
-    reqs.forEach(function(r){
-      var row=document.createElement('div');row.className='share-req';
-      var who=document.createElement('span');who.className='who';who.textContent=r.email||r.uid;
-      var btns=document.createElement('div');btns.className='req-btns';
-      var ap=document.createElement('button');ap.type='button';ap.className='req-approve';ap.textContent='Approve';
-      var dn=document.createElement('button');dn.type='button';dn.className='req-deny';dn.textContent='Deny';
-      ap.onclick=function(){actOnRequest(ap,dn,'approveViewer',r.uid);};
-      dn.onclick=function(){actOnRequest(dn,ap,'denyViewer',r.uid);};
-      btns.appendChild(ap);btns.appendChild(dn);row.appendChild(who);row.appendChild(btns);list.appendChild(row);
+  function refreshInvites(){return fetchInvites().catch(function(){return [];}).then(renderInvites);}
+  // Invite by email → granted now if the account exists, else on their first sign-in.
+  $('inviteBtn').onclick=function(){
+    var email=($('inviteEmail').value||'').trim();
+    if(!email){$('inviteEmail').focus();return;}
+    var b=$('inviteBtn'),old=b.textContent;b.disabled=true;b.textContent='Inviting…';
+    fns().httpsCallable('inviteViewer')({email:email}).then(function(){
+      b.disabled=false;b.textContent=old;$('inviteEmail').value='';refreshInvites();
+    }).catch(function(e){
+      b.disabled=false;b.textContent=old;
+      var msg=(e&&e.message)||'';
+      openAlert(/valid email|own account/i.test(msg)?msg:'Could not send that invite. Please try again.','Invite');
+      if(window.console)console.warn(e);
     });
-  }
-  function actOnRequest(clicked,other,fn,viewerUid){
-    clicked.disabled=true;other.disabled=true;clicked.textContent='…';
-    fns().httpsCallable(fn)({viewerUid:viewerUid}).then(refreshShareLists).catch(function(e){
-      clicked.disabled=false;other.disabled=false;
-      openAlert('Could not update that request. Please try again.','Family viewers');if(window.console)console.warn(e);
-    });
-  }
-  // Refresh both lists in place (after approve / deny / remove).
-  function refreshShareLists(){
-    return Promise.all([fetchViewers().catch(function(){return null;}),fetchPending().catch(function(){return [];})])
-      .then(function(res){renderPending(res[1]);renderViewers(res[0]);setShareHero(res[0],res[1]);});
-  }
+  };
+  $('inviteEmail').onkeydown=function(e){if(e.key==='Enter'){e.preventDefault();$('inviteBtn').click();}};
   // Signs out on the first tap — no confirm step.
   $('setSignOut').onclick=function(){closeSettings();doSignOut()};
   function doSignOut(){
     var reset=function(){
-      authUser=null;myUid=null;SPACE=null;cards=[];filter=null;yearFilter=null;showAllPeople=false;inviteLink='';
+      authUser=null;myUid=null;SPACE=null;cards=[];filter=null;yearFilter=null;showAllPeople=false;
       var sw=$('spaceSwitcher');if(sw){sw.classList.add('hidden');sw.innerHTML='';}
       $('gearBtn').classList.add('hidden');
       $('view').classList.add('hidden');
@@ -1300,18 +1198,6 @@
     if(u){
       authUser=u;
       openArchive();
-    }else if(inviteCode){
-      // Invite link, signed out: keep the in-page "You’re invited" sign-in —
-      // redirecting to home would drop the ?invite= code and break the share.
-      paintCloudButton();
-      $('cloudTitle').textContent='You’re invited';
-      $('cloudSub').textContent='Sign in with Google to view the shared cards';
-      $('start').classList.remove('hidden');
-      if(fbReady){
-        firebase.auth().getRedirectResult().then(function(r){
-          if(r&&r.user){authUser=r.user;openArchive()}
-        }).catch(function(){});
-      }
     }else{
       // Normal signed-out visit: go to the home sign-in page, same as the Scan
       // tab. Resolve any pending redirect sign-in first, then bounce home.
@@ -1334,20 +1220,6 @@
     loadCloud();
   }
 
-  // Viewer requested access but the owner hasn't approved yet — park on the invite
-  // screen. Tapping reloads (re-runs redeemInvite; once approved it returns the
-  // space and loads normally). Approval also surfaces in the space switcher.
-  function showWaiting(ownerEmail){
-    $('view').classList.add('hidden');
-    $('start').classList.remove('hidden');
-    $('gearBtn').classList.add('hidden');
-    var who=ownerEmail||'the owner';
-    $('cloudTitle').textContent='Waiting for approval';
-    $('cloudSub').textContent='Waiting for '+who+' to approve your access. Tap to check again.';
-    $('cloudOpen').onclick=function(){location.reload();};
-    $('cloudOpen').onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();location.reload();}};
-  }
-
   $('cloudOpen').onclick=loadCloud;
   $('cloudOpen').onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();loadCloud()}};
 
@@ -1362,13 +1234,15 @@
       paintCloudButton();
       $('gearBtn').classList.remove('hidden');   // signed in → settings reachable
       paintScanTab();
-      return ensureAccess();                     // redeem an invite link, if present
-    }).then(function(redeemed){
+      // Pick up any email-invites for this account (grants viewOf on first sign-in).
+      return fns().httpsCallable('syncSharedAccess')({}).then(function(r){return (r&&r.data&&r.data.granted)||[];},function(){return [];});
+    }).then(function(granted){
       if(!authUser)return null;
-      if(redeemed&&redeemed.status==='pending'){showWaiting(redeemed.ownerEmail);return null;}
-      if(redeemed&&redeemed.ownerUid)SPACE=redeemed.ownerUid;   // open the space just shared with me
       cloudCode=SPACE;
-      return fbDb.collection('tinyCards').doc(SPACE).get();
+      var read=function(){return fbDb.collection('tinyCards').doc(SPACE).get();};
+      // A freshly-granted claim (or any shared space) needs a token refresh first.
+      if((granted&&granted.length)||SPACE!==myUid)return authUser.getIdToken(true).then(read);
+      return read();
     }).then(function(doc){
       if(!doc)return;
       var rows=(doc.exists&&doc.data().cards)||[];
@@ -1379,7 +1253,11 @@
         $('view').classList.remove('hidden');
         $('people').innerHTML='';$('meta').textContent='';
         $('groups').innerHTML='<p class="empty">'+(isOwner()?'No cards yet — scan your first from the home screen.':'No cards shared with you yet.')+'</p>';
-        loadSpaces();return;
+        loadSpaces().then(function(shared){
+          // Pure viewer (own space empty) → land on the space shared with them.
+          if(SPACE===myUid&&shared&&shared.length){SPACE=shared[0].uid;authUser.getIdToken(true).then(loadCloud,loadCloud);}
+        });
+        return;
       }
       // Resolve each page to a full URL (lightbox/download) and a thumbnail URL
       // (grid). The grid loads the small _thumb.jpg the Cloud Function wrote, so
@@ -1422,19 +1300,10 @@
         $('cloudSub').textContent='This site is not authorised for sign-in yet.';
       }else if(/popup-closed-by-user|cancelled-popup-request/.test(code)){
         paintCloudButton();               // user backed out; say nothing
-      }else if(/failed-precondition/.test(code)){
-        // Inactive or expired invite link — show the reason on the invite screen.
-        cleanInviteURL();
-        $('view').classList.add('hidden');
-        paintCloudButton();$('start').classList.remove('hidden');
-        $('cloudTitle').textContent='Invite link inactive';
-        $('cloudSub').textContent=(e&&e.message)||'This invite link is no longer active — ask for a new one.';
-      }else if(/permission-denied|not-found|invalid-argument/.test(code)){
-        // A viewer whose access was removed, or a malformed invite.
-        cleanInviteURL();
-        $('view').classList.add('hidden');
-        paintCloudButton();$('start').classList.remove('hidden');
-        openAlert('This invite isn’t valid, or your access was removed. Ask the owner for a new link.','No access');
+      }else if(/permission-denied/.test(code)){
+        // Access to a shared space was removed — fall back to your own space.
+        if(SPACE!==myUid){SPACE=myUid;cloudCode=myUid;loadCloud();return;}
+        $('cloudSub').textContent='Could not load your cards.';
       }else{
         $('cloudSub').textContent='Could not load your cards.';
       }
@@ -1446,11 +1315,11 @@
   // Lists the archives shared with me (from sharedWithMe/{myUid}/spaces) plus my
   // own. Hidden entirely when nothing is shared with me, so solo users see no UI.
   function loadSpaces(){
-    if(!myUid)return;
-    fbDb.collection('sharedWithMe').doc(myUid).collection('spaces').get().then(function(qs){
+    if(!myUid)return Promise.resolve([]);
+    return fbDb.collection('sharedWithMe').doc(myUid).collection('spaces').get().then(function(qs){
       var shared=[];qs.forEach(function(d){shared.push({uid:d.id,email:(d.data()||{}).ownerEmail||'Shared cards'});});
-      renderSwitcher(shared);
-    }).catch(function(){renderSwitcher([]);});
+      renderSwitcher(shared);return shared;
+    },function(){renderSwitcher([]);return [];});
   }
   function renderSwitcher(shared){
     var sel=$('spaceSwitcher');if(!sel)return;

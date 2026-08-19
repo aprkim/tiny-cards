@@ -899,7 +899,7 @@
         <span>Delete All Cards</span>
       </button>
     </div>
-    <p class="setver">v2026.08.18.1</p>
+    <p class="setver">v2026.08.19.1</p>
   </div>
 </div>
 
@@ -1371,7 +1371,7 @@
     }).catch(function(e){b.disabled=false;b.textContent=old;openAlert('Could not create an invite. Please try again.','Invite');if(window.console)console.warn(e);});
   };
   function doShare(link){
-    if(navigator.share){navigator.share({title:'Tiny Cards',text:'View my cards on Tiny Cards — view only:',url:link}).catch(function(){});return;}
+    if(navigator.share){navigator.share({title:'Kept',text:'View my cards on Kept — view only:',url:link}).catch(function(){});return;}
     copyInvite();
   }
   function copyInvite(){

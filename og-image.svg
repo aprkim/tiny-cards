@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <!-- Kept — social share image (og:image). Edit this SVG and re-render to
+       og-image.png (1200x630). Colors mirror the app design tokens. -->
+  <rect width="1200" height="630" fill="#FAF9F6"/>
+
+  <!-- Left: wordmark + tagline + domain -->
+  <text x="90" y="304" font-size="116" font-weight="800" letter-spacing="-3" fill="#16161D">Kept</text>
+  <text x="94" y="366" font-size="34" font-weight="400" fill="#6E6E78">Every card, kept.</text>
+  <text x="94" y="438" font-size="30" font-weight="700" fill="#B0184F">kept.cards</text>
+
+  <!-- Right: brand card illustration -->
+  <g transform="translate(792 152)">
+    <!-- soft shadow under the front card -->
+    <rect x="60" y="10" width="232" height="326" rx="20" fill="#16161D" opacity="0.06"/>
+    <!-- back card, tilted -->
+    <rect x="0" y="26" width="196" height="300" rx="16" fill="#FBEDF2" stroke="#B0184F" stroke-width="4" transform="rotate(-9 98 176)"/>
+    <!-- front card -->
+    <rect x="60" y="0" width="232" height="326" rx="20" fill="#FFFFFF" stroke="#B0184F" stroke-width="4"/>
+    <!-- heart, centered in the upper half -->
+    <g transform="translate(123 74) scale(4.4)">
+      <path d="M12 20.5l-6.9-6.6C2.6 11.5 3.4 7.6 6.6 6.4c1.9-.7 4 .1 5.4 1.8 1.4-1.7 3.5-2.5 5.4-1.8 3.2 1.2 4 5.1 1.5 7.5L12 20.5z" fill="#B0184F"/>
+    </g>
+    <!-- two faint "text" lines near the bottom -->
+    <rect x="108" y="250" width="136" height="12" rx="6" fill="#F1D5E0"/>
+    <rect x="108" y="276" width="104" height="12" rx="6" fill="#F1D5E0"/>
+  </g>
+</svg>

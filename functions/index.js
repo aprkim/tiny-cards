@@ -1,5 +1,5 @@
 /**
- * Tiny Cards — Cloud Functions (2nd gen).
+ * Kept — Cloud Functions (2nd gen).
  *
  * v2 throughout: it runs on Cloud Run, supports response streaming and a
  * 60-minute timeout, which the streaming ZIP export needs. There is no v1
@@ -158,9 +158,9 @@ function cardBase(card) {
     ' from ' + (clean(card.sender) || 'Sender');
 }
 const README = [
-  'Tiny Cards — backup export',
+  'Kept — backup export',
   '',
-  'A complete backup of your Tiny Cards archive.',
+  'A complete backup of your cards.',
   '',
   "WHAT'S HERE",
   '  cards/         Every card image at full quality. Each filename describes the',
@@ -194,7 +194,7 @@ exports.exportAll = onRequest({memory: '512MiB', timeoutSeconds: 3600}, async (r
 
   const stamp = new Date().toISOString().slice(0, 10);
   res.setHeader('Content-Type', 'application/zip');
-  res.setHeader('Content-Disposition', `attachment; filename="tiny-cards-backup-${stamp}.zip"`);
+  res.setHeader('Content-Disposition', `attachment; filename="kept-backup-${stamp}.zip"`);
 
   const archive = archiver('zip', {store: true});   // images are already compressed
   archive.on('warning', (err) => logger.warn('archive warning: ' + err.message));
@@ -230,13 +230,12 @@ exports.exportAll = onRequest({memory: '512MiB', timeoutSeconds: 3600}, async (r
 });
 
 /**
- * Invites: the owner creates a reusable code; a family member redeems it to
- * REQUEST access (recorded in pendingViewers). The owner then approves — which
- * grants the viewer `viewOf` claim (read-only) and writes the rosters — or denies,
- * which drops the request. Revoking a viewer clears the claim. The rules check the
- * claim, so access is per-Google-account and revocable. All run with the Admin SDK,
- * so they bypass rules and are the only writers of invites / pendingViewers /
- * cardViewers.
+ * Sharing by email (no links, no approval). The owner names an email to share
+ * with; access is a `viewOf` custom claim, granted the moment that Google-verified
+ * email signs in (syncSharedAccess) — or immediately, if the account already
+ * exists. The rules check the claim, so access is per-Google-account and revocable.
+ * All run with the Admin SDK, so they bypass rules and are the only writers of
+ * viewerInvites / emailGrants / sharedWithMe.
  */
 // Per-space sharing: a viewer's `viewOf` custom claim lists the owner uids whose
 // archives they may read. Both the Firestore and Storage rules check it. This
@@ -252,134 +251,109 @@ function requireVerified(auth) {
   if (!auth) throw new HttpsError('unauthenticated', 'Sign in first.');
   if (!auth.token.email_verified) throw new HttpsError('permission-denied', 'Verified email required.');
 }
-
-// Any signed-in user can create a reusable invite to THEIR own archive.
-exports.createInvite = onCall(async (req) => {
-  requireVerified(req.auth);
-  const uid = req.auth.uid;
-  const db = admin.firestore();
-  // One active link at a time: deactivate any existing codes for this owner.
-  const prior = await db.collection('invites').where('ownerUid', '==', uid).get();
-  const batch = db.batch(); let deactivated = 0;
-  prior.forEach((d) => { if (d.data().active) { batch.update(d.ref, {active: false}); deactivated++; } });
-  if (deactivated) await batch.commit();
-
-  const code = crypto.randomBytes(9).toString('base64url');   // ~12 url-safe chars
-  await db.collection('invites').doc(code).set({
-    ownerUid: uid,
-    active: true,
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    expiresAt: admin.firestore.Timestamp.fromMillis(Date.now() + 7 * 24 * 60 * 60 * 1000),  // 7 days
-  });
-  return {code};
-});
-
-// The owner's current active, non-expired invite code (or null). Read-only — the
-// share UI uses this to show the existing link instead of minting a new one.
-exports.getInvite = onCall(async (req) => {
-  requireVerified(req.auth);
-  const snap = await admin.firestore().collection('invites').where('ownerUid', '==', req.auth.uid).get();
-  const now = Date.now();
-  let code = null;
-  snap.forEach((d) => {
-    const v = d.data();
-    if (v.active === true && (!v.expiresAt || v.expiresAt.toMillis() > now)) code = d.id;
-  });
-  return {code};
-});
-
-// Turn off sharing: deactivate all of the owner's invite codes so a leaked/old
-// link stops working (does not affect already-redeemed viewers — revoke those).
-exports.revokeInvite = onCall(async (req) => {
-  requireVerified(req.auth);
-  const db = admin.firestore();
-  const snap = await db.collection('invites').where('ownerUid', '==', req.auth.uid).get();
-  const batch = db.batch(); let n = 0;
-  snap.forEach((d) => { if (d.data().active) { batch.update(d.ref, {active: false}); n++; } });
-  if (n) await batch.commit();
-  return {ok: true};
-});
-
-exports.redeemInvite = onCall(async (req) => {
-  const auth = req.auth;
-  requireVerified(auth);
-  const code = String((req.data && req.data.code) || '').trim();
-  if (!code) throw new HttpsError('invalid-argument', 'Missing invite code.');
-  const db = admin.firestore();
-  const snap = await db.collection('invites').doc(code).get();
-  const v = snap.exists ? snap.data() : null;
-  const expired = !!(v && v.expiresAt && v.expiresAt.toMillis() < Date.now());
-  if (!v || v.active !== true || expired) {
-    throw new HttpsError('failed-precondition', 'This invite link is no longer active — ask for a new one.');
+// Normalize an email for matching: lowercase + trim; for gmail/googlemail also
+// strip dots and +tags in the local part so address variants map to one key.
+function normEmail(raw) {
+  const e = String(raw || '').trim().toLowerCase();
+  const at = e.lastIndexOf('@');
+  if (at < 1) return '';
+  let local = e.slice(0, at), domain = e.slice(at + 1);
+  if (!local || domain.indexOf('.') < 0) return '';
+  if (domain === 'gmail.com' || domain === 'googlemail.com') {
+    local = local.split('+')[0].replace(/\./g, '');
+    domain = 'gmail.com';
   }
-  const ownerUid = v.ownerUid;
-  if (ownerUid === auth.uid) return {ok: true, ownerUid, self: true};   // your own space
+  return local + '@' + domain;
+}
 
-  const owner = await admin.auth().getUser(ownerUid).catch(() => null);
-  const ownerEmail = (owner && owner.email) || '';
-
-  // Already approved? Roster is authoritative — independent of any token-claim
-  // staleness — so a reload after approval returns the space right away.
-  const approved = await db.doc('cardViewers/' + ownerUid + '/viewers/' + auth.uid).get();
-  if (approved.exists) return {ok: true, ownerUid, ownerEmail};
-
-  // Otherwise record a request for the owner to approve. No claim or roster
-  // changes happen here — access is granted only in approveViewer.
-  await db.doc('pendingViewers/' + ownerUid + '/requests/' + auth.uid).set({
-    email: auth.token.email || '', at: admin.firestore.FieldValue.serverTimestamp(), invite: code,
-  });
-  return {status: 'pending', ownerEmail};
-});
-
-// Owner approves a pending viewer: does what redeemInvite used to do (grant the
-// `viewOf` claim + write both rosters), then clears the request. Only over the
-// caller's OWN pending requests (pendingViewers/{auth.uid}/…).
-exports.approveViewer = onCall(async (req) => {
+// Owner grants view access to an email. If a verified account already exists for
+// it, the claim is set immediately (the viewer picks it up on their next open);
+// otherwise it's stored and granted when that email first signs in (syncSharedAccess).
+exports.inviteViewer = onCall(async (req) => {
   const auth = req.auth;
   requireVerified(auth);
   const ownerUid = auth.uid;
-  const viewerUid = String((req.data && req.data.viewerUid) || '').trim();
-  if (!viewerUid) throw new HttpsError('invalid-argument', 'Missing viewerUid.');
+  const rawEmail = String((req.data && req.data.email) || '').trim();
+  const key = normEmail(rawEmail);
+  if (!key) throw new HttpsError('invalid-argument', 'Enter a valid email address.');
+  if (key === normEmail(auth.token.email || '')) {
+    throw new HttpsError('failed-precondition', 'That is your own account.');
+  }
   const db = admin.firestore();
-  const reqRef = db.doc('pendingViewers/' + ownerUid + '/requests/' + viewerUid);
-  const reqSnap = await reqRef.get();
-  if (!reqSnap.exists) throw new HttpsError('not-found', 'No pending request from that person.');
-  const reqData = reqSnap.data() || {};
-
-  await setViewOf(viewerUid, (s) => s.add(ownerUid));   // grant read access
-  const owner = await admin.auth().getUser(ownerUid).catch(() => null);
-  const viewer = await admin.auth().getUser(viewerUid).catch(() => null);
-  const ownerEmail = (owner && owner.email) || '';
-  const viewerEmail = reqData.email || (viewer && viewer.email) || '';
-  await db.doc('cardViewers/' + ownerUid + '/viewers/' + viewerUid).set({
-    email: viewerEmail, redeemedAt: admin.firestore.FieldValue.serverTimestamp(), invite: reqData.invite || '',
+  let status = 'invited', viewerUid = null;
+  // Grant now if the person already has a verified account.
+  let existing = null;
+  try { existing = await admin.auth().getUserByEmail(rawEmail); } catch (e) { existing = null; }
+  if (existing && existing.emailVerified && existing.uid !== ownerUid) {
+    viewerUid = existing.uid; status = 'active';
+    await setViewOf(viewerUid, (s) => s.add(ownerUid));
+    const owner = await admin.auth().getUser(ownerUid).catch(() => null);
+    await db.doc('sharedWithMe/' + viewerUid + '/spaces/' + ownerUid).set({
+      ownerEmail: (owner && owner.email) || '', at: admin.firestore.FieldValue.serverTimestamp(),
+    }, {merge: true});
+  }
+  await db.doc('viewerInvites/' + ownerUid + '/emails/' + key).set({
+    email: rawEmail, invitedAt: admin.firestore.FieldValue.serverTimestamp(), status, viewerUid,
   });
-  await db.doc('sharedWithMe/' + viewerUid + '/spaces/' + ownerUid).set({
-    ownerEmail, at: admin.firestore.FieldValue.serverTimestamp(),
+  await db.doc('emailGrants/' + key + '/owners/' + ownerUid).set({
+    invitedAt: admin.firestore.FieldValue.serverTimestamp(),
   });
-  await reqRef.delete();
-  return {ok: true};   // the viewer must getIdToken(true) to pick up the claim
+  return {status};
 });
 
-// Owner denies a pending request: just drop it. No claim changes.
-exports.denyViewer = onCall(async (req) => {
+// Called by the client right after sign-in / on app open: turns any email-invites
+// for the caller's verified email into a real `viewOf` claim + rosters. Idempotent.
+exports.syncSharedAccess = onCall(async (req) => {
   const auth = req.auth;
   requireVerified(auth);
-  const viewerUid = String((req.data && req.data.viewerUid) || '').trim();
-  if (!viewerUid) throw new HttpsError('invalid-argument', 'Missing viewerUid.');
-  await admin.firestore().doc('pendingViewers/' + auth.uid + '/requests/' + viewerUid).delete().catch(() => {});
-  return {ok: true};
+  const uid = auth.uid;
+  const key = normEmail(auth.token.email || '');
+  if (!key) return {granted: []};
+  const db = admin.firestore();
+  const owners = await db.collection('emailGrants').doc(key).collection('owners').get();
+  if (owners.empty) return {granted: []};
+
+  const u = await admin.auth().getUser(uid);
+  const claims = u.customClaims || {};
+  const have = new Set(claims.viewOf || []);
+  const granted = [];
+  for (const d of owners.docs) {
+    const ownerUid = d.id;
+    if (ownerUid === uid) continue;
+    if (!have.has(ownerUid)) { have.add(ownerUid); granted.push(ownerUid); }
+    // Idempotent rosters + status, so a re-run also repairs any gaps.
+    const owner = await admin.auth().getUser(ownerUid).catch(() => null);
+    await db.doc('sharedWithMe/' + uid + '/spaces/' + ownerUid).set({
+      ownerEmail: (owner && owner.email) || '', at: admin.firestore.FieldValue.serverTimestamp(),
+    }, {merge: true});
+    await db.doc('viewerInvites/' + ownerUid + '/emails/' + key).set({
+      status: 'active', viewerUid: uid,
+    }, {merge: true});
+  }
+  if (granted.length) {
+    await admin.auth().setCustomUserClaims(uid, Object.assign({}, claims, {viewOf: Array.from(have)}));
+  }
+  return {granted};
 });
 
+// Owner removes an email's access: strips the claim + rosters if it was active,
+// and clears the invite either way (covers "cancel invite" and "remove viewer").
 exports.revokeViewer = onCall(async (req) => {
   const auth = req.auth;
   requireVerified(auth);
-  const viewerUid = String((req.data && req.data.viewerUid) || '').trim();
-  if (!viewerUid) throw new HttpsError('invalid-argument', 'Missing viewerUid.');
-  await setViewOf(viewerUid, (s) => s.delete(auth.uid));   // remove MY space from their access
+  const ownerUid = auth.uid;
+  const key = normEmail(String((req.data && req.data.email) || ''));
+  if (!key) throw new HttpsError('invalid-argument', 'Missing email.');
   const db = admin.firestore();
-  await db.doc('cardViewers/' + auth.uid + '/viewers/' + viewerUid).delete().catch(() => {});
-  await db.doc('sharedWithMe/' + viewerUid + '/spaces/' + auth.uid).delete().catch(() => {});
+  const inviteRef = db.doc('viewerInvites/' + ownerUid + '/emails/' + key);
+  const snap = await inviteRef.get();
+  const viewerUid = snap.exists ? (snap.data().viewerUid || null) : null;
+  if (viewerUid) {
+    await setViewOf(viewerUid, (s) => s.delete(ownerUid));
+    await db.doc('sharedWithMe/' + viewerUid + '/spaces/' + ownerUid).delete().catch(() => {});
+  }
+  await inviteRef.delete().catch(() => {});
+  await db.doc('emailGrants/' + key + '/owners/' + ownerUid).delete().catch(() => {});
   return {ok: true};
 });
 
