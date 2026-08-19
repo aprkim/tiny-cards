@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Terms of Service — Kept Cards</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root { --bg:#f2f2f0; --card:#fff; --ink:#111; --muted:#5c5c5c; --line:#e0e0dd; --footer:#161616; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html { scroll-behavior:smooth; }
+  @media (prefers-reduced-motion: reduce){ html{scroll-behavior:auto;} }
+  body { background:var(--bg); color:var(--ink); font-family:'Inter',-apple-system,sans-serif; font-size:16px; line-height:1.65; -webkit-font-smoothing:antialiased; }
+  a { color:var(--ink); }
+  a:focus-visible { outline:2px solid var(--ink); outline-offset:3px; }
+  .eyebrow { font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:0.14em; text-transform:uppercase; color:var(--muted); }
+  header.site { display:flex; align-items:center; justify-content:space-between; padding:28px 6vw; }
+  .logo { font-weight:700; font-size:18px; letter-spacing:-0.01em; text-decoration:none; }
+  header.site nav a { text-decoration:none; font-size:14px; color:var(--muted); margin-left:28px; }
+  header.site nav a:hover { color:var(--ink); }
+  .wrap { max-width:820px; margin:0 auto; padding:40px 6vw 96px; }
+  .titleblock { margin-bottom:48px; }
+  .titleblock h1 { font-size:clamp(34px,5vw,48px); font-weight:700; letter-spacing:-0.02em; line-height:1.1; margin:14px 0 18px; }
+  .meta { font-family:'IBM Plex Mono',monospace; font-size:13px; color:var(--muted); }
+  .toc { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:24px 28px; margin-bottom:56px; }
+  .toc .eyebrow { display:block; margin-bottom:12px; }
+  .toc ol { list-style:none; counter-reset:toc; columns:2; column-gap:40px; }
+  .toc li { counter-increment:toc; margin-bottom:8px; break-inside:avoid; }
+  .toc li a { text-decoration:none; font-size:14.5px; }
+  .toc li a::before { content:counter(toc,decimal-leading-zero); font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--muted); margin-right:10px; }
+  .toc li a:hover { text-decoration:underline; }
+  @media (max-width:640px){ .toc ol{columns:1;} }
+  section { margin-bottom:56px; scroll-margin-top:32px; }
+  section h2 { font-size:24px; font-weight:600; letter-spacing:-0.015em; margin-bottom:16px; }
+  section h3 { font-size:17px; font-weight:600; margin:26px 0 10px; }
+  section p { margin-bottom:14px; color:#2a2a2a; }
+  section ul { margin:0 0 14px 20px; }
+  section li { margin-bottom:8px; color:#2a2a2a; }
+  .inshort { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px 18px; margin-bottom:20px; font-size:14.5px; color:var(--muted); }
+  .inshort .eyebrow { display:inline; margin-right:10px; color:var(--ink); }
+  footer.site { background:var(--footer); color:#b8b8b8; padding:40px 6vw; font-size:13.5px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:16px; }
+  footer.site a { color:#e6e6e6; text-decoration:none; margin-left:24px; }
+  footer.site a:hover { text-decoration:underline; }
+  @media (max-width:640px){ footer.site{flex-direction:column;} footer.site a{margin-left:0; margin-right:24px;} }
+</style>
+</head>
+<body>
+
+<header class="site">
+  <a class="logo" href="/">Kept Cards</a>
+  <nav>
+    <a href="privacy">Privacy</a>
+    <a href="terms" aria-current="page">Terms</a>
+    <a href="mailto:hello@lihallc.com">Contact</a>
+  </nav>
+</header>
+
+<main class="wrap">
+
+  <div class="titleblock">
+    <span class="eyebrow">Legal</span>
+    <h1>Terms of Service</h1>
+    <p class="meta">Effective date: August 19, 2026</p>
+  </div>
+
+  <nav class="toc" aria-label="Contents">
+    <span class="eyebrow">Contents</span>
+    <ol>
+      <li><a href="#agreement">The agreement</a></li>
+      <li><a href="#accounts">Your account</a></li>
+      <li><a href="#content">Your cards and content</a></li>
+      <li><a href="#sharing">Sharing responsibly</a></li>
+      <li><a href="#conduct">Acceptable use</a></li>
+      <li><a href="#payments">Payments and subscriptions</a></li>
+      <li><a href="#ip">Our intellectual property</a></li>
+      <li><a href="#termination">Ending the relationship</a></li>
+      <li><a href="#disclaimers">Disclaimers</a></li>
+      <li><a href="#liability">Limitation of liability</a></li>
+      <li><a href="#disputes">Governing law and disputes</a></li>
+      <li><a href="#general">General terms</a></li>
+    </ol>
+  </nav>
+
+  <section id="agreement">
+    <h2>1. The agreement</h2>
+    <p>These Terms of Service are an agreement between you and Liha LLC, a California limited liability company ("we," "us"), the operator of Kept Cards. They govern your use of the Kept Cards app and websites (the "Service").</p>
+    <p>By creating an account or using the Service, you agree to these terms and to the Kept Cards <a href="privacy">Privacy Policy</a>. If you do not agree, do not use the Service. You must be at least 18 years old, or the age of majority where you live, to create an account.</p>
+  </section>
+
+  <section id="accounts">
+    <h2>2. Your account</h2>
+    <p>You are responsible for your account and everything that happens under it. Keep your credentials secure, give us accurate information, and tell us promptly at <a href="mailto:hello@lihallc.com">hello@lihallc.com</a> if you suspect unauthorized access.</p>
+  </section>
+
+  <section id="content">
+    <h2>3. Your cards and content</h2>
+    <div class="inshort"><span class="eyebrow">In short</span>Your collection stays yours. You give us permission to store and display it so the app works — nothing more.</div>
+    <p>You own the content you save to Kept Cards — your card images, notes, and everything you attach to them ("Your Content").</p>
+    <p>So we can operate the Service, you grant Liha LLC a limited, worldwide, non-exclusive, royalty-free license to host, store, reproduce, and display Your Content — solely to provide the Service to you and to the people you choose to share cards with. This license ends when you delete the content or your account, except for cards already shared with others at your direction and backups retained for a short period. We do not use Your Content for advertising or to train AI models.</p>
+    <p>Kept Cards is for keeping cards you have received, for personal use. Greeting card artwork belongs to its artists and publishers — saving and personally sharing cards you've received is the intended use; do not use the Service to reproduce or distribute card designs commercially.</p>
+  </section>
+
+  <section id="sharing">
+    <h2>4. Sharing responsibly</h2>
+    <p>Cards often carry other people's handwriting, photos, and personal messages. When you share a card, you are responsible for that choice — share things the sender would be comfortable having shared. Recipients of a shared card can view what you shared with them; sharing cannot be fully undone once someone has seen or saved what you sent.</p>
+  </section>
+
+  <section id="conduct">
+    <h2>5. Acceptable use</h2>
+    <p>When using the Service, you agree not to:</p>
+    <ul>
+      <li>Break the law or violate anyone else's rights, including privacy and copyright</li>
+      <li>Upload content that is unlawful or malicious</li>
+      <li>Use the Service to harass or harm others</li>
+      <li>Scrape, reverse engineer, or interfere with the operation or security of the Service</li>
+    </ul>
+    <p>We may remove content or suspend accounts that violate these terms.</p>
+  </section>
+
+  <section id="payments">
+    <h2>6. Payments and subscriptions</h2>
+    <p>Paid features are offered by subscription. Subscriptions renew automatically at the end of each billing period unless you cancel before renewal. Prices are shown before you subscribe; we will notify you before any price change takes effect on your next renewal.</p>
+    <p>Purchases made in our iOS or Android apps are processed by Apple or Google — billing, cancellation, and refunds for those purchases are handled under their terms, in your App Store or Google Play settings. Web purchases are processed by Stripe and can be canceled from your account settings or by emailing us. Canceling stops the next renewal; it does not refund the current period. Except where required by law, payments are non-refundable.</p>
+  </section>
+
+  <section id="ip">
+    <h2>7. Our intellectual property</h2>
+    <p>The Service — including our software, design, text, logo, and the Kept Cards name — is owned by Liha LLC or its licensors and protected by intellectual property laws. Using the Service gives you a personal, non-transferable right to use it as intended, not a license to our IP. If you send us feedback or suggestions, we may use them without obligation to you.</p>
+  </section>
+
+  <section id="termination">
+    <h2>8. Ending the relationship</h2>
+    <p>You can stop using Kept Cards and delete your account at any time — export options for your collection are available in the app. We may suspend or terminate your access if you violate these terms, if required by law, or if we discontinue the Service — in which case we will give reasonable notice where practicable so you can retrieve your collection. Sections that by their nature should survive (content license for already-shared cards, IP, disclaimers, limitation of liability, and disputes) survive termination.</p>
+  </section>
+
+  <section id="disclaimers">
+    <h2>9. Disclaimers</h2>
+    <p>THE SERVICE IS PROVIDED "AS IS" AND "AS AVAILABLE." TO THE FULLEST EXTENT PERMITTED BY LAW, LIHA LLC DISCLAIMS ALL WARRANTIES, EXPRESS OR IMPLIED, INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT. WE DO NOT WARRANT THAT THE SERVICE WILL BE UNINTERRUPTED, ERROR-FREE, OR SECURE. KEEP YOUR OWN COPIES OF CARDS THAT MATTER TO YOU.</p>
+    <p>Some jurisdictions do not allow certain warranty disclaimers, so parts of this section may not apply to you.</p>
+  </section>
+
+  <section id="liability">
+    <h2>10. Limitation of liability</h2>
+    <p>TO THE FULLEST EXTENT PERMITTED BY LAW, LIHA LLC WILL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR ANY LOSS OF DATA, PROFITS, OR GOODWILL, ARISING FROM YOUR USE OF THE SERVICE.</p>
+    <p>TO THE FULLEST EXTENT PERMITTED BY LAW, LIHA LLC'S TOTAL LIABILITY FOR ALL CLAIMS RELATING TO THE SERVICE WILL NOT EXCEED THE GREATER OF (A) THE AMOUNT YOU PAID US IN THE TWELVE MONTHS BEFORE THE CLAIM AROSE, OR (B) FIFTY US DOLLARS ($50).</p>
+    <p>Some jurisdictions do not allow certain limitations of liability, so parts of this section may not apply to you.</p>
+  </section>
+
+  <section id="disputes">
+    <h2>11. Governing law and disputes</h2>
+    <p>These terms are governed by the laws of the State of California, without regard to conflict-of-law rules. Before filing a claim, contact us at <a href="mailto:hello@lihallc.com">hello@lihallc.com</a> — most concerns can be resolved informally. Any dispute that cannot be resolved informally will be brought exclusively in the state or federal courts located in California, and you consent to their jurisdiction. Nothing in this section prevents either party from bringing a qualifying claim in small claims court.</p>
+  </section>
+
+  <section id="general">
+    <h2>12. General terms</h2>
+    <ul>
+      <li><strong>Changes.</strong> We may update these terms as the Service evolves. For material changes, we will give notice by email or in-app before they take effect. Continued use after the effective date means you accept the updated terms.</li>
+      <li><strong>Entire agreement.</strong> These terms and the Privacy Policy are the entire agreement between you and Liha LLC regarding the Service.</li>
+      <li><strong>Severability.</strong> If any provision is found unenforceable, the rest remain in effect.</li>
+      <li><strong>No waiver.</strong> Our not enforcing a provision is not a waiver of it.</li>
+      <li><strong>Assignment.</strong> You may not assign these terms; we may assign them in connection with a merger, acquisition, or sale of assets.</li>
+      <li><strong>Contact.</strong> Kept Cards · operated by Liha LLC · <a href="mailto:hello@lihallc.com">hello@lihallc.com</a></li>
+    </ul>
+  </section>
+
+</main>
+
+<footer class="site">
+  <span>© 2026 Liha LLC. All rights reserved.</span>
+  <span>
+    <a href="privacy">Privacy</a>
+    <a href="terms">Terms</a>
+    <a href="mailto:hello@lihallc.com">hello@lihallc.com</a>
+  </span>
+</footer>
+
+</body>
+</html>

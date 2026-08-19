@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Privacy Policy — Kept Cards</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root { --bg:#f2f2f0; --card:#fff; --ink:#111; --muted:#5c5c5c; --line:#e0e0dd; --footer:#161616; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html { scroll-behavior:smooth; }
+  @media (prefers-reduced-motion: reduce){ html{scroll-behavior:auto;} }
+  body { background:var(--bg); color:var(--ink); font-family:'Inter',-apple-system,sans-serif; font-size:16px; line-height:1.65; -webkit-font-smoothing:antialiased; }
+  a { color:var(--ink); }
+  a:focus-visible { outline:2px solid var(--ink); outline-offset:3px; }
+  .eyebrow { font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:0.14em; text-transform:uppercase; color:var(--muted); }
+  header.site { display:flex; align-items:center; justify-content:space-between; padding:28px 6vw; }
+  .logo { font-weight:700; font-size:18px; letter-spacing:-0.01em; text-decoration:none; }
+  header.site nav a { text-decoration:none; font-size:14px; color:var(--muted); margin-left:28px; }
+  header.site nav a:hover { color:var(--ink); }
+  .wrap { max-width:820px; margin:0 auto; padding:40px 6vw 96px; }
+  .titleblock { margin-bottom:48px; }
+  .titleblock h1 { font-size:clamp(34px,5vw,48px); font-weight:700; letter-spacing:-0.02em; line-height:1.1; margin:14px 0 18px; }
+  .meta { font-family:'IBM Plex Mono',monospace; font-size:13px; color:var(--muted); }
+  .toc { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:24px 28px; margin-bottom:56px; }
+  .toc .eyebrow { display:block; margin-bottom:12px; }
+  .toc ol { list-style:none; counter-reset:toc; columns:2; column-gap:40px; }
+  .toc li { counter-increment:toc; margin-bottom:8px; break-inside:avoid; }
+  .toc li a { text-decoration:none; font-size:14.5px; }
+  .toc li a::before { content:counter(toc,decimal-leading-zero); font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--muted); margin-right:10px; }
+  .toc li a:hover { text-decoration:underline; }
+  @media (max-width:640px){ .toc ol{columns:1;} }
+  section { margin-bottom:56px; scroll-margin-top:32px; }
+  section h2 { font-size:24px; font-weight:600; letter-spacing:-0.015em; margin-bottom:16px; }
+  section h3 { font-size:17px; font-weight:600; margin:26px 0 10px; }
+  section p { margin-bottom:14px; color:#2a2a2a; }
+  section ul { margin:0 0 14px 20px; }
+  section li { margin-bottom:8px; color:#2a2a2a; }
+  .inshort { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px 18px; margin-bottom:20px; font-size:14.5px; color:var(--muted); }
+  .inshort .eyebrow { display:inline; margin-right:10px; color:var(--ink); }
+  footer.site { background:var(--footer); color:#b8b8b8; padding:40px 6vw; font-size:13.5px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:16px; }
+  footer.site a { color:#e6e6e6; text-decoration:none; margin-left:24px; }
+  footer.site a:hover { text-decoration:underline; }
+  @media (max-width:640px){ footer.site{flex-direction:column;} footer.site a{margin-left:0; margin-right:24px;} }
+</style>
+</head>
+<body>
+
+<header class="site">
+  <a class="logo" href="/">Kept Cards</a>
+  <nav>
+    <a href="privacy" aria-current="page">Privacy</a>
+    <a href="terms">Terms</a>
+    <a href="mailto:hello@lihallc.com">Contact</a>
+  </nav>
+</header>
+
+<main class="wrap">
+
+  <div class="titleblock">
+    <span class="eyebrow">Legal</span>
+    <h1>Privacy Policy</h1>
+    <p class="meta">Effective date: August 19, 2026</p>
+  </div>
+
+  <nav class="toc" aria-label="Contents">
+    <span class="eyebrow">Contents</span>
+    <ol>
+      <li><a href="#who">Who we are</a></li>
+      <li><a href="#collect">Information we collect</a></li>
+      <li><a href="#cards">Your cards are private by default</a></li>
+      <li><a href="#use">How we use information</a></li>
+      <li><a href="#share">When we share information</a></li>
+      <li><a href="#retention">How long we keep information</a></li>
+      <li><a href="#rights">Your rights and choices</a></li>
+      <li><a href="#children">Children's privacy</a></li>
+      <li><a href="#security">Security</a></li>
+      <li><a href="#changes">Changes to this policy</a></li>
+      <li><a href="#contact">Contact us</a></li>
+    </ol>
+  </nav>
+
+  <section id="who">
+    <h2>1. Who we are</h2>
+    <p>Kept Cards is an app for keeping and sharing the greeting cards you've received, operated by Liha LLC, a California limited liability company ("we," "us"). For anything in this policy, reach us at <a href="mailto:hello@lihallc.com">hello@lihallc.com</a>.</p>
+    <p>This policy covers Kept Cards — the app and its websites. It does not cover other products operated by Liha LLC, which have their own policies.</p>
+  </section>
+
+  <section id="collect">
+    <h2>2. Information we collect</h2>
+    <div class="inshort"><span class="eyebrow">In short</span>Your account, the cards and notes you save, who you share with, subscription records, and standard analytics and crash data.</div>
+    <h3>Information you provide</h3>
+    <ul>
+      <li><strong>Account information.</strong> Name, email address, and password (stored in hashed form), used to sync your collection across devices.</li>
+      <li><strong>Your cards.</strong> Images of greeting cards you save, plus anything you attach: notes, dates, occasions, and the names of people you associate with a card.</li>
+      <li><strong>Sharing activity.</strong> When you share a card, we record what you shared and who you shared it with, so we can deliver it.</li>
+      <li><strong>Messages to us.</strong> Anything you send us for support.</li>
+    </ul>
+    <h3>Information collected automatically</h3>
+    <ul>
+      <li><strong>Usage and analytics data.</strong> Feature usage, device type, operating system, and approximate region, collected through analytics tools to understand how the app is used.</li>
+      <li><strong>Crash and diagnostic data.</strong> Crash reports and performance data so we can find and fix problems.</li>
+    </ul>
+    <h3>Payment information</h3>
+    <p>Subscription payments are processed by Apple's App Store or Google Play (with RevenueCat for subscription management), or by Stripe on the web. We never receive or store your full card number — only transaction records: what was purchased, when, and the amount.</p>
+  </section>
+
+  <section id="cards">
+    <h2>3. Your cards are private by default</h2>
+    <div class="inshort"><span class="eyebrow">In short</span>Nobody sees your collection unless you share it. Sharing is always your action, card by card.</div>
+    <p>Your card collection is yours. Cards you save are visible only to you unless you actively share them. When you share a card, only the specific card you shared becomes visible, and only to the people you shared it with. We do not browse, publish, or use your cards for anything other than storing and displaying them to you and your chosen recipients.</p>
+    <p>Cards often carry personal things — handwriting, family photos, messages from people you love. We treat your collection accordingly.</p>
+  </section>
+
+  <section id="use">
+    <h2>4. How we use information</h2>
+    <ul>
+      <li>Store your collection and sync it across your devices</li>
+      <li>Deliver cards to people you share them with</li>
+      <li>Manage your subscription and account</li>
+      <li>Respond to your requests and provide support</li>
+      <li>Understand usage so we can improve the app</li>
+      <li>Detect, prevent, and address fraud, abuse, and technical issues</li>
+      <li>Comply with legal obligations</li>
+    </ul>
+    <p>We do not sell your personal information, we do not share it for cross-context behavioral advertising, and we do not use your card images for advertising or to train AI models.</p>
+  </section>
+
+  <section id="share">
+    <h2>5. When we share information</h2>
+    <p>We share personal information only in these situations:</p>
+    <ul>
+      <li><strong>Service providers.</strong> Companies that process data on our behalf: payment processors (Apple, Google, Stripe, RevenueCat), cloud hosting and storage, analytics and crash reporting providers, and email delivery. They may use your data only to provide services to us.</li>
+      <li><strong>People you share with.</strong> The specific cards you choose to share, delivered to your chosen recipients.</li>
+      <li><strong>Legal requirements.</strong> If required by law, legal process, or to protect the rights, safety, or property of our users, the public, or Liha LLC.</li>
+      <li><strong>Business transfers.</strong> If Kept Cards or Liha LLC is involved in a merger, acquisition, or sale of assets, your information may transfer as part of that transaction. We will notify you of any change in ownership or use of your personal information.</li>
+    </ul>
+  </section>
+
+  <section id="retention">
+    <h2>6. How long we keep information</h2>
+    <p>We keep your collection for as long as your account is active. If you delete a card, it is removed from your collection and from our active systems; copies already shared with others at your direction remain with them. If you delete your account, we delete or de-identify your personal information — including your card images — within a reasonable period, except where we must retain records for legal, tax, or accounting purposes (such as transaction records). Analytics data is retained in aggregated or de-identified form.</p>
+  </section>
+
+  <section id="rights">
+    <h2>7. Your rights and choices</h2>
+    <div class="inshort"><span class="eyebrow">In short</span>You can access, correct, download, or delete your information — including your whole collection. Email us and we'll handle it.</div>
+    <p>Depending on where you live, you may have rights under laws such as the California Consumer Privacy Act (CCPA/CPRA), including the right to know what personal information we collect, to access and receive a copy of it, to correct it, to delete it, and not to be discriminated against for exercising these rights.</p>
+    <p>To exercise any of these rights, email <a href="mailto:hello@lihallc.com">hello@lihallc.com</a>. We will verify your request using your account email. We do not sell or share personal information as defined by the CCPA.</p>
+    <p>You can opt out of non-essential emails at any time using the unsubscribe link in any message.</p>
+  </section>
+
+  <section id="children">
+    <h2>8. Children's privacy</h2>
+    <p>Kept Cards is designed for adults and is not directed to children under 13. We do not knowingly collect personal information from children under 13. If you believe a child under 13 has provided us personal information, contact us at <a href="mailto:hello@lihallc.com">hello@lihallc.com</a> and we will delete it.</p>
+  </section>
+
+  <section id="security">
+    <h2>9. Security</h2>
+    <p>We use industry-standard measures to protect your information, including encryption in transit, hashed passwords, and access controls limiting who can reach personal data. No system is perfectly secure, so we cannot guarantee absolute security — but we work to protect your collection and will notify you of any breach as required by law.</p>
+  </section>
+
+  <section id="changes">
+    <h2>10. Changes to this policy</h2>
+    <p>We may update this policy as Kept Cards evolves. If we make material changes, we will notify you by email or an in-app notice before the changes take effect. The effective date at the top always reflects the current version.</p>
+  </section>
+
+  <section id="contact">
+    <h2>11. Contact us</h2>
+    <p>Questions about this policy or your data:</p>
+    <p><strong>Kept Cards</strong> · operated by Liha LLC<br>
+    <a href="mailto:hello@lihallc.com">hello@lihallc.com</a></p>
+  </section>
+
+</main>
+
+<footer class="site">
+  <span>© 2026 Liha LLC. All rights reserved.</span>
+  <span>
+    <a href="privacy">Privacy</a>
+    <a href="terms">Terms</a>
+    <a href="mailto:hello@lihallc.com">hello@lihallc.com</a>
+  </span>
+</footer>
+
+</body>
+</html>
