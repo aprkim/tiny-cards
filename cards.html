@@ -412,6 +412,16 @@
   .share-row .who{overflow-wrap:anywhere}
   .share-row button{font:inherit;font-size:12.5px;padding:5px 12px;border-radius:100px;border:1px solid var(--rule);background:var(--field);color:var(--muted);cursor:pointer;flex-shrink:0}
   .share-row button:hover{border-color:#BF3143;color:#BF3143;background:#FEF2F2}
+  #sharePending{margin-bottom:16px}
+  .share-pending-h{font-size:12px;font-weight:600;color:var(--accent);margin-bottom:8px}
+  .share-req{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:14px;margin-bottom:8px}
+  .share-req .who{overflow-wrap:anywhere;flex:1;min-width:0}
+  .share-req .req-btns{display:flex;gap:6px;flex-shrink:0}
+  .share-req button{font:inherit;font-size:12.5px;padding:5px 12px;border-radius:100px;cursor:pointer;border:1px solid var(--rule)}
+  .req-approve{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .req-approve:hover{background:#8E1340;border-color:#8E1340}
+  .req-deny{background:var(--field);color:var(--muted)}
+  .req-deny:hover{border-color:#BF3143;color:#BF3143;background:#FEF2F2}
   .share-empty{font-size:13px;color:var(--muted)}
   /* Sign out reads as a real button and acts on the first tap (no confirm). */
   .signout{
@@ -725,7 +735,7 @@
         <span>Delete All Cards</span>
       </button>
     </div>
-    <p class="setver">v2026.08.18.1</p>
+    <p class="setver">v2026.08.18.2</p>
   </div>
 </div>
 
@@ -748,6 +758,11 @@
       </div>
       <h3>Share your cards with family</h3>
       <p>They can view — never edit or delete.</p>
+    </div>
+
+    <div id="sharePending" class="hidden">
+      <div class="share-pending-h">Requests to join</div>
+      <div id="pendingList"></div>
     </div>
 
     <div id="shareListWrap" class="hidden">
@@ -904,16 +919,7 @@
     if(!authUser||!isOwner())return;
     if(isNativeApp()){nativeExport();return;}
     if(!canExport())return;
-    var btn=$('setExport'),hint=$('setExportHint');
-    btn.disabled=true;hint.textContent='Preparing…';
-    authUser.getIdToken().then(function(tok){
-      window.location.href=EXPORT_URL+'?token='+encodeURIComponent(tok);
-      setTimeout(function(){hint.textContent='Started — check downloads';btn.disabled=false;},2500);
-    }).catch(function(e){
-      hint.textContent='ZIP backup';btn.disabled=false;
-      openAlert('Could not start the export. Please try again.','Export failed');
-      if(window.console)console.warn(e);
-    });
+    runWebExport();
   };
 
   // ---- native "Save to Files" export (Capacitor: Filesystem + Share + Network) ----
@@ -953,17 +959,15 @@
 
   function exportReset(){$('exportProg').classList.add('hidden');$('setExport').classList.remove('hidden');$('setExportHint').textContent='about '+exportMB()+' MB';loadLastSaved();}
 
-  function runNativeExport(Fs,Share,total){
-    // Progress UI
+  function beginExportUI(total){
     $('setExport').classList.add('hidden');$('exportLast').classList.add('hidden');
     $('exportFill').parentNode.classList.toggle('indet',!total);
     $('exportFill').style.width='0%';$('exportPct').textContent='Preparing…';
     $('exportCancel').disabled=false;$('exportProg').classList.remove('hidden');
-
-    var controller=('AbortController' in window)?new AbortController():null, cancelled=false;
-    $('exportCancel').onclick=function(){cancelled=true;$('exportCancel').disabled=true;$('exportPct').textContent='Cancelling…';if(controller)controller.abort();};
-
-    authUser.getIdToken().then(function(tok){
+  }
+  // Fetch the export zip with determinate progress (total from stored bytes) → Blob.
+  function fetchExportZip(controller,total){
+    return authUser.getIdToken().then(function(tok){
       return fetch(EXPORT_URL+'?token='+encodeURIComponent(tok),controller?{signal:controller.signal}:{});
     }).then(function(resp){
       if(!resp.ok)throw new Error('http '+resp.status);
@@ -975,7 +979,14 @@
         if(total){var pct=Math.min(99,Math.round(got/total*100));$('exportFill').style.width=pct+'%';$('exportPct').textContent=pct+'%';}
         return pump();
       });})();
-    }).then(function(blob){
+    });
+  }
+
+  function runNativeExport(Fs,Share,total){
+    beginExportUI(total);
+    var controller=('AbortController' in window)?new AbortController():null, cancelled=false;
+    $('exportCancel').onclick=function(){cancelled=true;$('exportCancel').disabled=true;$('exportPct').textContent='Cancelling…';if(controller)controller.abort();};
+    fetchExportZip(controller,total).then(function(blob){
       $('exportPct').textContent='Saving…';return blobToBase64(blob);
     }).then(function(b64){
       // Assembled fully in memory, so a cancel/failure never writes a partial file.
@@ -992,6 +1003,30 @@
       if(window.console)console.warn('export failed',e);
       $('exportProg').classList.add('hidden');$('setExport').classList.remove('hidden');
       $('setExportHint').textContent='Couldn’t save — tap to try again';loadLastSaved();
+    });
+  }
+
+  // Web: same streamed download + progress, ending in a browser save (Downloads).
+  function runWebExport(){
+    var total=exportBytes();
+    beginExportUI(total);
+    var controller=('AbortController' in window)?new AbortController():null, cancelled=false;
+    $('exportCancel').onclick=function(){cancelled=true;$('exportCancel').disabled=true;$('exportPct').textContent='Cancelling…';if(controller)controller.abort();};
+    fetchExportZip(controller,total).then(function(blob){
+      if(total){$('exportFill').style.width='100%';}
+      $('exportPct').textContent='Done';
+      var url=URL.createObjectURL(blob);
+      var a=document.createElement('a');a.href=url;a.download='tiny-cards-backup-'+new Date().toISOString().slice(0,10)+'.zip';
+      document.body.appendChild(a);a.click();a.remove();
+      setTimeout(function(){URL.revokeObjectURL(url);},4000);
+      $('exportProg').classList.add('hidden');$('setExport').classList.remove('hidden');
+      $('setExportHint').textContent='Downloaded';
+    }).catch(function(e){
+      $('exportProg').classList.add('hidden');$('setExport').classList.remove('hidden');
+      if(cancelled||(e&&e.name==='AbortError')){$('setExportHint').textContent='ZIP backup';return;}
+      if(window.console)console.warn('export failed',e);
+      $('setExportHint').textContent='Couldn’t download — tap to try again';
+      openAlert('Could not download the backup. Please try again.','Export failed');
     });
   }
 
@@ -1016,7 +1051,11 @@
     var code=inviteCode;inviteCode=null;
     return fns().httpsCallable('redeemInvite')({code:code})
       .then(function(r){
-        return authUser.getIdToken(true).then(function(){cleanInviteURL();return (r&&r.data)||null;});
+        var data=(r&&r.data)||null;
+        return authUser.getIdToken(true).then(function(){
+          if(data&&data.ownerUid)cleanInviteURL();   // approved/self → drop the code; pending keeps it so a reload can re-check
+          return data;
+        });
       });
   }
 
@@ -1040,16 +1079,19 @@
     // Open straight into a stable loading state, then render the real content once
     // BOTH lookups (viewers + current invite link) resolve — so the sheet appears
     // in its final layout instead of flashing a stale frame and jumping twice.
-    ['shareHero','shareListWrap','shareLinkRow','shareOff','shareNew'].forEach(function(id){$(id).classList.add('hidden');});
+    ['shareHero','sharePending','shareListWrap','shareLinkRow','shareOff','shareNew'].forEach(function(id){$(id).classList.add('hidden');});
     $('shareBusy').classList.remove('hidden');
     $('share').classList.remove('hidden');
     Promise.all([
       fns().httpsCallable('getInvite')({}).then(function(r){return (r&&r.data&&r.data.code)||'';},function(){return '';}),
-      fetchViewers().catch(function(){return null;})   // null → empty-hero fallback
+      fetchViewers().catch(function(){return null;}),          // null → hero/empty fallback
+      fetchPending().catch(function(){return [];})
     ]).then(function(res){
       $('shareBusy').classList.add('hidden');
       $('shareNew').classList.remove('hidden');$('shareNew').disabled=false;
+      renderPending(res[2]);
       renderViewers(res[1]);
+      setShareHero(res[1],res[2]);
       paintInvite(res[0]);
     });
   }
@@ -1090,11 +1132,19 @@
       var arr=[];qs.forEach(function(doc){arr.push({uid:doc.id,email:(doc.data()||{}).email});});return arr;
     });
   }
-  // Paint the viewer list (or the empty hero). null = fetch failed → hero fallback.
+  function fetchPending(){
+    return fbDb.collection('pendingViewers').doc(myUid).collection('requests').get().then(function(qs){
+      var arr=[];qs.forEach(function(doc){arr.push({uid:doc.id,email:(doc.data()||{}).email});});return arr;
+    });
+  }
+  // Hero shows only when there are neither pending requests nor viewers.
+  function setShareHero(viewers,pending){
+    $('shareHero').classList.toggle('hidden',!!((viewers&&viewers.length)||(pending&&pending.length)));
+  }
+  // Paint the approved-viewer list.
   function renderViewers(viewers){
     var list=$('shareList');list.innerHTML='';
     var has=!!(viewers&&viewers.length);
-    $('shareHero').classList.toggle('hidden',has);       // hero only when no viewers
     $('shareListWrap').classList.toggle('hidden',!has);
     if(!has)return;
     viewers.forEach(function(v){
@@ -1103,14 +1153,41 @@
       var rm=document.createElement('button');rm.type='button';rm.textContent='Remove';
       rm.onclick=function(){
         rm.disabled=true;rm.textContent='…';
-        fns().httpsCallable('revokeViewer')({viewerUid:v.uid}).then(loadViewers)
-          .catch(function(e){rm.disabled=false;rm.textContent='Remove';openAlert('Could not remove that person. Please try again.','Viewers');if(window.console)console.warn(e);});
+        fns().httpsCallable('revokeViewer')({viewerUid:v.uid}).then(refreshShareLists)
+          .catch(function(e){rm.disabled=false;rm.textContent='Remove';openAlert('Could not remove that person. Please try again.','Family viewers');if(window.console)console.warn(e);});
       };
       row.appendChild(who);row.appendChild(rm);list.appendChild(row);
     });
   }
-  // Refresh the list in place (used after removing a viewer).
-  function loadViewers(){return fetchViewers().then(renderViewers,function(){renderViewers(null);});}
+  // Paint the pending-request list (above the viewers), each with Approve / Deny.
+  function renderPending(reqs){
+    var list=$('pendingList');list.innerHTML='';
+    var has=!!(reqs&&reqs.length);
+    $('sharePending').classList.toggle('hidden',!has);
+    if(!has)return;
+    reqs.forEach(function(r){
+      var row=document.createElement('div');row.className='share-req';
+      var who=document.createElement('span');who.className='who';who.textContent=r.email||r.uid;
+      var btns=document.createElement('div');btns.className='req-btns';
+      var ap=document.createElement('button');ap.type='button';ap.className='req-approve';ap.textContent='Approve';
+      var dn=document.createElement('button');dn.type='button';dn.className='req-deny';dn.textContent='Deny';
+      ap.onclick=function(){actOnRequest(ap,dn,'approveViewer',r.uid);};
+      dn.onclick=function(){actOnRequest(dn,ap,'denyViewer',r.uid);};
+      btns.appendChild(ap);btns.appendChild(dn);row.appendChild(who);row.appendChild(btns);list.appendChild(row);
+    });
+  }
+  function actOnRequest(clicked,other,fn,viewerUid){
+    clicked.disabled=true;other.disabled=true;clicked.textContent='…';
+    fns().httpsCallable(fn)({viewerUid:viewerUid}).then(refreshShareLists).catch(function(e){
+      clicked.disabled=false;other.disabled=false;
+      openAlert('Could not update that request. Please try again.','Family viewers');if(window.console)console.warn(e);
+    });
+  }
+  // Refresh both lists in place (after approve / deny / remove).
+  function refreshShareLists(){
+    return Promise.all([fetchViewers().catch(function(){return null;}),fetchPending().catch(function(){return [];})])
+      .then(function(res){renderPending(res[1]);renderViewers(res[0]);setShareHero(res[0],res[1]);});
+  }
   // Signs out on the first tap — no confirm step.
   $('setSignOut').onclick=function(){closeSettings();doSignOut()};
   function doSignOut(){
@@ -1257,6 +1334,20 @@
     loadCloud();
   }
 
+  // Viewer requested access but the owner hasn't approved yet — park on the invite
+  // screen. Tapping reloads (re-runs redeemInvite; once approved it returns the
+  // space and loads normally). Approval also surfaces in the space switcher.
+  function showWaiting(ownerEmail){
+    $('view').classList.add('hidden');
+    $('start').classList.remove('hidden');
+    $('gearBtn').classList.add('hidden');
+    var who=ownerEmail||'the owner';
+    $('cloudTitle').textContent='Waiting for approval';
+    $('cloudSub').textContent='Waiting for '+who+' to approve your access. Tap to check again.';
+    $('cloudOpen').onclick=function(){location.reload();};
+    $('cloudOpen').onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();location.reload();}};
+  }
+
   $('cloudOpen').onclick=loadCloud;
   $('cloudOpen').onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();loadCloud()}};
 
@@ -1274,6 +1365,7 @@
       return ensureAccess();                     // redeem an invite link, if present
     }).then(function(redeemed){
       if(!authUser)return null;
+      if(redeemed&&redeemed.status==='pending'){showWaiting(redeemed.ownerEmail);return null;}
       if(redeemed&&redeemed.ownerUid)SPACE=redeemed.ownerUid;   // open the space just shared with me
       cloudCode=SPACE;
       return fbDb.collection('tinyCards').doc(SPACE).get();
@@ -1370,7 +1462,10 @@
     sel.innerHTML=html;sel.value=SPACE;sel.classList.remove('hidden');
     sel.onchange=function(){
       SPACE=sel.value;$('groups').innerHTML='';$('q').value='';filter=null;yearFilter=null;showAllPeople=false;
-      $('cloudSub').textContent='Opening…';loadCloud();
+      $('cloudSub').textContent='Opening…';
+      // Switching to a shared space: refresh the token so a freshly-granted viewOf
+      // claim (just approved) is present before the read.
+      if(SPACE!==myUid&&authUser){authUser.getIdToken(true).then(loadCloud,loadCloud);}else{loadCloud();}
     };
   }
 

@@ -230,12 +230,13 @@ exports.exportAll = onRequest({memory: '512MiB', timeoutSeconds: 3600}, async (r
 });
 
 /**
- * Invites: the owner creates a reusable code; a family member redeems it to earn
- * a `cardsViewer` custom claim (read-only). The owner can revoke a viewer, which
- * clears the claim. The security rules check the claim, so access is per-Google-
- * account and revocable — not a forwardable bearer secret once redeemed. All
- * three run with the Admin SDK, so they bypass rules and are the only writers of
- * the invites / cardViewers collections.
+ * Invites: the owner creates a reusable code; a family member redeems it to
+ * REQUEST access (recorded in pendingViewers). The owner then approves — which
+ * grants the viewer `viewOf` claim (read-only) and writes the rosters — or denies,
+ * which drops the request. Revoking a viewer clears the claim. The rules check the
+ * claim, so access is per-Google-account and revocable. All run with the Admin SDK,
+ * so they bypass rules and are the only writers of invites / pendingViewers /
+ * cardViewers.
  */
 // Per-space sharing: a viewer's `viewOf` custom claim lists the owner uids whose
 // archives they may read. Both the Firestore and Storage rules check it. This
@@ -304,7 +305,8 @@ exports.redeemInvite = onCall(async (req) => {
   requireVerified(auth);
   const code = String((req.data && req.data.code) || '').trim();
   if (!code) throw new HttpsError('invalid-argument', 'Missing invite code.');
-  const snap = await admin.firestore().collection('invites').doc(code).get();
+  const db = admin.firestore();
+  const snap = await db.collection('invites').doc(code).get();
   const v = snap.exists ? snap.data() : null;
   const expired = !!(v && v.expiresAt && v.expiresAt.toMillis() < Date.now());
   if (!v || v.active !== true || expired) {
@@ -313,20 +315,60 @@ exports.redeemInvite = onCall(async (req) => {
   const ownerUid = v.ownerUid;
   if (ownerUid === auth.uid) return {ok: true, ownerUid, self: true};   // your own space
 
-  await setViewOf(auth.uid, (s) => s.add(ownerUid));   // grant read access
-  const db = admin.firestore();
   const owner = await admin.auth().getUser(ownerUid).catch(() => null);
   const ownerEmail = (owner && owner.email) || '';
-  const viewerEmail = auth.token.email || '';
-  // Rosters: the owner sees who can view (cardViewers); the viewer sees whose
-  // archives they can open, with a label (sharedWithMe).
-  await db.doc('cardViewers/' + ownerUid + '/viewers/' + auth.uid).set({
-    email: viewerEmail, redeemedAt: admin.firestore.FieldValue.serverTimestamp(), invite: code,
+
+  // Already approved? Roster is authoritative — independent of any token-claim
+  // staleness — so a reload after approval returns the space right away.
+  const approved = await db.doc('cardViewers/' + ownerUid + '/viewers/' + auth.uid).get();
+  if (approved.exists) return {ok: true, ownerUid, ownerEmail};
+
+  // Otherwise record a request for the owner to approve. No claim or roster
+  // changes happen here — access is granted only in approveViewer.
+  await db.doc('pendingViewers/' + ownerUid + '/requests/' + auth.uid).set({
+    email: auth.token.email || '', at: admin.firestore.FieldValue.serverTimestamp(), invite: code,
   });
-  await db.doc('sharedWithMe/' + auth.uid + '/spaces/' + ownerUid).set({
+  return {status: 'pending', ownerEmail};
+});
+
+// Owner approves a pending viewer: does what redeemInvite used to do (grant the
+// `viewOf` claim + write both rosters), then clears the request. Only over the
+// caller's OWN pending requests (pendingViewers/{auth.uid}/…).
+exports.approveViewer = onCall(async (req) => {
+  const auth = req.auth;
+  requireVerified(auth);
+  const ownerUid = auth.uid;
+  const viewerUid = String((req.data && req.data.viewerUid) || '').trim();
+  if (!viewerUid) throw new HttpsError('invalid-argument', 'Missing viewerUid.');
+  const db = admin.firestore();
+  const reqRef = db.doc('pendingViewers/' + ownerUid + '/requests/' + viewerUid);
+  const reqSnap = await reqRef.get();
+  if (!reqSnap.exists) throw new HttpsError('not-found', 'No pending request from that person.');
+  const reqData = reqSnap.data() || {};
+
+  await setViewOf(viewerUid, (s) => s.add(ownerUid));   // grant read access
+  const owner = await admin.auth().getUser(ownerUid).catch(() => null);
+  const viewer = await admin.auth().getUser(viewerUid).catch(() => null);
+  const ownerEmail = (owner && owner.email) || '';
+  const viewerEmail = reqData.email || (viewer && viewer.email) || '';
+  await db.doc('cardViewers/' + ownerUid + '/viewers/' + viewerUid).set({
+    email: viewerEmail, redeemedAt: admin.firestore.FieldValue.serverTimestamp(), invite: reqData.invite || '',
+  });
+  await db.doc('sharedWithMe/' + viewerUid + '/spaces/' + ownerUid).set({
     ownerEmail, at: admin.firestore.FieldValue.serverTimestamp(),
   });
-  return {ok: true, ownerUid, ownerEmail};   // client must getIdToken(true) to pick up the claim
+  await reqRef.delete();
+  return {ok: true};   // the viewer must getIdToken(true) to pick up the claim
+});
+
+// Owner denies a pending request: just drop it. No claim changes.
+exports.denyViewer = onCall(async (req) => {
+  const auth = req.auth;
+  requireVerified(auth);
+  const viewerUid = String((req.data && req.data.viewerUid) || '').trim();
+  if (!viewerUid) throw new HttpsError('invalid-argument', 'Missing viewerUid.');
+  await admin.firestore().doc('pendingViewers/' + auth.uid + '/requests/' + viewerUid).delete().catch(() => {});
+  return {ok: true};
 });
 
 exports.revokeViewer = onCall(async (req) => {
