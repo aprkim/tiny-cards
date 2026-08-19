@@ -393,7 +393,10 @@
   .exp-last{margin:0 2px 4px;font-size:13px;color:var(--muted)}
   /* Build stamp — bumped every deploy so it's obvious whether the live page is
      the current version. */
-  .setver{margin-top:16px;text-align:center;font-size:10px;color:#9A9AA2;letter-spacing:.02em}
+  .set-legal{margin-top:18px;text-align:center;font-size:12.5px;color:var(--muted)}
+  .set-legal a{color:var(--muted);text-decoration:none}
+  .set-legal a:hover,.set-legal a:focus-visible{color:var(--ink);text-decoration:underline}
+  .setver{margin-top:6px;text-align:center;font-size:10px;color:#9A9AA2;letter-spacing:.02em}
   /* ---- sharing modal (owner) ---- */
   .share-busy{min-height:180px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:14px}
   .share-people-h{font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px}
@@ -728,7 +731,8 @@
         <span>Delete All Cards</span>
       </button>
     </div>
-    <p class="setver">v2026.08.19.2</p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a></p>
+    <p class="setver">v2026.08.19.3</p>
   </div>
 </div>
 
