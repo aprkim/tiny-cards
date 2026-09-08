@@ -28,7 +28,7 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<!-- Google Sign-In callback: REVERSED_CLIENT_ID from GoogleService-Info.plist -->
-				<string>com.googleusercontent.apps.497477643272-k88rdbori6akqir4a3914o814mtktsfr</string>
+				<string>com.googleusercontent.apps.497477643272-pa0b669umo2idk2077sr2rtauitcgteh</string>
 			</array>
 		</dict>
 	</array>
@@ -36,6 +36,11 @@
 	<string>Take photos of your cards to add them to your archive.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Choose card photos from your library to add them to your archive.</string>
+	<!-- Kept uses only standard HTTPS/TLS, which is exempt from export
+	     compliance. Declaring it here avoids the App Store Connect prompt
+	     on every build upload. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>
