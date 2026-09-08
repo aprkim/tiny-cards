@@ -28,7 +28,7 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<!-- Google Sign-In callback: REVERSED_CLIENT_ID from GoogleService-Info.plist -->
-				<string>com.googleusercontent.apps.497477643272-k88rdbori6akqir4a3914o814mtktsfr</string>
+				<string>com.googleusercontent.apps.497477643272-pa0b669umo2idk2077sr2rtauitcgteh</string>
 			</array>
 		</dict>
 	</array>

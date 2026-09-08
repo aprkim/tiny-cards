@@ -3,9 +3,9 @@
 <plist version="1.0">
 <dict>
 	<key>CLIENT_ID</key>
-	<string>497477643272-k88rdbori6akqir4a3914o814mtktsfr.apps.googleusercontent.com</string>
+	<string>497477643272-pa0b669umo2idk2077sr2rtauitcgteh.apps.googleusercontent.com</string>
 	<key>REVERSED_CLIENT_ID</key>
-	<string>com.googleusercontent.apps.497477643272-k88rdbori6akqir4a3914o814mtktsfr</string>
+	<string>com.googleusercontent.apps.497477643272-pa0b669umo2idk2077sr2rtauitcgteh</string>
 	<key>API_KEY</key>
 	<string>AIzaSyDFUaFHu97p6Y90y1JMwnqnFVwRbtdbXAI</string>
 	<key>GCM_SENDER_ID</key>
@@ -13,7 +13,7 @@
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>space.tinywins.cards</string>
+	<string>com.lihallc.kept</string>
 	<key>PROJECT_ID</key>
 	<string>tiny-wins25</string>
 	<key>STORAGE_BUCKET</key>
@@ -29,6 +29,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:497477643272:ios:ce7287bc483ca45ee5f5bd</string>
+	<string>1:497477643272:ios:e2807267b5407ba9e5f5bd</string>
 </dict>
 </plist>
