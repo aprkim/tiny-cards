@@ -408,10 +408,14 @@
   .share-row button:hover{border-color:#BF3143;color:#BF3143;background:#FEF2F2}
   /* Invite by email */
   .share-invite{display:flex;gap:8px;margin-top:4px;align-items:center}
+  /* 16px is a floor, not a taste: WKWebView zooms the whole page when an
+     input smaller than that takes focus, and the viewport allows zoom on
+     purpose. At 15px, focusing this field scaled the layout and pushed the
+     Invite button off the right edge of the sheet. */
   /* width:0 + flex:1 1 0 is the WebKit fix: iOS ignores min-width:0 on a flex
      <input> and lets its content width push the Invite button off-screen while
      typing. An explicit zero base makes flex-grow (not the text) set the width. */
-  .share-invite input{flex:1 1 0;min-width:0;width:0;font:inherit;font-size:15px;padding:11px 12px;border:1px solid var(--rule);border-radius:10px;background:var(--field);color:var(--ink);-webkit-appearance:none;appearance:none}
+  .share-invite input{flex:1 1 0;min-width:0;width:0;font:inherit;font-size:16px;padding:11px 12px;border:1px solid var(--rule);border-radius:10px;background:var(--field);color:var(--ink);-webkit-appearance:none;appearance:none}
   .share-invite input:focus{outline:none;border-color:var(--accent)}
   #inviteBtn{flex:0 0 auto;font:inherit;font-size:15px;font-weight:600;padding:11px 18px;border-radius:10px;border:none;background:var(--accent);color:#fff;cursor:pointer}
   #inviteBtn:hover{background:#8E1340}
