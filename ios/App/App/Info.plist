@@ -36,6 +36,11 @@
 	<string>Take photos of your cards to add them to your archive.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Choose card photos from your library to add them to your archive.</string>
+	<!-- Kept uses only standard HTTPS/TLS, which is exempt from export
+	     compliance. Declaring it here avoids the App Store Connect prompt
+	     on every build upload. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>
