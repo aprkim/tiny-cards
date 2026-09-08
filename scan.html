@@ -1708,32 +1708,31 @@
 
   /* Native camera capture (getPhoto).
 
-     The crop stage is shown the moment the camera returns, before the photo is
-     fetched. Doing it later — inside ingestCapturePhoto, once uriToFile had
-     resolved — left a gap in which the screen underneath repainted, so the app
-     appeared to bounce back to the home page between the shutter and the crop
-     view. The gap grows with the size of the photo.
+     The crop stage is entered before the camera is opened, so the camera
+     dismisses onto the crop view. Doing it inside ingestCapturePhoto — or even
+     on getPhoto resolving — was too late: iOS animates the camera away and only
+     then resolves, so the home screen was already showing underneath.
 
-     Showing it early is safe here in a way it would not be for the web file
+     Entering early is safe here in a way it would not be for the web file
      input, whose cancel fires no event at all: a cancelled getPhoto rejects, so
-     cancelCrop() puts the previous screen back (naming screen if this card
-     already has pages, otherwise the start screen) rather than stranding an
-     empty crop stage. `entered` keeps that restore from firing when the camera
-     failed before we ever left the current screen. */
+     cancelCrop() puts the previous screen back — the naming screen if this card
+     already has pages, otherwise the start screen. */
   function nativeCapture(){
     var C=cam(); if(!C)return openCamera();
-    var entered=false;
+    // Before opening the camera, not after it returns: iOS dismisses the camera
+    // with an animation and resolves getPhoto only once that is done, so the
+    // screen underneath is already on display by the time any of this promise
+    // chain runs. Entering the crop stage first means the camera pulls back to
+    // reveal the crop view rather than the home screen.
+    enterCropStage();
     C.getPhoto({source:'CAMERA',resultType:'uri',quality:92})
-      .then(function(p){
-        entered=true;enterCropStage();
-        return uriToFile(p.webPath,'photo.'+(p.format||'jpg'));
-      })
+      .then(function(p){return uriToFile(p.webPath,'photo.'+(p.format||'jpg'));})
       .then(function(file){
         if(file)return ingestCapturePhoto(file);
-        if(entered)cancelCrop();       // empty result: never sit on a blank stage
+        cancelCrop();                  // empty result: never sit on a blank stage
       })
       .catch(function(e){
-        if(entered)cancelCrop();
+        cancelCrop();                  // cancel or failure: put the screen back
         if(window.console)console.warn('getPhoto',e);
       });
   }
