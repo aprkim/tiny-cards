@@ -1670,11 +1670,11 @@
     });
   }
 
-  // One captured page -> the crop stage. Cancelled captures never call this, so
-  // the current screen is left untouched.
-  function ingestCapturePhoto(f){
-    if(!f)return;
-    if(pendingNewCard){cardNo++;pendingNewCard=false}
+  /* The crop-stage screen switch on its own. Split out of ingestCapturePhoto so
+     the native path can show the stage as soon as the camera returns, instead of
+     waiting for the file to be fetched. Safe to call twice: nextLabel() is pure
+     and the card counters are set from current state. */
+  function enterCropStage(){
     $('start').classList.add('hidden');
     $('finish').classList.add('hidden');
     $('meta').classList.add('hidden');
@@ -1683,6 +1683,14 @@
     $('cardTot').textContent=cardNo;
     $('pageTag').textContent=nextLabel();
     $('fill').style.width='0%';
+  }
+
+  // One captured page -> the crop stage. Cancelled captures never call this, so
+  // the current screen is left untouched.
+  function ingestCapturePhoto(f){
+    if(!f)return;
+    if(pendingNewCard){cardNo++;pendingNewCard=false}
+    enterCropStage();
 
     decodable(f).then(function(file){
       curSource=file;
@@ -1698,13 +1706,36 @@
   }
   camera.onchange=function(){ ingestCapturePhoto(camera.files&&camera.files[0]); };
 
-  // Native camera capture (getPhoto). Cancel throws → swallowed (stay put).
+  /* Native camera capture (getPhoto).
+
+     The crop stage is shown the moment the camera returns, before the photo is
+     fetched. Doing it later — inside ingestCapturePhoto, once uriToFile had
+     resolved — left a gap in which the screen underneath repainted, so the app
+     appeared to bounce back to the home page between the shutter and the crop
+     view. The gap grows with the size of the photo.
+
+     Showing it early is safe here in a way it would not be for the web file
+     input, whose cancel fires no event at all: a cancelled getPhoto rejects, so
+     cancelCrop() puts the previous screen back (naming screen if this card
+     already has pages, otherwise the start screen) rather than stranding an
+     empty crop stage. `entered` keeps that restore from firing when the camera
+     failed before we ever left the current screen. */
   function nativeCapture(){
     var C=cam(); if(!C)return openCamera();
+    var entered=false;
     C.getPhoto({source:'CAMERA',resultType:'uri',quality:92})
-      .then(function(p){return uriToFile(p.webPath,'photo.'+(p.format||'jpg'));})
-      .then(ingestCapturePhoto)
-      .catch(function(e){if(window.console)console.warn('getPhoto',e);});
+      .then(function(p){
+        entered=true;enterCropStage();
+        return uriToFile(p.webPath,'photo.'+(p.format||'jpg'));
+      })
+      .then(function(file){
+        if(file)return ingestCapturePhoto(file);
+        if(entered)cancelCrop();       // empty result: never sit on a blank stage
+      })
+      .catch(function(e){
+        if(entered)cancelCrop();
+        if(window.console)console.warn('getPhoto',e);
+      });
   }
 
   function addAnotherPhoto(){if(pages.length>=MAX_PAGES)return;if(isNativeApp())return nativeCapture();openCamera();}
