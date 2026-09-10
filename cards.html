@@ -369,6 +369,10 @@
   /* Account row: email with a small stats subtext beneath it (right-aligned). */
   .set-row.set-acc{align-items:flex-start}
   .set-accv{display:flex;flex-direction:column;align-items:flex-end;gap:4px;min-width:0}
+  /* Export row: label with its detail beneath, mirroring .set-acc but aligned
+     left, so the right-hand side of the row stays empty. */
+  .set-row.set-stack{align-items:flex-start}
+  .set-stackv{display:flex;flex-direction:column;align-items:flex-start;gap:3px;min-width:0;text-align:left}
   .set-stats{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;text-align:right}
   .set-stats:empty{display:none}
   /* Family viewers row: viewer count (or "Invite" when none) + chevron. */
@@ -721,8 +725,11 @@
         <span>Family viewers</span>
         <span class="set-end"><span class="set-count" id="setShareCount"></span><span class="set-chev" aria-hidden="true">&rsaquo;</span></span>
       </button>
-      <button type="button" class="set-row hidden" id="setExport">
-        <span id="setExportLabel">Export all</span><span class="set-hint" id="setExportHint">ZIP backup</span>
+      <button type="button" class="set-row set-stack hidden" id="setExport">
+        <span class="set-stackv">
+          <span id="setExportLabel">Export all cards</span>
+          <span class="set-hint" id="setExportHint"></span>
+        </span>
       </button>
       <div class="exp-prog hidden" id="exportProg">
         <div class="exp-bar"><div class="exp-fill" id="exportFill"></div></div>
@@ -731,10 +738,6 @@
       <p class="exp-last hidden" id="exportLast"></p>
       <div class="set-sep"></div>
       <button type="button" class="set-row" id="setSignOut"><span>Sign out</span></button>
-      <div class="set-sep hidden" id="wipeSep"></div>
-      <button type="button" class="set-row danger hidden" id="setWipe">
-        <span>Delete All Cards</span>
-      </button>
       <div class="set-sep"></div>
       <!-- Account deletion. Unlike Delete All Cards this is not owner-gated: a
            viewer with no archive of their own still has an account to delete. -->
@@ -881,21 +884,19 @@
     if(owner&&isNativeApp()){
       // Native: a real backup — fetch the zip, write to cache, open the share sheet.
       $('setExport').classList.toggle('hidden',!(fromCloud&&cards.length>0));
-      $('setExportLabel').textContent='Save all cards to Files';
-      $('setExportHint').textContent='about '+exportMB()+' MB';
+      $('setExportLabel').textContent='Export all cards';
+      $('setExportHint').textContent=exportSubtext();
       loadLastSaved();
     }else{
       $('setExport').classList.toggle('hidden',!canExport());        // owner + desktop
-      $('setExportLabel').textContent='Export all';
-      $('setExportHint').textContent='ZIP backup';
+      $('setExportLabel').textContent='Export all cards';
+      $('setExportHint').textContent=exportSubtext();
       $('exportLast').classList.add('hidden');
     }
     // Library summary as a subtext under the email (whole archive, not filtered).
     var photos=0,ppl={};cards.forEach(function(x){photos+=x.pages.length;ppl[x.person]=1;});
     $('meta').textContent=cards.length?(plur(cards.length,'card')+' · '+plur(photos,'photo')+' · '+plur(Object.keys(ppl).length,'person','people')):'';
     var hasCards=fromCloud&&cards.length>0;
-    $('wipeSep').classList.toggle('hidden',!(owner&&hasCards));
-    $('setWipe').classList.toggle('hidden',!(owner&&hasCards));
     if(owner)loadViewerCount();          // "N" viewers, or "Invite" when none
     $('settings').classList.remove('hidden');
   }
@@ -957,7 +958,12 @@
       });
   }
 
-  function exportReset(){$('exportProg').classList.add('hidden');$('setExport').classList.remove('hidden');$('setExportHint').textContent='about '+exportMB()+' MB';loadLastSaved();}
+  /* The detail line under the export label. Native saves into Files; on the web
+     the same zip is a download, so the wording differs while the size does not. */
+  function exportSubtext(){
+    return (isNativeApp()?'Save to Files':'ZIP backup')+' · about '+exportMB()+' MB';
+  }
+  function exportReset(){$('exportProg').classList.add('hidden');$('setExport').classList.remove('hidden');$('setExportHint').textContent=exportSubtext();loadLastSaved();}
 
   function beginExportUI(total){
     $('setExport').classList.add('hidden');$('exportLast').classList.add('hidden');
@@ -1023,7 +1029,7 @@
       $('setExportHint').textContent='Downloaded';
     }).catch(function(e){
       $('exportProg').classList.add('hidden');$('setExport').classList.remove('hidden');
-      if(cancelled||(e&&e.name==='AbortError')){$('setExportHint').textContent='ZIP backup';return;}
+      if(cancelled||(e&&e.name==='AbortError')){$('setExportHint').textContent=exportSubtext();return;}
       if(window.console)console.warn('export failed',e);
       $('setExportHint').textContent='Couldn’t download — tap to try again';
       openAlert('Could not download the backup. Please try again.','Export failed');
@@ -1744,20 +1750,9 @@
      Irreversible and, for the cloud archive, affects every device sharing the
      code. A plain confirm() is too easy to click through for that, so this
      asks the user to type the word. */
-  // Delete All now lives in the settings sheet. Close the sheet first so the
-  // type-to-confirm dialog shows on its own (same pattern as Share).
-  $('setWipe').onclick=function(){
-    var n=cards.length;
-    if(!n||!isOwner())return;
-    closeSettings();
-    openConfirm({
-      title:'Delete all '+n+' card'+(n===1?'':'s')+'?',
-      body:'This deletes all cards from every device and cannot be undone. Exported files are not affected.',
-      input:true,requireText:'DELETE',inputLabel:'Type DELETE to confirm.',
-      confirmText:'Delete all',danger:true,
-      onConfirm:doWipe
-    });
-  };
+  // The Delete All Cards row was removed from Settings: Delete Account is the
+  // only destructive action there now. doWipe() below is left intact and simply
+  // has no caller, so restoring the row is a markup change and nothing more.
   /* Account deletion (App Store guideline 5.1.1(v)). Calls the deleteAccount
      callable, which removes the Storage, Firestore and Auth records server-side,
      then signs out so the app lands back on the start screen with no session.
