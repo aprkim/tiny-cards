@@ -620,16 +620,15 @@
   }
   .modal-input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
   /* Privacy · Terms and the build stamp — bumped every deploy so it's obvious
-     whether the live page is the current version. One block, as on the archive's
-     sheet: `.sheet p` outranks .set-legal on specificity and would wedge ~30px
-     between the two lines, so drop the margins there and tighten only the
-     leading. The 18px above is deliberate — it detaches the pair from the rows. */
+     whether the live page is the current version. One line, as on the archive's
+     sheet: `.sheet p` outranks .set-legal on specificity and would apply its
+     margin-bottom:22px, floating the line off the bottom of the sheet. The 18px
+     above is deliberate — it detaches the line from the rows. */
   .set-legal{margin-top:18px;text-align:center;font-size:12.5px;color:var(--muted)}
   .set-legal a{color:var(--muted);text-decoration:none}
   .set-legal a:hover,.set-legal a:focus-visible{color:var(--ink);text-decoration:underline}
-  .setver{margin-top:6px;text-align:center;font-size:10px;color:#9A9AA2;letter-spacing:.02em}
+  .setver{font-size:10px;color:#9A9AA2;letter-spacing:.02em}
   .sheet .set-legal{margin-bottom:0;line-height:1.4}
-  .sheet .setver{margin-top:0;line-height:1.4}
   /* ---- sharing modal (owner) ---- */
   .share-sub{font-size:13.5px;color:var(--muted);line-height:1.55;margin:-2px 0 16px}
   .share-linkrow{display:flex;gap:8px;margin-bottom:12px}
@@ -916,8 +915,7 @@
         <span>Delete Account</span>
       </button>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a></p>
-    <p class="setver">v2026.08.19.1</p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.08.19.1</span></p>
   </div>
 </div>
 
