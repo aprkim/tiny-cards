@@ -11,9 +11,11 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!--
   This page is deliberately SELF-CONTAINED: no Firebase, no SDKs, no network
-  requests at all. It exists as the escape hatch for the export ZIP — if the
-  cloud archive is ever gone, a saved copy of this one file still browses the
-  exported images, because the filenames carry the data.
+  requests at all. (The back link only reads the session other pages already
+  saved on this device — see the last script.) It exists as the escape hatch
+  for the export ZIP — if the cloud archive is ever gone, a saved copy of this
+  one file still browses the exported images, because the filenames carry the
+  data.
 -->
 <style>
   :root{
@@ -55,27 +57,25 @@
   .tabbar a.on{color:var(--accent)}
   .tabbar a:active{background:rgba(0,0,0,.035)}
   h1{font-size:19px;font-weight:700;letter-spacing:-.02em}
-  header p{font-size:13.5px;color:var(--muted);margin-top:3px}
 
+  /* The one thing to do on this page, so it is the biggest thing on it: a
+     solid brand-coloured target, a folder picture above the words, and two
+     short words beneath — readable at a glance without much English. */
   .drop{
-    border:1.5px dashed var(--rule);border-radius:14px;padding:22px 20px;
-    text-align:center;background:var(--field);cursor:pointer;
+    border:2px solid var(--accent);border-radius:18px;padding:34px 24px;
+    text-align:center;background:var(--accent-soft);cursor:pointer;
     transition:border-color .15s,background .15s;
-    min-height:128px;
+    min-height:230px;
     display:flex;flex-direction:column;align-items:center;justify-content:center;
+    -webkit-tap-highlight-color:transparent;
   }
-  .drop:hover,.drop:focus-visible{border-color:#BFBAAE;background:#F3F1EB}
+  .drop:hover,.drop:focus-visible,.drop:active{border-color:#8E1340;background:#F7DCE6}
+  .dropicon{width:64px;height:64px;color:var(--accent);margin-bottom:14px}
   .drop:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-  .drop strong{display:block;font-size:15.5px;font-weight:600;margin-bottom:6px}
-  .drop span{font-size:13px;color:var(--muted)}
-
-  .hint{
-    margin-top:18px;padding:13px 15px;background:var(--field);
-    border:1px solid var(--rule);border-radius:12px;
-    font-size:13px;color:var(--muted);line-height:1.75;
-  }
-  .hint b{color:var(--ink);font-weight:600}
-  .hint code{font-size:12.5px;background:var(--paper);padding:2px 6px;border-radius:5px;color:var(--ink)}
+  .drop strong{display:block;font-size:21px;font-weight:700;color:var(--accent);margin-bottom:6px}
+  /* Darker than --muted: that gray measured 4.44:1 on this pink (3.92 pressed),
+     under the 4.5 minimum, and this line is read by people who struggle with it. */
+  .drop span{font-size:15px;color:#63636D}
 
   input[type=search]{
     width:100%;font:inherit;font-size:16px;padding:12px 14px;
@@ -155,26 +155,20 @@
 
   <header>
     <h1>Card File Viewer</h1>
-    <p>Browse a folder of exported card files. Nothing is uploaded — this page works offline.</p>
   </header>
 
   <section id="start">
     <div class="drop" id="drop" tabindex="0" role="button">
+      <svg class="dropicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4.1c.4 0 .78.16 1.06.44L11.2 8h8.3A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>
       <strong>Open Card Files</strong>
-      <span>Select the exported images all at once</span>
+      <span>Select files</span>
     </div>
     <input type="file" id="picker" accept="image/*" multiple class="hidden">
 
-    <div class="hint">
-      The filename is the data. <code>2026-08-03 Mothers Day - Hazel from Grandma Kim - front.jpg</code>
-      is read as date, occasion, recipient, sender, and page. Older names like
-      <code>2026-08-02 HazelBirthday Grandma Kim.jpg</code> still work.
-      Multi-photo cards are grouped automatically, and anything that doesn't match
-      lands in <b>Unsorted</b>, so nothing disappears.
-    </div>
-
     <div class="footlink">
-      <a class="altlink" href="cards.html">&larr; Back to your cards</a>
+      <!-- Starts as the signed-out link, which is right for everyone; the
+           script at the end upgrades it when this device holds a session. -->
+      <a class="altlink" id="backLink" href="./">&larr; Back</a>
     </div>
   </section>
 
@@ -403,5 +397,54 @@
     <span>View</span>
   </a>
 </nav>
+<script>
+/* Back link. This page stays self-contained — no Firebase SDK, no network —
+   so rather than ask Firebase who is signed in, it looks for the session that
+   the other pages' Firebase SDK (v8, default LOCAL persistence) has already
+   saved on this device: localStorage first, then the IndexedDB store that SDK
+   prefers. Any "firebase:authUser:" entry counts, so an API-key change can't
+   silently break it.
+
+   The default is the signed-out "← Back" to the home screen, which works for
+   everyone. If the lookup fails or that storage format ever changes, the link
+   still goes somewhere sensible; it just says less. */
+(function(){
+  var PREFIX='firebase:authUser:';
+  function upgrade(){
+    var a=document.getElementById('backLink');
+    if(!a)return;
+    a.textContent='\u2190 Back to your cards';
+    a.setAttribute('href','cards.html');
+  }
+  try{
+    for(var i=0;i<localStorage.length;i++){
+      if((localStorage.key(i)||'').indexOf(PREFIX)===0){upgrade();return;}
+    }
+  }catch(e){}
+  try{
+    if(!window.indexedDB)return;
+    var open=indexedDB.open('firebaseLocalStorageDb');
+    /* Never create that database from here. If it doesn't exist yet, opening
+       it would make an empty one, and the Firebase SDK on the other pages would
+       then find a database without its store. Abort instead. */
+    open.onupgradeneeded=function(){open.transaction.abort();};
+    open.onerror=function(e){if(e&&e.preventDefault)e.preventDefault();};
+    open.onsuccess=function(){
+      var db=open.result;
+      try{
+        if(!db.objectStoreNames.contains('firebaseLocalStorage')){db.close();return;}
+        var cur=db.transaction('firebaseLocalStorage','readonly').objectStore('firebaseLocalStorage').openCursor();
+        cur.onsuccess=function(){
+          var c=cur.result;
+          if(!c){db.close();return;}
+          if(String(c.key).indexOf(PREFIX)===0&&c.value&&c.value.value){upgrade();db.close();return;}
+          c.continue();
+        };
+        cur.onerror=function(){db.close();};
+      }catch(e){db.close();}
+    };
+  }catch(e){}
+})();
+</script>
 </body>
 </html>
