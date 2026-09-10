@@ -141,7 +141,11 @@
   }
   /* 150px when there's room, but flex-shrink lets it scale down on a very short
      screen so the button below is never pushed off. */
-  .heroart{position:relative;height:150px;max-height:150px;margin:0 auto 18px;width:126px;flex:0 1 auto;min-height:0}
+  .heroart{position:relative;height:150px;max-height:150px;margin:0 auto 18px;width:126px;flex:0 1 auto;min-height:0;
+    display:block;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .12s ease}
+  .heroart:active{transform:scale(.97)}
+  .heroart:focus-visible{outline:2px solid var(--accent);outline-offset:8px;border-radius:14px}
+  @media (prefers-reduced-motion:reduce){.heroart{transition:none}}
   .heroart span{position:absolute;border-radius:12px;background:#fff;border:2.5px solid var(--accent)}
   .heroart .c1{inset:12px 22px 12px 0;transform:rotate(-9deg);background:var(--accent-soft)}
   .heroart .c2{inset:0 0 0 24px;display:flex;align-items:center;justify-content:center}
@@ -447,17 +451,21 @@
   </header>
 
   <!-- Landing screen. A tall flex column: the illustration and the running
-       card count sit up top, the action pair drops into the lower-third thumb
-       zone, and the account row is pinned quietly to the very bottom — out of
-       the path between the illustration and the primary button. -->
+       card count sit up top, the sign-in button drops into the lower-third
+       thumb zone, and the account row is pinned quietly to the very bottom.
+       Once signed in the illustration is the only thing left in the middle,
+       so it is the control that starts a scan. -->
   <section id="home">
     <div class="hero">
-      <div class="heroart" aria-hidden="true">
-        <span class="c1"></span>
-        <span class="c2">
+      <!-- The illustration is the only thing in the middle of an empty home
+           screen, so it does the obvious job: tapping it starts a scan. A real
+           link, so it works before the script runs and reads as a control. -->
+      <a class="heroart" href="scan.html" aria-label="Scan a card">
+        <span class="c1" aria-hidden="true"></span>
+        <span class="c2" aria-hidden="true">
           <svg viewBox="0 0 24 24"><path d="M12 20.5l-6.9-6.6C2.6 11.5 3.4 7.6 6.6 6.4c1.9-.7 4 .1 5.4 1.8 1.4-1.7 3.5-2.5 5.4-1.8 3.2 1.2 4 5.1 1.5 7.5L12 20.5z"/></svg>
         </span>
-      </div>
+      </a>
       <!-- Carries state: the number climbing is the point during a 200-card session -->
       <p class="cardcount" id="cardCount" aria-live="polite"></p>
     </div>
@@ -658,13 +666,15 @@
   };
   $('signOutBtn').onclick=function(){signOutUser().then(paintHome)};
 
-  /* Both tabs turn a signed-out visitor straight back here — scan.html and
-     cards.html each replace themselves with '/' — so tapping one before signing
-     in loaded a whole page just to be sent back, which reads as a flash. Those
-     bounces stay; they still catch someone arriving at a direct URL. This only
-     skips the trip whose answer we already know, and points at the button
-     already on this screen. Gated on auth having actually resolved: an unknown
-     user is not a signed-out one, and blocking on a maybe is worse than a flash. */
+  /* Every route to the scanner or the archive — both tabs and the hero
+     illustration — turns a signed-out visitor straight back here, since
+     scan.html and cards.html each replace themselves with '/'. Tapping one
+     before signing in loaded a whole page just to be sent back, which reads as
+     a flash. Those bounces stay; they still catch someone arriving at a direct
+     URL. This only skips the trip whose answer we already know, and points at
+     the button already on this screen. Gated on auth having actually resolved:
+     an unknown user is not a signed-out one, and blocking on a maybe is worse
+     than a flash. */
   var authReady=false;
   function nudgeSignIn(){
     $('pageSub').textContent='Sign in first — then you can scan and view your cards.';
@@ -678,7 +688,7 @@
   // Delegated from the document: the tab bar parses after this script runs.
   document.addEventListener('click',function(e){
     if(!authReady||authUser)return;
-    var a=e.target&&e.target.closest&&e.target.closest('.tabbar a');
+    var a=e.target&&e.target.closest&&e.target.closest('.tabbar a,.heroart');
     if(!a)return;
     e.preventDefault();
     nudgeSignIn();
