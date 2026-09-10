@@ -591,7 +591,10 @@
 
     <!-- Folder mode is now the export's reader, not a front-door feature.
          It lives on /viewer, reached by a quiet link. -->
-    <div class="footlink">
+    <!-- Hidden for now: the viewer is the export's reader, and surfacing it on
+         the sign-in screen invites people in before they have anything to read.
+         The page itself still works at /viewer for anyone with the link. -->
+    <div class="footlink hidden">
       <a class="altlink" href="viewer.html">Have exported files? Open the file viewer &rarr;</a>
     </div>
   </section>
