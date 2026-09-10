@@ -19,6 +19,10 @@
   :root{
     --ink:#16161D;--paper:#FAF9F6;--accent:#B0184F;--accent-soft:#FBEDF2;
     --muted:#6E6E78;--rule:#E4E2DB;--field:#FFFFFF;
+    /* Same bottom-nav sizing as index/cards/scan. env() is 0 in a desktop
+       browser, so --barh collapses to --tabbar-height there. */
+    --tabbar-height:54px;
+    --barh:calc(var(--tabbar-height) + env(safe-area-inset-bottom));
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html{-webkit-text-size-adjust:100%}
@@ -28,8 +32,28 @@
     padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
     -webkit-font-smoothing:antialiased;
   }
-  .wrap{max-width:760px;margin:0 auto;padding:26px 18px 60px}
+  .wrap{max-width:760px;margin:0 auto;padding:26px 18px calc(60px + var(--barh))}
   header{margin-bottom:22px}
+
+  /* Fixed bottom nav — the same Scan/View bar every other page has. The viewer
+     was the one screen without it, so opening a folder of exported files left
+     no way back at all: the "Back to your cards" link lives in #start, which is
+     hidden once #view appears, and a native webview has no browser chrome to
+     fall back on. */
+  .tabbar{
+    position:fixed;left:0;right:0;bottom:0;z-index:40;
+    display:flex;background:var(--paper);border-top:1px solid var(--rule);
+    min-height:var(--tabbar-height);
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  .tabbar a{
+    flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:2px;padding:8px 0 7px;text-decoration:none;color:var(--muted);
+    font-size:11px;font-weight:600;letter-spacing:.01em;-webkit-tap-highlight-color:transparent;
+  }
+  .tabbar a svg{width:23px;height:23px;display:block}
+  .tabbar a.on{color:var(--accent)}
+  .tabbar a:active{background:rgba(0,0,0,.035)}
   h1{font-size:19px;font-weight:700;letter-spacing:-.02em}
   header p{font-size:13.5px;color:var(--muted);margin-top:3px}
 
@@ -366,5 +390,18 @@
   $('q').addEventListener('input',render);
 })();
 </script>
+<!-- Neither tab is marked current: the viewer is reached from a link inside
+     View, not from the bar itself, so highlighting one would misreport where
+     you are. -->
+<nav class="tabbar" aria-label="Primary">
+  <a href="scan.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9a2 2 0 0 1 2-2h1.6l1.2-1.8A1 1 0 0 1 9.6 5h4.8a1 1 0 0 1 .8.4L16.4 7H19a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="3.3"/></svg>
+    <span>Scan</span>
+  </a>
+  <a href="cards.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="6.4" height="6.4" rx="1.6"/><rect x="13.6" y="4" width="6.4" height="6.4" rx="1.6"/><rect x="4" y="13.6" width="6.4" height="6.4" rx="1.6"/><rect x="13.6" y="13.6" width="6.4" height="6.4" rx="1.6"/></svg>
+    <span>View</span>
+  </a>
+</nav>
 </body>
 </html>
