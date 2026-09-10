@@ -763,7 +763,7 @@
         <span>Delete Account</span>
       </button>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.10.0257</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.10.1202</span></p>
   </div>
 </div>
 
@@ -892,10 +892,9 @@
   // that doesn't belong on a phone), and needs cards to export — an empty
   // archive would hand back an empty zip. Shown only when all three hold.
   var EXPORT_URL='https://us-east1-tiny-wins25.cloudfunctions.net/exportAll';
-  /* Export is off for now: one flag rather than commented-out blocks, so the
-     row and everything that hangs off it disappear together and turning it
-     back on is a one-word change. */
-  var EXPORT_ENABLED=false;
+  /* One switch for the export row and everything that hangs off it (progress
+     bar, last-saved line), so hiding it again is a one-word change. */
+  var EXPORT_ENABLED=true;
   function canExport(){return isOwner()&&window.matchMedia('(min-width:760px)').matches}
   function openSettings(){
     $('setEmail').textContent=(authUser&&authUser.email)||'Signed in';
