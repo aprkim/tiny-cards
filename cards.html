@@ -402,6 +402,15 @@
   .set-legal a{color:var(--muted);text-decoration:none}
   .set-legal a:hover,.set-legal a:focus-visible{color:var(--ink);text-decoration:underline}
   .setver{margin-top:6px;text-align:center;font-size:10px;color:#9A9AA2;letter-spacing:.02em}
+  /* The links and the version are one block of app info, but `.sheet p` outranks
+     .set-legal on specificity (0,1,1 vs 0,1,0) and was applying its
+     margin-bottom:22px — a ~30px gap between the two lines, wider than the 18px
+     separating the pair from the row above, so they read as unrelated. Drop the
+     margins and tighten only the leading; measured optical gap ~6px. The 18px
+     above is deliberately untouched, so the group still detaches from the
+     content above it. */
+  .sheet .set-legal{margin-bottom:0;line-height:1.4}
+  .sheet .setver{margin-top:0;line-height:1.4}
   /* ---- sharing modal (owner) ---- */
   .share-busy{min-height:180px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:14px}
   .share-people-h{font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px}
