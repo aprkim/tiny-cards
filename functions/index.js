@@ -178,7 +178,24 @@ const README = [
   ''
 ].join('\n');
 
-exports.exportAll = onRequest({memory: '512MiB', timeoutSeconds: 3600}, async (req, res) => {
+exports.exportAll = onRequest({
+  memory: '512MiB',
+  timeoutSeconds: 3600,
+  // The app fetches this cross-origin — from https://kept.cards on the web and
+  // from capacitor://localhost inside the iOS webview — so without an
+  // Access-Control-Allow-Origin the browser discards the response before the
+  // client can read it and the export fails instantly with "Failed to fetch".
+  // An allowlist rather than `true`: the id token rides in the query string, so
+  // there is no reason for arbitrary origins to be able to read the reply.
+  cors: [
+    'https://kept.cards',
+    'capacitor://localhost',        // iOS native webview
+    'ionic://localhost',            // older Capacitor scheme
+    'http://localhost',             // local development
+    'https://tiny-wins25.web.app',
+    'https://tiny-wins25.firebaseapp.com',
+  ],
+}, async (req, res) => {
   // --- auth: verified owner only ---
   const token = req.query.token || (req.get('authorization') || '').replace(/^Bearer\s+/i, '');
   if (!token) { res.status(401).send('Sign in required.'); return; }
