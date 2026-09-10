@@ -731,7 +731,7 @@
       </div>
       <div class="set-sep"></div>
       <button type="button" class="set-row hidden" id="setShare">
-        <span>Family viewers</span>
+        <span>Shared with</span>
         <span class="set-end"><span class="set-count" id="setShareCount"></span><span class="set-chev" aria-hidden="true">&rsaquo;</span></span>
       </button>
       <button type="button" class="set-row set-stack hidden" id="setExport">
@@ -766,7 +766,7 @@
     <button type="button" class="sheetx" id="shareClose" aria-label="Close">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
     </button>
-    <h2 id="shareTitle">Family viewers</h2>
+    <h2 id="shareTitle">Shared with</h2>
     <div id="shareBusy" class="share-busy hidden">Loading…</div>
 
     <div id="shareHero" class="share-hero hidden">
@@ -1097,7 +1097,7 @@
       rm.onclick=function(){
         rm.disabled=true;rm.textContent='…';
         fns().httpsCallable('revokeViewer')({email:v.email}).then(refreshInvites)
-          .catch(function(e){rm.disabled=false;rm.textContent='Remove';openAlert('Could not remove that person. Please try again.','Family viewers');if(window.console)console.warn(e);});
+          .catch(function(e){rm.disabled=false;rm.textContent='Remove';openAlert('Could not remove that person. Please try again.','Shared with');if(window.console)console.warn(e);});
       };
       right.appendChild(tag);right.appendChild(rm);
       row.appendChild(who);row.appendChild(right);ul.appendChild(row);
