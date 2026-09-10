@@ -357,6 +357,99 @@ exports.revokeViewer = onCall(async (req) => {
   return {ok: true};
 });
 
+/**
+ * Account deletion (App Store guideline 5.1.1(v): an app that creates accounts
+ * must let people delete them from inside the app).
+ *
+ * Owner-only and self-only: the uid comes from the verified callable context,
+ * never from the request body, so this can only ever delete the caller — the
+ * same guarantee the export and transcribe functions rely on.
+ *
+ * Order matters. Storage and Firestore go first and Auth goes last, because
+ * every step needs admin.auth() lookups and a surviving user record; deleting
+ * the account first would strand the rest. Each step is best-effort so one
+ * failure cannot leave the account half-deleted with no way to retry — a
+ * re-run is idempotent.
+ *
+ * Cross-account cleanup is deliberate, not incidental. Viewers this person
+ * invited hold a `viewOf` claim naming their uid; leaving it would keep a
+ * pointer to an archive that no longer exists.
+ */
+exports.deleteAccount = onCall(async (req) => {
+  const auth = req.auth;
+  requireVerified(auth);
+  const uid = auth.uid;
+  const myKey = normEmail(auth.token.email || '');
+  const db = admin.firestore();
+  const failures = [];
+  const step = async (label, fn) => {
+    try { await fn(); }
+    catch (e) { failures.push(label); logger.error(`deleteAccount:${label}`, {uid, err: e.message}); }
+  };
+
+  // 1) Storage — every master and _thumb under this user's prefix.
+  await step('storage', async () => {
+    await admin.storage().bucket().deleteFiles({prefix: `cards/${uid}/`, force: true});
+  });
+
+  // 2a) Viewers this person invited: strip the claim that points at them, drop
+  //     the viewer's roster entry, and remove the pending grant. Mirrors
+  //     revokeViewer, run for every outstanding invite.
+  await step('revoke-viewers', async () => {
+    const invites = await db.collection('viewerInvites').doc(uid).collection('emails').get();
+    for (const d of invites.docs) {
+      const viewerUid = (d.data() || {}).viewerUid || null;
+      if (viewerUid) {
+        await setViewOf(viewerUid, (s) => s.delete(uid)).catch(() => {});
+        await db.doc(`sharedWithMe/${viewerUid}/spaces/${uid}`).delete().catch(() => {});
+      }
+      // d.id is the normalized email key used by inviteViewer.
+      await db.doc(`emailGrants/${d.id}/owners/${uid}`).delete().catch(() => {});
+    }
+  });
+
+  // 2b) Archives shared WITH this person: remove their access, and put the
+  //     owner's invite back to 'invited'. The owner invited an email address,
+  //     not this account — deleting their invite would silently undo a decision
+  //     that was never theirs to reverse.
+  await step('leave-shared', async () => {
+    const spaces = await db.collection('sharedWithMe').doc(uid).collection('spaces').get();
+    for (const d of spaces.docs) {
+      const ownerUid = d.id;
+      if (myKey) {
+        await db.doc(`viewerInvites/${ownerUid}/emails/${myKey}`)
+          .set({status: 'invited', viewerUid: null}, {merge: true}).catch(() => {});
+      }
+    }
+  });
+
+  // 2c) The caller's own documents. recursiveDelete clears subcollections,
+  //     which a plain doc delete would orphan.
+  await step('own-docs', async () => {
+    await db.recursiveDelete(db.collection('viewerInvites').doc(uid));
+    await db.recursiveDelete(db.collection('sharedWithMe').doc(uid));
+    await db.recursiveDelete(db.collection('cardViewers').doc(uid));   // legacy, read-only in the client
+    await db.collection('transcriptions').doc(uid).delete().catch(() => {});
+    await db.collection('tinyCards').doc(uid).delete().catch(() => {});
+  });
+
+  // 3) Auth last: once this succeeds the caller's token is void, so nothing
+  //    above can run afterwards.
+  let authDeleted = false;
+  await step('auth', async () => {
+    await admin.auth().deleteUser(uid);
+    authDeleted = true;
+  });
+
+  if (!authDeleted) {
+    // The account still exists, so the person can retry. Say so rather than
+    // reporting a success that would leave them signed in to a hollow account.
+    throw new HttpsError('internal', 'Could not finish deleting your account. Please try again.');
+  }
+  if (failures.length) logger.warn('deleteAccount: partial', {uid, failures});
+  return {ok: true};
+});
+
 // (The one-off `migrateFamily` function was removed after the family → per-uid
 // migration completed; the original `family` data is kept as a backup.)
 
