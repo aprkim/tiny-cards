@@ -425,10 +425,18 @@ exports.deleteAccount = onCall(async (req) => {
     }
   });
 
-  // 2b) Archives shared WITH this person: remove their access, and put the
-  //     owner's invite back to 'invited'. The owner invited an email address,
-  //     not this account — deleting their invite would silently undo a decision
-  //     that was never theirs to reverse.
+  // 2b) Archives shared WITH this person: disconnect them from every one.
+  //
+  //     The pending grant goes too, not just the active claim. emailGrants is
+  //     keyed by normalized email rather than uid, so leaving it meant signing
+  //     up again with the same address silently restored access to every archive
+  //     they had ever been invited to — a new uid inheriting the old one's
+  //     reach, without the owner acting. Deleting an account has to mean losing
+  //     that access; getting it back needs a fresh invite.
+  //
+  //     The owner's invite is reset rather than deleted. They invited an email
+  //     address, and that record is theirs: it stays visible in their Shared
+  //     with list as invited, so they can see it and revoke it deliberately.
   await step('leave-shared', async () => {
     const spaces = await db.collection('sharedWithMe').doc(uid).collection('spaces').get();
     for (const d of spaces.docs) {
@@ -436,6 +444,7 @@ exports.deleteAccount = onCall(async (req) => {
       if (myKey) {
         await db.doc(`viewerInvites/${ownerUid}/emails/${myKey}`)
           .set({status: 'invited', viewerUid: null}, {merge: true}).catch(() => {});
+        await db.doc(`emailGrants/${myKey}/owners/${ownerUid}`).delete().catch(() => {});
       }
     }
   });
