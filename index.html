@@ -166,6 +166,11 @@
   }
   .gbtn:hover,.gbtn:focus-visible{border-color:#BFBAAE;box-shadow:0 1px 4px rgba(0,0,0,.07)}
   .gbtn[disabled]{opacity:.55;cursor:progress}
+  /* A tab tapped before sign-in points back at this button. The lift says
+     "over here" without raising a dialog over a tap that merely came early. */
+  @keyframes nudge{0%,100%{transform:none}30%{transform:translateY(-4px)}60%{transform:translateY(1px)}}
+  .gbtn.nudge{animation:nudge .42s ease}
+  @media (prefers-reduced-motion:reduce){.gbtn.nudge{animation:none}}
 
   /* Pinned low and quiet, off the path to the primary button */
   .who{font-size:12px;color:#9A9AA2;text-align:center;margin-top:20px;padding-top:4px}
@@ -653,12 +658,41 @@
   };
   $('signOutBtn').onclick=function(){signOutUser().then(paintHome)};
 
+  /* Both tabs turn a signed-out visitor straight back here — scan.html and
+     cards.html each replace themselves with '/' — so tapping one before signing
+     in loaded a whole page just to be sent back, which reads as a flash. Those
+     bounces stay; they still catch someone arriving at a direct URL. This only
+     skips the trip whose answer we already know, and points at the button
+     already on this screen. Gated on auth having actually resolved: an unknown
+     user is not a signed-out one, and blocking on a maybe is worse than a flash. */
+  var authReady=false;
+  function nudgeSignIn(){
+    $('pageSub').textContent='Sign in first — then you can scan and view your cards.';
+    var b=$('googleBtn');
+    if(!b)return;
+    b.classList.remove('nudge');
+    void b.offsetWidth;                  // restart the animation on a second tap
+    b.classList.add('nudge');
+    if(b.scrollIntoView)b.scrollIntoView({block:'center',behavior:'smooth'});
+  }
+  // Delegated from the document: the tab bar parses after this script runs.
+  document.addEventListener('click',function(e){
+    if(!authReady||authUser)return;
+    var a=e.target&&e.target.closest&&e.target.closest('.tabbar a');
+    if(!a)return;
+    e.preventDefault();
+    nudgeSignIn();
+  });
+
   currentUser().then(function(u){
     paintHome();
     if(!u&&fbReady){
+      // A redirect back from Google resolves here, so we are not signed out yet.
       firebase.auth().getRedirectResult().then(function(r){
         if(r&&r.user){authUser=r.user;paintHome()}
-      }).catch(function(){});
+      }).catch(function(){}).then(function(){authReady=true});
+    }else{
+      authReady=true;
     }
   });
   paintHome();
