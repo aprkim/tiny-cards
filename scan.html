@@ -630,20 +630,23 @@
   .setver{font-size:10px;color:#9A9AA2;letter-spacing:.02em}
   .sheet .set-legal{margin-bottom:0;line-height:1.4}
   /* ---- sharing modal (owner) ---- */
-  .share-sub{font-size:13.5px;color:var(--muted);line-height:1.55;margin:-2px 0 16px}
-  .share-linkrow{display:flex;gap:8px;margin-bottom:12px}
-  .share-linkrow input{flex:1;min-width:0;font:inherit;font-size:16px;padding:10px 12px;border:1px solid var(--rule);border-radius:10px;background:var(--field);color:var(--ink)}
-  #shareCopy{font:inherit;font-size:14px;font-weight:600;padding:0 16px;border-radius:10px;border:1px solid var(--rule);background:var(--field);color:var(--ink);cursor:pointer;flex-shrink:0}
-  #shareNew{width:100%;font:inherit;font-size:15px;font-weight:600;padding:13px;border-radius:12px;border:none;background:var(--accent);color:#fff;cursor:pointer;margin:16px 0 6px}
-  #shareNew:hover{background:#8E1340}
-  #shareNew:disabled{opacity:.6;cursor:progress}
+  .share-busy{min-height:180px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:14px}
   .share-people-h{font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px}
   .share-list{display:flex;flex-direction:column;gap:8px;margin-bottom:18px;max-height:180px;overflow-y:auto}
   .share-row{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:14px}
   .share-row .who{overflow-wrap:anywhere}
   .share-row button{font:inherit;font-size:12.5px;padding:5px 12px;border-radius:100px;border:1px solid var(--rule);background:var(--field);color:var(--muted);cursor:pointer;flex-shrink:0}
   .share-row button:hover{border-color:#BF3143;color:#BF3143;background:#FEF2F2}
-  .share-empty{font-size:13px;color:var(--muted)}
+  .share-rowr{display:flex;align-items:center;gap:10px;flex-shrink:0}
+  .share-status{font-size:11px;font-weight:600;padding:2px 8px;border-radius:100px}
+  .share-status.is-active{color:#1B7A43;background:#E7F5EC}
+  .share-status.is-invited{color:var(--muted);background:var(--paper);border:1px solid var(--rule)}
+  .share-invite{display:flex;gap:8px;margin-top:4px;align-items:center}
+  .share-invite input{flex:1 1 0;min-width:0;width:0;font:inherit;font-size:16px;padding:11px 12px;border:1px solid var(--rule);border-radius:10px;background:var(--field);color:var(--ink);-webkit-appearance:none;appearance:none}
+  .share-invite input:focus{outline:none;border-color:var(--accent)}
+  #inviteBtn{flex:0 0 auto;font:inherit;font-size:15px;font-weight:600;padding:11px 18px;border-radius:10px;border:none;background:var(--accent);color:#fff;cursor:pointer}
+  #inviteBtn:hover{background:#8E1340}
+  #inviteBtn:disabled{opacity:.6;cursor:progress}
   /* Sign out reads as a real button and acts on the first tap (no confirm). */
   .signout{
     display:block;width:100%;font:inherit;font-size:15px;font-weight:600;
@@ -926,6 +929,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
     </button>
     <h2 id="shareTitle">Shared with</h2>
+    <div id="shareBusy" class="share-busy hidden">Loading…</div>
 
     <div id="shareHero" class="share-hero hidden">
       <div class="share-heroicon" aria-hidden="true">
@@ -943,12 +947,10 @@
       <div id="shareList" class="share-list"></div>
     </div>
 
-    <div class="share-linkrow hidden" id="shareLinkRow">
-      <input type="text" id="shareLink" readonly>
-      <button type="button" id="shareCopy">Copy</button>
+    <div class="share-invite" id="shareInvite">
+      <input type="email" id="inviteEmail" size="1" placeholder="family@email.com" autocomplete="off" autocapitalize="none" spellcheck="false" aria-label="Email to invite">
+      <button type="button" id="inviteBtn">Invite</button>
     </div>
-
-    <button type="button" class="share-primary" id="shareNew">Invite by email</button>
   </div>
 </div>
 
@@ -1324,7 +1326,7 @@
   // Family viewers count for the Settings row.
   function loadViewerCount(){
     var el=$('setShareCount');if(!el)return;el.textContent='';el.classList.remove('invite');
-    fbDb.collection('cardViewers').doc(SPACE).collection('viewers').get().then(function(qs){
+    fbDb.collection('viewerInvites').doc(SPACE).collection('emails').get().then(function(qs){
       if(qs.size>0){el.textContent=String(qs.size);el.classList.remove('invite');}
       else{el.textContent='Invite';el.classList.add('invite');}
     }).catch(function(){});
@@ -1368,80 +1370,75 @@
 
   // ---- invites (owner sharing) — same as the View page ----
   function fns(){return firebase.app().functions('us-east1');}
-  var inviteLink='';   // cached reusable invite link for this owner/session
-  function ensureInvite(){
-    if(inviteLink)return Promise.resolve(inviteLink);
-    return fns().httpsCallable('createInvite')({}).then(function(r){
-      var code=(r&&r.data&&r.data.code)||'';
-      inviteLink='https://kept.cards/cards.html?invite='+code;
-      $('shareLink').value=inviteLink;
-      return inviteLink;
-    });
-  }
+  /* Sharing is invite-based: viewerInvites is the record the owner acts on, and
+     it lists people who have not signed in yet alongside those who have. What
+     stood here read cardViewers — a collection nothing writes any more — and
+     minted links through a createInvite callable that does not exist in the
+     project, so the list was always empty and Invite always failed. */
   function openShare(){
     closeSettings();
-    $('shareLinkRow').classList.add('hidden');
-    $('shareNew').disabled=false;
+    ['shareHero','shareListWrap','shareInvite'].forEach(function(id){$(id).classList.add('hidden');});
+    $('shareBusy').classList.remove('hidden');
+    $('inviteEmail').value='';
     $('share').classList.remove('hidden');
-    loadViewers();                          // empty hero vs viewer list + button label
-    // Mint the invite link and show it (with Copy) right away — no separate
-    // "tap to reveal" step. "Invite by email" then just opens the share sheet.
-    ensureInvite().then(function(){$('shareLinkRow').classList.remove('hidden');}).catch(function(){});
+    fetchInvites().catch(function(){return [];}).then(function(list){
+      $('shareBusy').classList.add('hidden');
+      $('shareInvite').classList.remove('hidden');
+      renderInvites(list);
+    });
   }
-  function closeShare(){$('share').classList.add('hidden');}
+  // Reached from Settings, so closing belongs back at Settings, not the scanner.
+  function closeShare(){$('share').classList.add('hidden');openSettings();}
   $('setShare').onclick=openShare;
   $('shareClose').onclick=closeShare;
   $('share').onclick=function(e){if(e.target===$('share'))closeShare();};
-  // Invite: open the native share sheet with the link (Mail, Messages, …). The
-  // link is pre-minted on open so this runs inside the tap gesture. Anything
-  // without Web Share (desktop) falls back to copying the visible link. (The old
-  // mailto: approach broke the iOS WebView, so it's gone.)
-  $('shareNew').onclick=function(){
-    $('shareLinkRow').classList.remove('hidden');
-    if(inviteLink){doShare(inviteLink);return;}
-    var b=$('shareNew'),old=b.textContent;b.disabled=true;b.textContent='Preparing…';
-    ensureInvite().then(function(l){
-      b.disabled=false;b.textContent=old;$('shareLinkRow').classList.remove('hidden');doShare(l);
-    }).catch(function(e){b.disabled=false;b.textContent=old;openAlert('Could not create an invite. Please try again.','Invite');if(window.console)console.warn(e);});
-  };
-  function doShare(link){
-    if(navigator.share){navigator.share({title:'Kept',text:'View my cards on Kept — view only:',url:link}).catch(function(){});return;}
-    copyInvite();
-  }
-  function copyInvite(){
-    var v=$('shareLink').value;
-    function flash(){$('shareCopy').textContent='Copied';setTimeout(function(){$('shareCopy').textContent='Copy';},1500);}
-    function sel(){try{$('shareLink').select();document.execCommand('copy');}catch(e){}flash();}
-    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(v).then(flash,sel);}
-    else{sel();}
-  }
-  $('shareCopy').onclick=copyInvite;
-  function loadViewers(){
-    var list=$('shareList');list.innerHTML='';
-    fbDb.collection('cardViewers').doc(SPACE).collection('viewers').get().then(function(qs){
-      var has=qs.size>0;
-      $('shareHero').classList.toggle('hidden',has);       // hero only when no viewers
-      $('shareListWrap').classList.toggle('hidden',!has);
-      $('shareNew').textContent=has?'Invite another':'Invite by email';
-      if(!has)return;
-      qs.forEach(function(doc){
-        var d=doc.data()||{};
-        var row=document.createElement('div');row.className='share-row';
-        var who=document.createElement('span');who.className='who';who.textContent=d.email||doc.id;
-        var rm=document.createElement('button');rm.type='button';rm.textContent='Remove';
-        rm.onclick=function(){
-          rm.disabled=true;rm.textContent='…';
-          fns().httpsCallable('revokeViewer')({viewerUid:doc.id}).then(loadViewers)
-            .catch(function(e){rm.disabled=false;rm.textContent='Remove';openAlert('Could not remove that person. Please try again.','Viewers');if(window.console)console.warn(e);});
-        };
-        row.appendChild(who);row.appendChild(rm);list.appendChild(row);
-      });
-    }).catch(function(e){
-      $('shareHero').classList.remove('hidden');$('shareListWrap').classList.add('hidden');
-      $('shareNew').textContent='Invite by email';
-      if(window.console)console.warn(e);
+
+  // The owner's shared-with list (email + invited/active status).
+  function fetchInvites(){
+    return fbDb.collection('viewerInvites').doc(SPACE).collection('emails').get().then(function(qs){
+      var arr=[];qs.forEach(function(doc){var d=doc.data()||{};arr.push({email:d.email||doc.id,status:d.status||'invited'});});
+      arr.sort(function(a,b){return (a.email||'').localeCompare(b.email||'');});
+      return arr;
     });
   }
+  function renderInvites(list){
+    var ul=$('shareList');ul.innerHTML='';
+    var has=!!(list&&list.length);
+    $('shareListWrap').classList.toggle('hidden',!has);
+    $('shareHero').classList.toggle('hidden',has);   // hero only when nobody's shared with
+    if(!has)return;
+    list.forEach(function(v){
+      var row=document.createElement('div');row.className='share-row';
+      var who=document.createElement('span');who.className='who';who.textContent=v.email;
+      var right=document.createElement('div');right.className='share-rowr';
+      var tag=document.createElement('span');tag.className='share-status '+(v.status==='active'?'is-active':'is-invited');
+      tag.textContent=v.status==='active'?'Active':'Invited';
+      var rm=document.createElement('button');rm.type='button';rm.textContent='Remove';
+      rm.onclick=function(){
+        rm.disabled=true;rm.textContent='…';
+        fns().httpsCallable('revokeViewer')({email:v.email}).then(refreshInvites)
+          .catch(function(e){rm.disabled=false;rm.textContent='Remove';openAlert('Could not remove that person. Please try again.','Shared with');if(window.console)console.warn(e);});
+      };
+      right.appendChild(tag);right.appendChild(rm);
+      row.appendChild(who);row.appendChild(right);ul.appendChild(row);
+    });
+  }
+  function refreshInvites(){return fetchInvites().catch(function(){return [];}).then(renderInvites);}
+  // Invite by email → granted now if the account exists, else on their first sign-in.
+  $('inviteBtn').onclick=function(){
+    var email=($('inviteEmail').value||'').trim();
+    if(!email){$('inviteEmail').focus();return;}
+    var b=$('inviteBtn'),old=b.textContent;b.disabled=true;b.textContent='Inviting…';
+    fns().httpsCallable('inviteViewer')({email:email}).then(function(){
+      b.disabled=false;b.textContent=old;$('inviteEmail').value='';refreshInvites();
+    }).catch(function(e){
+      b.disabled=false;b.textContent=old;
+      var msg=(e&&e.message)||'';
+      openAlert(/valid email|own account/i.test(msg)?msg:'Could not send that invite. Please try again.','Invite');
+      if(window.console)console.warn(e);
+    });
+  };
+  $('inviteEmail').onkeydown=function(e){if(e.key==='Enter'){e.preventDefault();$('inviteBtn').click();}};
   $('setExport').onclick=function(){
     if(!isOwner())return;
     if(isNativeApp()){

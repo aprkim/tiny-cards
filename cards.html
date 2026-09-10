@@ -1091,7 +1091,8 @@
       renderInvites(list);
     });
   }
-  function closeShare(){$('share').classList.add('hidden');}
+  // Reached from Settings, so closing belongs back at Settings, not the grid.
+  function closeShare(){$('share').classList.add('hidden');openSettings();}
   $('setShare').onclick=openShare;
   $('shareClose').onclick=closeShare;
   $('share').onclick=function(e){if(e.target===$('share'))closeShare();};
