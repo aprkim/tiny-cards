@@ -1535,9 +1535,19 @@
      ignores orientation unless explicitly told otherwise. */
   var UP_MAX_EDGE = 2000;      // longest side; never upscales
   var UP_QUALITY  = 0.8;
+  /* Pages that came straight out of warp(). It caps at 1600px — inside
+     UP_MAX_EDGE — and now encodes at UP_QUALITY, so re-encoding them here would
+     be a second generation of JPEG loss for no size win. A WeakSet keeps the
+     marking off the blob and out of the parallel page arrays, and lets the
+     entries go when the page does. */
+  var warpOutput = new WeakSet();
 
   function compressForUpload(blob){
     if(!blob || !/^image\//.test(blob.type||'')) return Promise.resolve(blob);
+    if(warpOutput.has(blob)){
+      if(window.console)console.log('[upload] '+Math.round(blob.size/1024)+'KB (already encoded by crop)');
+      return Promise.resolve(blob);
+    }
     return new Promise(function(res){
       var url=URL.createObjectURL(blob), done=false;
       var finish=function(out,why){
@@ -2038,7 +2048,10 @@
       var dc=warp();
       btn.disabled=false;btn.textContent='Crop';
       if(!dc){openAlert('Selected area is too small. Adjust the dots and try again.','Crop too small');return}
-      dc.toBlob(function(bl){acceptPage(bl)},'image/jpeg',0.92);
+      // Encode once, at the quality the upload would have used anyway: going
+      // 0.92 here and 0.8 again before upload costs a generation of loss for
+      // nothing. Output is already capped at 1600px, so it needs no resize.
+      dc.toBlob(function(bl){if(bl)warpOutput.add(bl);acceptPage(bl)},'image/jpeg',UP_QUALITY);
     },30);
   };
 
