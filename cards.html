@@ -944,6 +944,11 @@
   var EXPORT_LAST_KEY='tinycards_export_last';
   function loadLastSaved(){
     var el=$('exportLast');if(!el)return;
+    /* This line captions the export row. With no cards the row is hidden, and
+       the caption was still appearing on its own — a last-saved date under
+       nothing, in an archive with nothing to save. Every other caller runs
+       after endExportUI has restored the row, so one guard here covers them. */
+    if($('setExport').classList.contains('hidden')){el.classList.add('hidden');return;}
     var ts=0;try{ts=parseInt(localStorage.getItem(EXPORT_LAST_KEY)||'0',10);}catch(e){}
     if(ts){el.textContent='Last saved: '+new Date(ts).toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'});el.classList.remove('hidden');}
     else el.classList.add('hidden');
