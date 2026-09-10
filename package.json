@@ -23,6 +23,7 @@
     "@capacitor/camera": "^8.2.2",
     "@capacitor/cli": "^8.5.0",
     "@capacitor/core": "^8.5.0",
+    "@capacitor/file-transfer": "^2.0.5",
     "@capacitor/filesystem": "^8.1.2",
     "@capacitor/ios": "^8.5.0",
     "@capacitor/network": "^8.0.1",

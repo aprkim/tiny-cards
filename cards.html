@@ -778,7 +778,7 @@
         <span>Delete Account</span>
       </button>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.10.1430</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.10.1656</span></p>
   </div>
 </div>
 
@@ -980,17 +980,12 @@
   }
   function persistLastSaved(){try{localStorage.setItem(EXPORT_LAST_KEY,String(Date.now()));}catch(e){}loadLastSaved();}
 
-  function blobToBase64(blob){return new Promise(function(res,rej){
-    var r=new FileReader();r.onerror=function(){rej(r.error);};
-    r.onload=function(){var s=String(r.result||''),i=s.indexOf(',');res(i>=0?s.slice(i+1):s);};
-    r.readAsDataURL(blob);
-  });}
-
   function nativeExport(){
-    var Fs=capPlugin('Filesystem'),Share=capPlugin('Share'),Net=capPlugin('Network');
-    if(!Fs||!Share){openAlert('This version of the app can’t save to Files yet — please update the app.','Save unavailable');return;}
+    var Fs=capPlugin('Filesystem'),Share=capPlugin('Share'),Net=capPlugin('Network'),FT=capPlugin('FileTransfer');
+    var ftReady=!!FT&&!(window.Capacitor&&window.Capacitor.isPluginAvailable&&!window.Capacitor.isPluginAvailable('FileTransfer'));
+    if(!Fs||!Share||!ftReady){openAlert('This version of the app can’t save to Files yet — please update the app.','Save unavailable');return;}
     var mb=exportMB(),total=exportBytes();
-    var start=function(){runNativeExport(Fs,Share,total);};
+    var start=function(){runNativeExport(Fs,Share,FT,total);};
     // Cellular: one confirm (no dialog on wifi).
     (Net?Net.getStatus().catch(function(){return {connectionType:'unknown'};}):Promise.resolve({connectionType:'unknown'}))
       .then(function(st){
@@ -1028,62 +1023,85 @@
     $('exportFill').style.width='0%';$('exportPct').textContent='Preparing…';
     $('exportCancel').disabled=false;$('exportProg').classList.remove('hidden');
   }
-  // Fetch the export zip with determinate progress (total from stored bytes) → Blob.
-  function fetchExportZip(controller,total){
+  /* The server builds the ZIP into Cloud Storage and answers with a link, the
+     exact size and a filename. It used to stream the ZIP straight back here, and
+     when the server died mid-build the early end of the response looked like a
+     finished download: 87 bytes were saved and shared as a backup. */
+  function buildExport(controller){
     return authUser.getIdToken().then(function(tok){
       return fetch(EXPORT_URL+'?token='+encodeURIComponent(tok),controller?{signal:controller.signal}:{});
     }).then(function(resp){
       if(!resp.ok)throw new Error('http '+resp.status);
-      if(!resp.body||!resp.body.getReader)return resp.blob();      // no streaming → whole blob
-      var reader=resp.body.getReader(),chunks=[],got=0;
-      return (function pump(){return reader.read().then(function(r){
-        if(r.done)return new Blob(chunks,{type:'application/zip'});
-        chunks.push(r.value);got+=r.value.length;
-        if(total){var pct=Math.min(99,Math.round(got/total*100));$('exportFill').style.width=pct+'%';$('exportPct').textContent=pct+'%';}
-        return pump();
-      });})();
+      return resp.json();
+    }).then(function(info){
+      if(!info||!info.url||!(info.size>0)||!info.filename)throw new Error('bad export response');
+      return info;
     });
   }
+  // Building has no measurable progress, so the bar runs indeterminate until
+  // the download starts reporting bytes.
+  function preparingUI(){
+    $('exportFill').parentNode.classList.add('indet');
+    $('exportFill').style.width='0%';$('exportPct').textContent='Preparing backup…';
+  }
 
-  function runNativeExport(Fs,Share,total){
-    beginExportUI(total);
-    var controller=('AbortController' in window)?new AbortController():null, cancelled=false;
+  function runNativeExport(Fs,Share,FT,total){
+    beginExportUI(total);preparingUI();
+    var controller=('AbortController' in window)?new AbortController():null, cancelled=false, handle=null, filename='';
     $('exportCancel').onclick=function(){cancelled=true;$('exportCancel').disabled=true;$('exportPct').textContent='Cancelling…';if(controller)controller.abort();};
-    fetchExportZip(controller,total).then(function(blob){
-      $('exportPct').textContent='Saving…';return blobToBase64(blob);
-    }).then(function(b64){
-      // Assembled fully in memory, so a cancel/failure never writes a partial file.
-      return Fs.writeFile({path:'kept-backup-'+new Date().toISOString().slice(0,10)+'.zip',data:b64,directory:'CACHE'});
-    }).then(function(w){
-      if(total){$('exportFill').style.width='100%';$('exportPct').textContent='100%';}
-      return Share.share({title:'Kept backup',url:w.uri});
+    buildExport(controller).then(function(info){
+      if(cancelled)throw new Error('cancelled');
+      filename=info.filename;
+      return Fs.getUri({path:filename,directory:'CACHE'}).then(function(u){
+        /* Straight to disk. The old path held the whole ZIP in memory and then a
+           base64 copy of it — well over a gigabyte for a 536 MB archive. The
+           file-transfer plugin has no cancel, so a cancel during the download
+           lets it finish and then discards the file. */
+        $('exportFill').parentNode.classList.remove('indet');
+        $('exportPct').textContent='0%';
+        return FT.addListener('progress',function(p){
+          if(cancelled)return;
+          var pct=Math.min(99,Math.round(p.bytes/info.size*100));
+          $('exportFill').style.width=pct+'%';$('exportPct').textContent=pct+'%';
+        }).then(function(h){
+          handle=h;
+          return FT.downloadFile({url:info.url,path:u.uri,progress:true});
+        }).then(function(){
+          return Fs.stat({path:filename,directory:'CACHE'});
+        }).then(function(st){
+          // The check the old path never made: a short file is not a backup.
+          if(Number(st.size)!==Number(info.size))throw new Error('incomplete: '+st.size+' of '+info.size+' bytes');
+          if(cancelled)throw new Error('cancelled');
+          $('exportFill').style.width='100%';$('exportPct').textContent='100%';
+          return Share.share({title:'Kept backup',url:u.uri});
+        });
+      });
     }).then(function(){
       persistLastSaved();exportReset();
       openAlert('Your cards were saved to Files.','Saved to Files');
     }).catch(function(e){
       var msg=(e&&(e.message||(''+e)))||'';
+      if(filename)Fs.deleteFile({path:filename,directory:'CACHE'}).catch(function(){});
       if(cancelled||(e&&e.name==='AbortError')||/cancel/i.test(msg)){exportReset();return;}  // cancel / share-dismiss → idle
       if(window.console)console.warn('export failed',e);
       endExportUI();
       $('setExportHint').textContent='Couldn’t save — tap to try again';loadLastSaved();
-    });
+      openAlert('Could not save the backup. Please try again.','Export failed');
+    }).then(function(){if(handle)handle.remove();});
   }
 
-  // Web: same streamed download + progress, ending in a browser save (Downloads).
+  // Web: build on the server, then let the browser download the finished object
+  // itself — its own progress, straight to disk — since it's stored as an attachment.
   function runWebExport(){
     var total=exportBytes();
-    beginExportUI(total);
+    beginExportUI(total);preparingUI();
     var controller=('AbortController' in window)?new AbortController():null, cancelled=false;
     $('exportCancel').onclick=function(){cancelled=true;$('exportCancel').disabled=true;$('exportPct').textContent='Cancelling…';if(controller)controller.abort();};
-    fetchExportZip(controller,total).then(function(blob){
-      if(total){$('exportFill').style.width='100%';}
-      $('exportPct').textContent='Done';
-      var url=URL.createObjectURL(blob);
-      var a=document.createElement('a');a.href=url;a.download='kept-backup-'+new Date().toISOString().slice(0,10)+'.zip';
-      document.body.appendChild(a);a.click();a.remove();
-      setTimeout(function(){URL.revokeObjectURL(url);},4000);
+    buildExport(controller).then(function(info){
       endExportUI();
-      $('setExportHint').textContent='Downloaded';
+      if(cancelled){$('setExportHint').textContent=exportSubtext();return;}
+      window.location.href=info.url;
+      $('setExportHint').textContent='Downloading — check your downloads';
     }).catch(function(e){
       endExportUI();
       if(cancelled||(e&&e.name==='AbortError')){$('setExportHint').textContent=exportSubtext();return;}

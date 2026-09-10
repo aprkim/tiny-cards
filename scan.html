@@ -933,7 +933,7 @@
         <span>Delete Account</span>
       </button>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.10.1430</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.10.1656</span></p>
   </div>
 </div>
 
@@ -1519,10 +1519,18 @@
     }
     if(!canExport())return;
     var btn=$('setExport'),hint=$('setExportHint');
-    btn.disabled=true;hint.textContent='Preparing…';
+    btn.disabled=true;hint.textContent='Preparing backup…';
+    // Same flow as the archive's sheet: the server builds the ZIP into Storage and
+    // returns a link; the browser downloads that finished file as an attachment.
     authUser.getIdToken().then(function(tok){
-      window.location.href=EXPORT_URL+'?token='+encodeURIComponent(tok);
-      setTimeout(function(){hint.textContent='Started — check downloads';btn.disabled=false;},2500);
+      return fetch(EXPORT_URL+'?token='+encodeURIComponent(tok));
+    }).then(function(resp){
+      if(!resp.ok)throw new Error('http '+resp.status);
+      return resp.json();
+    }).then(function(info){
+      if(!info||!info.url)throw new Error('bad export response');
+      window.location.href=info.url;
+      hint.textContent='Downloading — check your downloads';btn.disabled=false;
     }).catch(function(e){hint.textContent='Couldn’t start — try again';btn.disabled=false;if(window.console)console.warn(e)});
   };
   $('settings').onclick=function(e){if(e.target===$('settings'))closeSettings()};

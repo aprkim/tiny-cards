@@ -13,6 +13,7 @@
 
 const {onObjectFinalized} = require('firebase-functions/v2/storage');
 const {onCall, onRequest, HttpsError} = require('firebase-functions/v2/https');
+const {onSchedule} = require('firebase-functions/v2/scheduler');
 const {setGlobalOptions} = require('firebase-functions/v2');
 const {defineSecret} = require('firebase-functions/params');
 const logger = require('firebase-functions/logger');
@@ -179,7 +180,11 @@ const README = [
 ].join('\n');
 
 exports.exportAll = onRequest({
-  memory: '512MiB',
+  // 1GiB while the new path proves itself. The version that streamed the ZIP to
+  // the phone was killed at 512MiB having delivered 87 bytes, and why was never
+  // pinned down; 'export progress' and 'export built' log RSS so the limit can
+  // come back down once real exports show where it peaks.
+  memory: '1GiB',
   timeoutSeconds: 3600,
   // The app fetches this cross-origin — from https://kept.cards on the web and
   // from capacitor://localhost inside the iOS webview — so without an
@@ -209,41 +214,115 @@ exports.exportAll = onRequest({
   const snap = await admin.firestore().collection('tinyCards').doc(user.uid).get();
   const cards = (snap.exists && snap.data().cards) || [];
 
+  /* Build the ZIP into Cloud Storage and answer with a link, instead of streaming
+     it to the caller. Streaming put the phone's connection inside the build: a
+     536 MB export ran out of memory 88 seconds in, the client took the early end
+     of the response for a finished download, and 87 bytes were saved as a backup.
+     Now the build is Storage to Storage in one region, the upload stream applies
+     backpressure, and the client downloads a finished object whose size it checks. */
   const stamp = new Date().toISOString().slice(0, 10);
-  res.setHeader('Content-Type', 'application/zip');
-  res.setHeader('Content-Disposition', `attachment; filename="kept-backup-${stamp}.zip"`);
-
-  const archive = archiver('zip', {store: true});   // images are already compressed
-  archive.on('warning', (err) => logger.warn('archive warning: ' + err.message));
-  archive.on('error', (err) => { logger.error('archive error', err); try { res.destroy(err); } catch (_) {} });
-  archive.pipe(res);
-
+  const filename = `kept-backup-${stamp}.zip`;
   const bucket = admin.storage().bucket();
-  const rows = [['id', 'sender', 'recipient', 'occasion', 'date', 'pages', 'files', 'storagePaths', 'totalBytes', 'savedAt'].join(',')];
+  const dest = bucket.file(`exports/${user.uid}/${Date.now()}-${filename}`);
+  // A Firebase download token rather than a signed URL: signing needs signBlob on
+  // the runtime service account, which this project doesn't grant. The link lives
+  // only as long as the object — until the next export, cleanupExports, or
+  // deleteAccount removes it.
+  const downloadToken = crypto.randomUUID();
 
-  for (const card of cards) {
-    const paths = card.paths || [];
-    const labels = card.labels || [];
-    const base = cardBase(card);
-    const names = [];
-    for (let i = 0; i < paths.length; i++) {
-      const p = paths[i];
-      const ext = /\.png$/i.test(p) ? 'png' : 'jpg';
-      const label = labels[i] || ('p' + (i + 1));
-      const name = paths.length > 1 ? `${base} - ${label}.${ext}` : `${base}.${ext}`;
-      names.push(name);
-      archive.append(bucket.file(p).createReadStream(), {name: `cards/${name}`});
+  try {
+    const out = dest.createWriteStream({
+      resumable: true,
+      metadata: {
+        contentType: 'application/zip',
+        // Makes a browser save it as a file instead of trying to display it.
+        contentDisposition: `attachment; filename="${filename}"`,
+        metadata: {firebaseStorageDownloadTokens: downloadToken},
+      },
+    });
+    const archive = archiver('zip', {store: true});   // images are already compressed
+    const written = new Promise((resolve, reject) => {
+      out.on('finish', resolve);
+      out.on('error', reject);
+      archive.on('error', reject);
+    });
+    archive.on('warning', (err) => logger.warn('archive warning: ' + err.message));
+    let entries = 0;
+    archive.on('entry', () => {
+      entries++;
+      if (entries % 100 === 0) {
+        logger.info('export progress', {uid: user.uid, entries, bytes: archive.pointer(),
+          rssMB: Math.round(process.memoryUsage().rss / 1048576)});
+      }
+    });
+    archive.pipe(out);
+
+    const rows = [['id', 'sender', 'recipient', 'occasion', 'date', 'pages', 'files', 'storagePaths', 'totalBytes', 'savedAt'].join(',')];
+
+    for (const card of cards) {
+      const paths = card.paths || [];
+      const labels = card.labels || [];
+      const base = cardBase(card);
+      const names = [];
+      for (let i = 0; i < paths.length; i++) {
+        const p = paths[i];
+        const ext = /\.png$/i.test(p) ? 'png' : 'jpg';
+        const label = labels[i] || ('p' + (i + 1));
+        const name = paths.length > 1 ? `${base} - ${label}.${ext}` : `${base}.${ext}`;
+        names.push(name);
+        archive.append(bucket.file(p).createReadStream(), {name: `cards/${name}`});
+      }
+      rows.push([
+        csvCell(card.id), csvCell(card.sender), csvCell(card.recipient), csvCell(card.occasion),
+        csvCell(card.date), csvCell(paths.length), csvCell(names.join(' | ')),
+        csvCell(paths.join(' | ')), csvCell(card.totalBytes || ''), csvCell(card.savedAt || '')
+      ].join(','));
     }
-    rows.push([
-      csvCell(card.id), csvCell(card.sender), csvCell(card.recipient), csvCell(card.occasion),
-      csvCell(card.date), csvCell(paths.length), csvCell(names.join(' | ')),
-      csvCell(paths.join(' | ')), csvCell(card.totalBytes || ''), csvCell(card.savedAt || '')
-    ].join(','));
-  }
 
-  archive.append(rows.join('\n') + '\n', {name: 'metadata.csv'});
-  archive.append(README, {name: 'README.txt'});
-  await archive.finalize();
+    archive.append(rows.join('\n') + '\n', {name: 'metadata.csv'});
+    archive.append(README, {name: 'README.txt'});
+    await archive.finalize();
+    await written;
+
+    // The object has to be the whole archive, not most of it.
+    const size = archive.pointer();
+    const [meta] = await dest.getMetadata();
+    if (Number(meta.size) !== size) throw new Error(`stored ${meta.size} bytes, expected ${size}`);
+    logger.info('export built', {uid: user.uid, entries, bytes: size,
+      rssMB: Math.round(process.memoryUsage().rss / 1048576)});
+
+    // One export per person: drop the earlier ones now that this one is complete.
+    const [existing] = await bucket.getFiles({prefix: `exports/${user.uid}/`});
+    await Promise.all(existing.filter((x) => x.name !== dest.name).map((x) => x.delete().catch(() => {})));
+
+    const url = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/` +
+      `${encodeURIComponent(dest.name)}?alt=media&token=${downloadToken}`;
+    res.json({url, size, filename, entries});
+  } catch (err) {
+    logger.error('export failed', {uid: user.uid, message: err.message});
+    await dest.delete().catch(() => {});        // never leave a partial ZIP behind
+    if (!res.headersSent) res.status(500).send('Could not build the backup. Please try again.');
+  }
+});
+
+/**
+ * Export ZIPs are complete copies of someone's archive behind a link that needs
+ * no sign-in, so they shouldn't outlive the download. Each export already
+ * replaces the previous one; this removes the last one a day later.
+ */
+exports.cleanupExports = onSchedule({schedule: 'every 24 hours', timeoutSeconds: 300}, async () => {
+  const bucket = admin.storage().bucket();
+  const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+  const [files] = await bucket.getFiles({prefix: 'exports/'});
+  let deleted = 0;
+  for (const file of files) {
+    const created = Date.parse((file.metadata && file.metadata.timeCreated) || '');
+    if (created && created < cutoff) {
+      await file.delete().catch(() => {});
+      deleted++;
+    }
+  }
+  logger.info('export cleanup', {deleted, kept: files.length - deleted});
 });
 
 /**
@@ -404,9 +483,12 @@ exports.deleteAccount = onCall(async (req) => {
     catch (e) { failures.push(label); logger.error(`deleteAccount:${label}`, {uid, err: e.message}); }
   };
 
-  // 1) Storage — every master and _thumb under this user's prefix.
+  // 1) Storage — every master and _thumb under this user's prefix, and any
+  //    export ZIP still waiting to be downloaded: that is a full copy of the
+  //    archive, so it goes with the account rather than lingering until cleanup.
   await step('storage', async () => {
     await admin.storage().bucket().deleteFiles({prefix: `cards/${uid}/`, force: true});
+    await admin.storage().bucket().deleteFiles({prefix: `exports/${uid}/`, force: true});
   });
 
   // 2a) Viewers this person invited: strip the claim that points at them, drop
