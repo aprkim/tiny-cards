@@ -514,6 +514,15 @@
   }
   .altlink:hover,.altlink:focus-visible{border-bottom-color:var(--accent)}
   .footlink{margin-top:20px;text-align:center}
+  /* Same 32px as the home screen. The sign-in card's own 14px bottom margin
+     collapses into this one, so 32 is the gap you actually see. */
+  #start .footlink{margin-top:32px}
+  /* A quiet exit, not a second call to action: the subtitle's gray, no
+     underline (the arrow says it's tappable), darkening on hover like the
+     Settings footer links. Keyboard focus still gets a visible ring. */
+  .altlink.quiet{color:var(--muted)}
+  .altlink.quiet:hover{color:var(--ink);border-bottom-color:transparent}
+  .altlink.quiet:focus-visible{border-bottom-color:transparent;outline:2px solid var(--accent);outline-offset:3px;border-radius:4px}
 
   /* Always visible, so there is a way back to the scanner while browsing —
      the one in the start section disappears as soon as cards are open. */
@@ -593,7 +602,7 @@
     <!-- The viewer needs no account, so every signed-out screen has a way in,
          in the same words as the home screen. -->
     <div class="footlink">
-      <a class="altlink" href="viewer.html">Someone shared cards with you? View them here &rarr;</a>
+      <a class="altlink quiet" href="viewer.html">View shared cards &rarr;</a>
     </div>
   </section>
 
@@ -769,7 +778,7 @@
         <span>Delete Account</span>
       </button>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.10.1255</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.10.1259</span></p>
   </div>
 </div>
 

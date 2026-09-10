@@ -381,7 +381,15 @@
   }
   .altlink:hover,.altlink:focus-visible{border-bottom-color:var(--accent)}
   .footlink{margin-top:20px;text-align:center}
-  #signedOut .footlink{margin-top:16px}
+  /* 32px, twice the old 16: close enough to belong to this screen, far enough
+     that it doesn't read as part of the sign-in button. */
+  #signedOut .footlink{margin-top:32px}
+  /* A quiet exit, not a second call to action: the subtitle's gray, no
+     underline (the arrow says it's tappable), darkening on hover like the
+     Settings footer links. Keyboard focus still gets a visible ring. */
+  .altlink.quiet{color:var(--muted)}
+  .altlink.quiet:hover{color:var(--ink);border-bottom-color:transparent}
+  .altlink.quiet:focus-visible{border-bottom-color:transparent;outline:2px solid var(--accent);outline-offset:3px;border-radius:4px}
 
   .opt{
     margin-top:18px;padding:14px 15px;background:var(--field);
@@ -487,7 +495,7 @@
            an .altlink, which the signed-out tab-tap guard deliberately does not
            match (it looks only at .tabbar a and .heroart). -->
       <div class="footlink">
-        <a class="altlink" href="viewer.html">Someone shared cards with you? View them here &rarr;</a>
+        <a class="altlink quiet" href="viewer.html">View shared cards &rarr;</a>
       </div>
     </div>
 
