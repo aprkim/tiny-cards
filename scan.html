@@ -632,12 +632,17 @@
   /* ---- sharing modal (owner) ---- */
   .share-busy{min-height:180px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:14px}
   .share-people-h{font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px}
-  .share-list{display:flex;flex-direction:column;gap:8px;margin-bottom:18px;max-height:180px;overflow-y:auto}
-  .share-row{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:14px}
+  .share-list{display:flex;flex-direction:column;gap:14px;margin-bottom:18px;max-height:240px;overflow-y:auto}
+  /* Email on its own line, controls beneath. Measured: with the status tag
+     and two buttons on one line the address had 115px left and wrapped to
+     three lines; stacked, every address tested fits on one at 280px. */
+  .share-row{display:flex;flex-direction:column;align-items:stretch;gap:7px;font-size:14px}
   .share-row .who{overflow-wrap:anywhere}
   .share-row button{font:inherit;font-size:12.5px;padding:5px 12px;border-radius:100px;border:1px solid var(--rule);background:var(--field);color:var(--muted);cursor:pointer;flex-shrink:0}
   .share-row button:hover{border-color:#BF3143;color:#BF3143;background:#FEF2F2}
-  .share-rowr{display:flex;align-items:center;gap:10px;flex-shrink:0}
+  /* Not destructive, so it must not borrow Remove's red hover. */
+  .share-row button.share-again:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+  .share-rowr{display:flex;align-items:center;gap:8px;flex-shrink:0}
   .share-status{font-size:11px;font-weight:600;padding:2px 8px;border-radius:100px}
   .share-status.is-active{color:#1B7A43;background:#E7F5EC}
   .share-status.is-invited{color:var(--muted);background:var(--paper);border:1px solid var(--rule)}
@@ -918,7 +923,7 @@
         <span>Delete Account</span>
       </button>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.10.0245</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.10.0257</span></p>
   </div>
 </div>
 
@@ -1420,11 +1425,64 @@
         fns().httpsCallable('revokeViewer')({email:v.email}).then(refreshInvites)
           .catch(function(e){rm.disabled=false;rm.textContent='Remove';openAlert('Could not remove that person. Please try again.','Shared with');if(window.console)console.warn(e);});
       };
-      right.appendChild(tag);right.appendChild(rm);
+      right.appendChild(tag);
+      // Still waiting on them: let the owner send the message again, since
+      // dismissing the share sheet at invite time leaves no other trace of it.
+      if(v.status!=='active'){
+        var sh=document.createElement('button');sh.type='button';sh.className='share-again';
+        sh.textContent='Share invite';
+        sh.onclick=function(){shareInvite(v.email);};
+        right.appendChild(sh);
+      }
+      right.appendChild(rm);
       row.appendChild(who);row.appendChild(right);ul.appendChild(row);
     });
   }
   function refreshInvites(){return fetchInvites().catch(function(){return [];}).then(renderInvites);}
+  /* Sharing the invite is a separate step from making it. inviteViewer only
+     records permission — nothing is emailed, by us or by Firebase — so without
+     this the person just invited never finds out. Fires on success only: never
+     on a failed invite, never on revoke.
+
+     Duplicated verbatim in cards.html and scan.html. These pages are standalone
+     documents with no module system, so "shared" means identical, and a change
+     to one belongs in the other. */
+  var APP_STORE_URL='https://apps.apple.com/app/kept/id0000000000';   // TODO: real id once approved
+  function inviteMessage(email){
+    return 'I saved our cards in Kept and shared them with you! Download Kept from '+
+           'the App Store, then sign in with Google using this email: '+email+
+           ' \u2014 your cards will be waiting.';
+  }
+  // Dismissing the sheet is an ordinary outcome, not a failure — the invite
+  // already stands. Anything else is worth a line in the console.
+  function isShareCancel(e){
+    var n=(e&&e.name)||'', m=(e&&(e.message||(''+e)))||'';
+    return /abort/i.test(n)||/cancel|abort|dismiss/i.test(m);
+  }
+  /* The link rides in `url` rather than inside the sentence so Messages and
+     Mail render the App Store card, which tells someone who has never heard of
+     the app far more than a bare URL would. */
+  function shareInvite(email){
+    var text=inviteMessage(email), full=text+' '+APP_STORE_URL;
+    var S=(window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.Share)||null;
+    var go;
+    if(S&&S.share)go=S.share({title:'Kept',text:text,url:APP_STORE_URL,dialogTitle:'Tell them'});
+    else if(navigator.share)go=navigator.share({title:'Kept',text:text,url:APP_STORE_URL});
+    else go=Promise.reject(new Error('no share target'));
+    return go.catch(function(e){
+      if(isShareCancel(e))return;
+      /* Web share needs a live user gesture and the invite round trip has
+         already spent it, so a rejection here is ordinary on desktop rather
+         than exceptional. Hand the message over instead of losing it. */
+      if(window.console)console.warn('share invite',e);
+      if(navigator.clipboard&&navigator.clipboard.writeText){
+        return navigator.clipboard.writeText(full).then(function(){
+          openAlert('Invite message copied — paste it into a message to them.','Share invite');
+        },function(){openAlert(full,'Share invite');});
+      }
+      openAlert(full,'Share invite');
+    });
+  }
   // Invite by email → granted now if the account exists, else on their first sign-in.
   $('inviteBtn').onclick=function(){
     var email=($('inviteEmail').value||'').trim();
@@ -1432,6 +1490,7 @@
     var b=$('inviteBtn'),old=b.textContent;b.disabled=true;b.textContent='Inviting…';
     fns().httpsCallable('inviteViewer')({email:email}).then(function(){
       b.disabled=false;b.textContent=old;$('inviteEmail').value='';refreshInvites();
+      shareInvite(email);          // success only — never on failure, never on revoke
     }).catch(function(e){
       b.disabled=false;b.textContent=old;
       var msg=(e&&e.message)||'';
