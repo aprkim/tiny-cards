@@ -1516,6 +1516,57 @@
     syncChain=syncChain.then(runSync,runSync); // run regardless of the previous result
     return syncChain;
   }
+  /* ---- upload compression ------------------------------------------------
+     Downscale and re-encode immediately before each put(), which is the one
+     place every page reaches Storage: camera capture, library picks, Keep
+     Original and the HEIC/decode fallbacks all converge here, so nothing can
+     slip past. Doing it here rather than in acceptPage also leaves pages[]
+     holding the full-resolution bitmap, so the on-screen preview and re-crop
+     keep working from the original.
+
+     Cropped pages arrive from warp() already capped at 1600px and encoded at
+     0.92, so for those this is a re-encode rather than a resize.
+
+     EXIF: an <img> applies orientation as it decodes (image-orientation is
+     from-image by default) and drawImage bakes in whatever the element shows,
+     so the canvas output is upright and carries no EXIF to contradict it. This
+     is the same route warp() already takes — which is why cropped cards have
+     never come out rotated. createImageBitmap is deliberately not used: it
+     ignores orientation unless explicitly told otherwise. */
+  var UP_MAX_EDGE = 2000;      // longest side; never upscales
+  var UP_QUALITY  = 0.8;
+
+  function compressForUpload(blob){
+    if(!blob || !/^image\//.test(blob.type||'')) return Promise.resolve(blob);
+    return new Promise(function(res){
+      var url=URL.createObjectURL(blob), done=false;
+      var finish=function(out,why){
+        if(done)return; done=true;
+        var keep = out && out.size < blob.size ? out : blob;   // never grow a file
+        if(window.console){
+          console.log('[upload] '+(blob.type||'?')+' '+Math.round(blob.size/1024)+'KB -> '+
+                      Math.round(keep.size/1024)+'KB'+(keep===blob?' (kept original: '+why+')':''));
+        }
+        res(keep);
+      };
+      var im=new Image();
+      im.onload=function(){
+        URL.revokeObjectURL(url);
+        var w=im.naturalWidth,h=im.naturalHeight;
+        if(!w||!h)return finish(null,'no dimensions');
+        var scale=Math.min(1, UP_MAX_EDGE/Math.max(w,h));
+        var dw=Math.max(1,Math.round(w*scale)), dh=Math.max(1,Math.round(h*scale));
+        var c=document.createElement('canvas');c.width=dw;c.height=dh;
+        c.getContext('2d').drawImage(im,0,0,dw,dh);
+        c.toBlob(function(out){finish(out,'encode failed')},'image/jpeg',UP_QUALITY);
+      };
+      // Anything the webview cannot decode (an unconverted HEIC, say) uploads
+      // untouched rather than not at all.
+      im.onerror=function(){URL.revokeObjectURL(url);finish(null,'undecodable')};
+      im.src=url;
+    });
+  }
+
   function runSync(){
     if(!useCloud||!pages.length)return Promise.resolve(null);
     if(!curCardId)curCardId=genId();
@@ -1525,15 +1576,17 @@
       pages.forEach(function(bl,i){if(!upDone[i])todo.push({i:i,bl:bl})});
       if(todo.length)upProgress(recordCreated?'Saving…':'Saving draft…',8);
       return todo.reduce(function(chain,u,k){
-        return chain.then(function(){
-          var ext=(u.bl&&u.bl.type==='image/png')?'png':'jpg';
+        return chain.then(function(){return compressForUpload(u.bl)}).then(function(bl){
+          // Extension follows the bytes actually written, so a re-encoded page
+          // never lands on a path that misdescribes it.
+          var ext=(bl&&bl.type==='image/png')?'png':'jpg';
           var path='cards/'+SPACE+'/'+curCardId+'/p'+(u.i+1)+'.'+ext;
           return new Promise(function(res,rej){
-            var task=fbStore.ref().child(path).put(u.bl,{contentType:(u.bl&&u.bl.type)||'image/jpeg'});
+            var task=fbStore.ref().child(path).put(bl,{contentType:(bl&&bl.type)||'image/jpeg'});
             task.on('state_changed',function(s){
               var frac=(k+(s.bytesTransferred/(s.totalBytes||1)))/todo.length;
               upProgress('Saving…',Math.round(frac*80)+8);
-            },rej,function(){upPaths[u.i]=path;upBytes[u.i]=u.bl.size;upDone[u.i]=true;res()});
+            },rej,function(){upPaths[u.i]=path;upBytes[u.i]=bl.size;upDone[u.i]=true;res()});
           });
         });
       },Promise.resolve()).then(function(){
