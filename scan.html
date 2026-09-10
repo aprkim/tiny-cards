@@ -923,7 +923,7 @@
           <path d="M24 30C21 27 17.5 24.4 17.5 21.2C17.5 19.2 19 17.8 20.8 17.8C22.3 17.8 23.4 18.9 24 19.9C24.6 18.9 25.7 17.8 27.2 17.8C29 17.8 30.5 19.2 30.5 21.2C30.5 24.4 27 27 24 30Z" fill="currentColor"/>
         </svg>
       </div>
-      <h3>Share your cards with family</h3>
+      <h3>Share your cards with the people you love</h3>
       <p>They can view — never edit or delete.</p>
     </div>
 
@@ -1022,8 +1022,10 @@
   setDateVal('dateY','dateM','dateD',new Date().toISOString().slice(0,10));
 
   /* ==================== ARCHIVE (Firebase) ====================
-     Images go to Cloud Storage at cards/family/{cardId}/{label}.jpg — one
-     shared space; the rules' email allowlist decides who reads and writes. This replaced a sync-code scheme where the
+     Images go to Cloud Storage at cards/{uid}/{cardId}/pN.jpg — one space per
+     signed-in owner. The rules let the owner read and write their own prefix,
+     and grant read-only access to anyone whose `viewOf` claim names that uid.
+     This replaced a sync-code scheme where the
      code was a shared secret you had to carry between devices: losing it lost
      the archive, and anyone holding it could read the cards. Signing in means
      nothing to type or remember, and it survives the browser clearing storage.
