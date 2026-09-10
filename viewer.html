@@ -34,7 +34,25 @@
     padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
     -webkit-font-smoothing:antialiased;
   }
-  .wrap{max-width:760px;margin:0 auto;padding:26px 18px calc(60px + var(--barh))}
+  /* Fills the visible height (100vh first for iOS 15.0-15.3, which lack dvh)
+     so the landing can centre in it. The bottom clearance for the fixed tab
+     bar moved onto #view, the only content tall enough to need it, which puts
+     the results list exactly where it was. */
+  .wrap{
+    max-width:760px;margin:0 auto;padding:26px 18px 0;
+    display:flex;flex-direction:column;
+    min-height:calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    min-height:calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  }
+  #view{padding-bottom:calc(60px + var(--barh))}
+  /* Landing: button and back link centred between the title and the tab bar,
+     the way the Scan screen balances its buttons. Written as :not(.hidden)
+     because an id rule outranks .hidden (not !important here), and the script
+     hides #start by adding that class once files are open. */
+  #start:not(.hidden){
+    flex:1 1 auto;display:flex;flex-direction:column;justify-content:center;
+    padding-bottom:calc(16px + var(--tabbar-height));
+  }
   header{margin-bottom:22px}
 
   /* Fixed bottom nav — the same Scan/View bar every other page has. The viewer
@@ -58,24 +76,24 @@
   .tabbar a:active{background:rgba(0,0,0,.035)}
   h1{font-size:19px;font-weight:700;letter-spacing:-.02em}
 
-  /* The one thing to do on this page, so it is the biggest thing on it: a
-     solid brand-coloured target, a folder picture above the words, and two
-     short words beneath — readable at a glance without much English. */
+  /* Same box as Take Photos on the Scan screen (.drop.cam there): full width,
+     128px minimum, 14px corners, solid brand border on the pink fill. The folder
+     icon and both lines are scaled to fit inside that height. */
   .drop{
-    border:2px solid var(--accent);border-radius:18px;padding:34px 24px;
+    border:1.5px solid var(--accent);border-radius:14px;padding:22px 20px;
     text-align:center;background:var(--accent-soft);cursor:pointer;
     transition:border-color .15s,background .15s;
-    min-height:230px;
+    min-height:128px;
     display:flex;flex-direction:column;align-items:center;justify-content:center;
     -webkit-tap-highlight-color:transparent;
   }
   .drop:hover,.drop:focus-visible,.drop:active{border-color:#8E1340;background:#F7DCE6}
-  .dropicon{width:64px;height:64px;color:var(--accent);margin-bottom:14px}
+  .dropicon{width:32px;height:32px;color:var(--accent);margin-bottom:8px}
   .drop:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-  .drop strong{display:block;font-size:21px;font-weight:700;color:var(--accent);margin-bottom:6px}
+  .drop strong{display:block;font-size:15.5px;font-weight:600;color:var(--accent);margin-bottom:4px}
   /* Darker than --muted: that gray measured 4.44:1 on this pink (3.92 pressed),
      under the 4.5 minimum, and this line is read by people who struggle with it. */
-  .drop span{font-size:15px;color:#63636D}
+  .drop span{font-size:13px;color:#63636D}
 
   input[type=search]{
     width:100%;font:inherit;font-size:16px;padding:12px 14px;
@@ -140,6 +158,7 @@
   .box button.on{background:#fff;color:var(--ink);border-color:#fff}
 
   .footlink{margin-top:20px;text-align:center}
+  #start .footlink{margin-top:28px}
   .altlink{
     display:inline-block;font-size:13.5px;color:var(--accent);
     text-decoration:none;border-bottom:1px solid transparent;
