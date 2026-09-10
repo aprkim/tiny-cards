@@ -431,7 +431,7 @@
   #modalConfirm{background:var(--field);color:var(--ink);border-color:var(--rule)}
   @media (max-width:560px){
     .scrim{align-items:flex-end;padding:0}
-    .sheet{max-width:none;border-radius:20px 20px 0 0;padding:24px 20px calc(24px + env(safe-area-inset-bottom));animation:sheetup .22s ease}
+    .sheet{max-width:none;border-radius:20px 20px 0 0;padding:24px 20px max(20px,env(safe-area-inset-bottom));animation:sheetup .22s ease}
     @keyframes sheetup{from{transform:translateY(100%)}to{transform:translateY(0)}}
   }
   .hidden{display:none!important}

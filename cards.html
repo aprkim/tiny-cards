@@ -336,7 +336,7 @@
     .scrim{align-items:flex-end;padding:0}
     .sheet{
       max-width:none;border-radius:20px 20px 0 0;
-      padding:24px 20px calc(24px + env(safe-area-inset-bottom));
+      padding:24px 20px max(20px,env(safe-area-inset-bottom));
       animation:sheetup .22s ease;
     }
     @keyframes sheetup{from{transform:translateY(100%)}to{transform:translateY(0)}}
