@@ -1311,41 +1311,66 @@
         });
         return;
       }
-      // Resolve each page to a full URL (lightbox/download) and a thumbnail URL
-      // (grid). The grid loads the small _thumb.jpg the Cloud Function wrote, so
-      // browsing is cheap; the full image is only fetched when a card is opened.
-      // Thumb falls back to the full image for anything without one yet.
-      return Promise.all(rows.map(function(row){
-        var paths=row.paths||[],labels=row.labels||[];
-        return Promise.all(paths.map(function(p,i){
-          var tp=p.replace(/\.[^.]+$/,'')+'_thumb.jpg';
-          return Promise.all([
-            fbStore.ref().child(p).getDownloadURL().catch(function(){return null}),
-            fbStore.ref().child(tp).getDownloadURL().catch(function(){return null})
-          ]).then(function(a){return {url:a[0],thumb:a[1]||a[0],label:labels[i]||'',path:p};});
-        })).then(function(pgs){
-          return {row:row,pages:pgs.filter(function(pg){return !!pg.url;})};
-        });
-      })).then(function(resolved){
-        cards=[];fromCloud=true;
-        resolved.forEach(function(x){
-          if(!x.pages.length)return;
-          cards.push({
-            key:x.row.id,id:x.row.id,date:x.row.date||'',year:(x.row.date||'').slice(0,4),
-            event:x.row.occasion||'Unsorted',person:x.row.sender||'Unknown',
-            recipient:x.row.recipient||'',ok:!!x.row.date,raw:x.row,
-            pages:x.pages
-          });
-        });
+      /* Only the thumbnail URL is resolved here — the grid is all thumbnails, and
+         the full-size URL is fetched by pageUrl() when a card is actually opened.
+         That halves the round trips, and getDownloadURL is a network call that
+         returns a string, so halving them is the whole saving.
+
+         Cards are also rendered as they arrive rather than after the last one.
+         Previously a single Promise.all over every page meant a blank screen
+         until the slowest request landed; on a weak connection that is seconds
+         of nothing. */
+      $('start').classList.add('hidden');
+      $('view').classList.remove('hidden');
+      cards=[];fromCloud=true;
+      var pending=rows.length, paintTimer=null;
+      function sortCards(){
         cards.sort(function(a,b){
           if(a.date===b.date)return a.person.localeCompare(b.person);
           return b.date.localeCompare(a.date);
         });
-        $('start').classList.add('hidden');
-        $('view').classList.remove('hidden');
-        people();render();loadSpaces();
-        openCardFromURL();
+      }
+      // Coalesce paints: a burst of six arriving together should redraw once.
+      function paintSoon(){
+        // render() writes "No cards match." on an empty list, so hold the
+        // "Loading your cards…" placeholder until at least one card is real.
+        if(paintTimer||!cards.length)return;
+        paintTimer=setTimeout(function(){
+          paintTimer=null;sortCards();people();render();
+        },120);
+      }
+      function addRow(row,pages){
+        if(pages.length){
+          cards.push({
+            key:row.id,id:row.id,date:row.date||'',year:(row.date||'').slice(0,4),
+            event:row.occasion||'Unsorted',person:row.sender||'Unknown',
+            recipient:row.recipient||'',ok:!!row.date,raw:row,
+            pages:pages
+          });
+        }
+        if(--pending<=0){
+          if(paintTimer){clearTimeout(paintTimer);paintTimer=null;}
+          sortCards();people();render();loadSpaces();openCardFromURL();
+        }else paintSoon();
+      }
+      rows.forEach(function(row){
+        var paths=row.paths||[],labels=row.labels||[];
+        Promise.all(paths.map(function(p,i){
+          var tp=p.replace(/\.[^.]+$/,'')+'_thumb.jpg';
+          // A card saved before thumbnails existed has none, so fall back to the
+          // full image for that page only rather than dropping it.
+          return fbStore.ref().child(tp).getDownloadURL().then(
+            function(t){return {url:null,thumb:t,label:labels[i]||'',path:p};},
+            function(){
+              return fbStore.ref().child(p).getDownloadURL().then(
+                function(u){return {url:u,thumb:u,label:labels[i]||'',path:p};},
+                function(){return null;});
+            });
+        })).then(function(pgs){
+          addRow(row,pgs.filter(function(pg){return pg&&(pg.thumb||pg.url);}));
+        },function(){addRow(row,[]);});
       });
+      return;
     }).catch(function(e){
       var code=e&&e.code||'';
       if(/unauthorized-domain/.test(code)){
@@ -1514,10 +1539,26 @@
     });
   }
 
+  /* The full-size URL for a page, fetched on demand and cached on the page
+     object. Resolving these up front cost one round trip per page for images
+     most people never open. */
+  function pageUrl(pg){
+    if(!pg)return Promise.reject(new Error('no page'));
+    if(pg.url)return Promise.resolve(pg.url);
+    if(!pg.path)return Promise.reject(new Error('no path'));
+    return fbStore.ref().child(pg.path).getDownloadURL().then(function(u){pg.url=u;return u;});
+  }
+
   function show(card,page){
     openCard=card;openPage=page;
     var p=card.pages[page];
-    $('boxImg').src=p.url;
+    // Show the thumbnail immediately so the lightbox is never blank, then swap in
+    // the full image. The guard stops a slow fetch from overwriting a page the
+    // user has since paged past.
+    $('boxImg').src=p.url||p.thumb||'';
+    pageUrl(p).then(function(u){
+      if(openCard===card&&openPage===page)$('boxImg').src=u;
+    },function(){});
     $('boxName').textContent=card.person+(card.recipient?' \u2192 '+card.recipient:'');
     $('boxSub').textContent=(card.date?card.date+' \u00b7 ':'')+card.event;
     var nav=$('boxNav');nav.innerHTML='';
@@ -1726,7 +1767,7 @@
 
     c.pages.forEach(function(pg,i){
       setTimeout(function(){
-        fetch(pg.url).then(function(r){return r.blob()})
+        pageUrl(pg).then(function(u){return fetch(u)}).then(function(r){return r.blob()})
           .then(function(bl){push(bl,i)})
           .catch(function(){openAlert('Could not download that page.','Download failed')});
       },i*350);
@@ -1871,13 +1912,13 @@
     e.stopPropagation();
     if(!openCard||!isOwner())return;
     var pg=openCard.pages[openPage];
-    if(!pg||!pg.url)return;
+    if(!pg||!(pg.url||pg.path))return;
     // Pin the target now: arrow-key corner nudges must not be able to change
     // which page Save writes to.
     ccard=openCard;cpage=openPage;
     var btn=$('boxCrop');btn.disabled=true;btn.textContent='Loading…';
     var reset=function(){btn.disabled=false;btn.textContent='Crop';};
-    fetch(pg.url).then(function(r){if(!r.ok)throw 0;return r.blob();}).then(function(bl){
+    pageUrl(pg).then(function(u){return fetch(u)}).then(function(r){if(!r.ok)throw 0;return r.blob();}).then(function(bl){
       var u=URL.createObjectURL(bl);
       var im=new Image();
       im.onload=function(){
