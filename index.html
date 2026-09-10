@@ -696,6 +696,14 @@
     }
   });
   paintHome();
+  /* Deleting an account from the scanner's Settings signs out by leaving that
+     page, so it leaves the confirmation here for us to deliver. */
+  try{
+    if(sessionStorage.getItem('accountDeleted')){
+      sessionStorage.removeItem('accountDeleted');
+      openAlert('Your account and all your cards have been deleted.','Account deleted');
+    }
+  }catch(e){}
   // The tab bar parses after this script, so re-apply once the DOM is ready
   // (covers the case where auth resolves before #tabScan exists).
   document.addEventListener('DOMContentLoaded',paintHome);

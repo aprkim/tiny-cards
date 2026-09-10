@@ -619,9 +619,17 @@
     -webkit-appearance:none;appearance:none;
   }
   .modal-input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
-  /* Build stamp — bumped every deploy so it's obvious whether the live page is
-     the current version. */
-  .setver{margin-top:16px;text-align:center;font-size:10px;color:#9A9AA2;letter-spacing:.02em}
+  /* Privacy · Terms and the build stamp — bumped every deploy so it's obvious
+     whether the live page is the current version. One block, as on the archive's
+     sheet: `.sheet p` outranks .set-legal on specificity and would wedge ~30px
+     between the two lines, so drop the margins there and tighten only the
+     leading. The 18px above is deliberate — it detaches the pair from the rows. */
+  .set-legal{margin-top:18px;text-align:center;font-size:12.5px;color:var(--muted)}
+  .set-legal a{color:var(--muted);text-decoration:none}
+  .set-legal a:hover,.set-legal a:focus-visible{color:var(--ink);text-decoration:underline}
+  .setver{margin-top:6px;text-align:center;font-size:10px;color:#9A9AA2;letter-spacing:.02em}
+  .sheet .set-legal{margin-bottom:0;line-height:1.4}
+  .sheet .setver{margin-top:0;line-height:1.4}
   /* ---- sharing modal (owner) ---- */
   .share-sub{font-size:13.5px;color:var(--muted);line-height:1.55;margin:-2px 0 16px}
   .share-linkrow{display:flex;gap:8px;margin-bottom:12px}
@@ -899,11 +907,16 @@
       </button>
       <div class="set-sep"></div>
       <button type="button" class="set-row" id="setSignOut"><span>Sign out</span></button>
-      <div class="set-sep hidden" id="wipeSep"></div>
-      <button type="button" class="set-row danger hidden" id="setWipe">
-        <span>Delete All Cards</span>
+      <div class="set-sep"></div>
+      <!-- Account deletion (App Store 5.1.1(v)). On both Settings sheets, not
+           just the archive's: a reviewer who opens this one from the Scan tab
+           has to find it too. Not owner-gated — a viewer with no archive of
+           their own still has an account to delete. -->
+      <button type="button" class="set-row danger" id="setDeleteAccount">
+        <span>Delete Account</span>
       </button>
     </div>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a></p>
     <p class="setver">v2026.08.19.1</p>
   </div>
 </div>
@@ -1295,22 +1308,17 @@
     // sheet as the View tab. The scanner doesn't hold the archive in memory, so
     // fetch it fresh when Settings opens.
     $('setLibStats').textContent='';
-    $('wipeSep').classList.add('hidden');
-    $('setWipe').classList.add('hidden');
     if(owner){loadLibrary();loadViewerCount();}
     $('settings').classList.remove('hidden');
   }
-  var libRows=[];
   function loadLibrary(){
     if(!fbDb||!SPACE)return;
     fbDb.collection('tinyCards').doc(SPACE).get().then(function(doc){
-      var rows=(doc.exists&&doc.data().cards)||[];libRows=rows;
+      var rows=(doc.exists&&doc.data().cards)||[];
       if(!rows.length){$('setLibStats').textContent='';return;}
       var photos=0,people={};
       rows.forEach(function(r){photos+=(r.paths||[]).length;people[r.sender||'Unknown']=1;});
       $('setLibStats').textContent=plur(rows.length,'card')+' · '+plur(photos,'photo')+' · '+plur(Object.keys(people).length,'person','people');
-      $('wipeSep').classList.remove('hidden');
-      $('setWipe').classList.remove('hidden');
     }).catch(function(){});
   }
   // Family viewers count for the Settings row.
@@ -1321,32 +1329,37 @@
       else{el.textContent='Invite';el.classList.add('invite');}
     }).catch(function(){});
   }
-  // Delete All Cards — identical flow to the View tab (type-to-confirm).
-  $('setWipe').onclick=function(){
-    var n=libRows.length;
-    if(!n||!isOwner())return;
+  /* Account deletion (App Store guideline 5.1.1(v)). Same callable and same
+     type-to-confirm as the archive's Settings sheet. */
+  $('setDeleteAccount').onclick=function(){
+    if(!authUser)return;
     closeSettings();
     openConfirm({
-      title:'Delete all '+n+' card'+(n===1?'':'s')+'?',
-      body:'This deletes all cards from every device and cannot be undone. Exported files are not affected.',
+      title:'Delete your account?',
+      body:'This permanently deletes your account, all your cards, and your shared '+
+           'viewers. This cannot be undone. Files you\u2019ve already exported are '+
+           'not affected.',
       input:true,requireText:'DELETE',inputLabel:'Type DELETE to confirm.',
-      confirmText:'Delete all',danger:true,
-      onConfirm:doWipe
+      confirmText:'Delete account',danger:true,
+      onConfirm:doDeleteAccount
     });
   };
-  function doWipe(){
-    var paths=[];
-    libRows.forEach(function(r){if(r.paths)paths=paths.concat(r.paths);});
-    Promise.all(paths.map(function(p){
-      return fbStore.ref().child(p).delete().catch(function(){});
-    })).then(function(){
-      return fbDb.collection('tinyCards').doc(SPACE).delete();
-    }).then(function(){
-      libRows=[];
-      openAlert('All cards were deleted.','Done');
+  function doDeleteAccount(){
+    if(!fbInit()){openAlert('You appear to be offline. Reconnect and try again.','Delete account');return;}
+    openConfirm({title:'Deleting your account…',body:'This may take a moment.',alert:true,confirmText:'Please wait'});
+    $('modalConfirm').disabled=true;
+    fns().httpsCallable('deleteAccount')({}).then(function(){
+      closeConfirm();
+      /* Unlike the archive's sheet, signing out here leaves the page — an alert
+         raised on the way out would be destroyed before it could be read. Hand
+         the confirmation to the home screen, which is where a session with no
+         account belongs anyway. */
+      try{sessionStorage.setItem('accountDeleted','1')}catch(e){}
+      return Promise.resolve(doSignOut()).catch(function(){});
     }).catch(function(e){
-      openAlert('Could not delete everything. Some cards may remain.','Delete failed');
-      if(window.console)console.warn(e);
+      closeConfirm();
+      if(window.console)console.warn('deleteAccount',e);
+      openAlert('Could not delete your account. Please try again, or email hello@lihallc.com.','Delete failed');
     });
   }
   function closeSettings(){$('settings').classList.add('hidden')}
