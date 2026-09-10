@@ -216,8 +216,8 @@
   var $=function(id){return document.getElementById(id)};
   var picker=$('picker'),drop=$('drop');
 
-  drop.onclick=function(){picker.value='';picker.click()};
-  drop.onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();picker.value='';picker.click()}};
+  drop.onclick=openFiles;
+  drop.onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();openFiles()}};
 
   var DATE=/^(\d{4})-(\d{2})-(\d{2})\s+(.+)$/;
   var PAGE=/^(.*?)\s+-\s+(front|inside|back|p\d+)$/i;
@@ -259,14 +259,56 @@
 
   picker.onchange=function(){
     if(!picker.files.length)return;
+    ingest(picker.files);
+  };
+
+  /* iOS app only. A web <input type="file" accept="image/*"> makes iOS ask
+     Photo Library / Take Photo / Choose Files first, but exported cards live in
+     Files — so open the document picker directly. Everywhere else (a desktop
+     browser, or an older app build without the plugin) the input still runs.
+
+     The plugin copies each pick to a temporary file and returns a webPath the
+     web view can load, so the picks go to ingest() as {name, type, url} and the
+     images load from disk exactly as input files do. Reading them into Blobs
+     first would hold a whole export in memory at once, which a few hundred
+     card photos can be enough to get the web view killed for.
+
+     This page still loads no SDK: window.Capacitor is injected by the native
+     bridge, and on the web it simply isn't there. */
+  function nativePicker(){
+    var C=window.Capacitor;
+    return !!(C&&typeof C.isNativePlatform==='function'&&C.isNativePlatform()&&
+              typeof C.isPluginAvailable==='function'&&C.isPluginAvailable('FilePicker'));
+  }
+  var picking=false;
+  function openFiles(){
+    if(!nativePicker()){picker.value='';picker.click();return;}
+    if(picking)return;                     // one picker at a time
+    picking=true;
+    window.Capacitor.Plugins.FilePicker.pickFiles({types:['image/*'],limit:0}).then(function(r){
+      var picked=((r&&r.files)||[]).map(function(p){
+        return {name:p.name||'',type:p.mimeType||'',url:p.webPath||''};
+      }).filter(function(p){return p.url;});
+      if(picked.length)ingest(picked);
+    }).catch(function(e){
+      var m=(e&&(e.message||(''+e)))||'';
+      if(/cancel/i.test(m))return;           // closed the picker without choosing
+      if(window.console)console.warn('file picker',e);
+      alert('Could not open those files. Please try again.');
+    }).then(function(){picking=false;});
+  }
+
+  // The original change handler, unchanged except that it takes its list as an
+  // argument and uses a pick's own url when it has one.
+  function ingest(files){
     urls.forEach(URL.revokeObjectURL);
     cards=[];urls=[];
     var byKey={};
 
-    Array.prototype.slice.call(picker.files).forEach(function(f){
+    Array.prototype.slice.call(files).forEach(function(f){
       if(!/^image\//.test(f.type))return;
       var stem=f.name.replace(/\.[^.]+$/,'');
-      var u=URL.createObjectURL(f);urls.push(u);
+      var u=f.url||URL.createObjectURL(f);urls.push(u);
 
       var p=parse(stem);
       if(!p){
@@ -300,7 +342,7 @@
     $('start').classList.add('hidden');
     $('view').classList.remove('hidden');
     people();render();
-  };
+  }
 
   function esc(t){var d=document.createElement('div');d.textContent=t;return d.innerHTML}
   function plur(n,s,p){return n+' '+(n===1?s:(p||s+'s'));}
