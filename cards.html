@@ -1275,13 +1275,28 @@
   $('cloudOpen').onclick=loadCloud;
   $('cloudOpen').onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();loadCloud()}};
 
+  /* A cancelled sign-in is not a failure. The web SDK reports it as an error
+     code; the native plugin surfaces the platform's own wording instead, so the
+     message is tested too — the same check the export path already uses. Without
+     this, backing out of the Google sheet on a device reads as something broken. */
+  function isSignInCancel(e){
+    var code=(e&&e.code)||'', msg=(e&&(e.message||(''+e)))||'';
+    return /popup-closed-by-user|cancelled-popup-request/.test(code)||/cancel/i.test(msg);
+  }
   function loadCloud(){
     $('cloudSub').textContent='Opening…';
 
     currentUser().then(function(u){
       return u || signIn();
     }).then(function(u){
-      if(!u)return null;                 // redirect flow: we return later
+      if(!u){
+        /* Web redirect sign-in navigates away and comes back, so leaving
+           "Opening…" up is right there. Native has no redirect flow: no user
+           here means the sheet was dismissed, and the label would otherwise sit
+           there until the app was force-quit. */
+        if(isNativeApp())paintCloudButton();
+        return null;
+      }
       authUser=u;myUid=u.uid;if(!SPACE)SPACE=u.uid;cloudCode=SPACE;
       paintCloudButton();
       $('gearBtn').classList.remove('hidden');   // signed in → settings reachable
@@ -1375,7 +1390,7 @@
       var code=e&&e.code||'';
       if(/unauthorized-domain/.test(code)){
         $('cloudSub').textContent='This site is not authorised for sign-in yet.';
-      }else if(/popup-closed-by-user|cancelled-popup-request/.test(code)){
+      }else if(isSignInCancel(e)){
         paintCloudButton();               // user backed out; say nothing
       }else if(/permission-denied/.test(code)){
         // Access to a shared space was removed — fall back to your own space.

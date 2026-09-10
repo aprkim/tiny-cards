@@ -1195,6 +1195,14 @@
     paintExport();
   }
 
+  /* A cancelled sign-in is not a failure. The web SDK reports it as an error
+     code; the native plugin surfaces the platform's own wording instead, so the
+     message is tested too — the same check the export path already uses. Without
+     this, backing out of the Google sheet on a device reads as something broken. */
+  function isSignInCancel(e){
+    var code=(e&&e.code)||'', msg=(e&&(e.message||(''+e)))||'';
+    return /popup-closed-by-user|cancelled-popup-request/.test(code)||/cancel/i.test(msg);
+  }
   function connectCloud(){
     var t=$('cloudToggle');
     if(t)t.setAttribute('aria-busy','true');
@@ -1210,7 +1218,7 @@
       var code=e&&e.code||'';
       if(/unauthorized-domain/.test(code)){
         openAlert('This site isn’t authorised for sign-in yet. Add kept.cards in the Firebase console under Authentication → Settings → Authorized domains.','Sign-in not set up');
-      }else if(!/popup-closed-by-user|cancelled-popup-request/.test(code)){
+      }else if(!isSignInCancel(e)){
         openAlert('Could not sign in. Check your connection and try again.','Sign-in failed');
       }
       if(window.console)console.warn(e);
