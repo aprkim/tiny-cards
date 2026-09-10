@@ -456,19 +456,20 @@
   .chip:hover{border-color:var(--accent);color:var(--accent)}
 
   .done{text-align:center;padding:52px 20px}
-  .done h2{font-size:20px;font-weight:700;margin-bottom:8px}
+  .done h2{font-size:20px;font-weight:700;margin-bottom:0}
   .done p{font-size:14px;color:var(--muted);margin-bottom:24px}
   /* A thumbnail of the saved front, so the finish screen confirms visually.
      Tapping it opens the card's detail in the archive. */
   .finthumb{
-    display:block;max-width:150px;max-height:190px;margin:14px auto 6px;
+    /* The screen is heading, photo, button. The photo takes the room the caption
+       and tally used to occupy, with a little more beneath than above so it sits
+       at the optical centre rather than the mathematical one. */
+    display:block;max-width:150px;max-height:190px;margin:30px auto 34px;
     border-radius:12px;border:1px solid var(--rule);background:var(--field);
     object-fit:contain;box-shadow:0 6px 20px rgba(22,22,29,.14);
     cursor:pointer;transition:transform .12s,box-shadow .12s;
   }
   .finthumb:hover,.finthumb:focus-visible{transform:translateY(-2px);box-shadow:0 10px 26px rgba(22,22,29,.2);outline:none}
-  .finthumbcap{text-align:center;font-size:12.5px;color:var(--muted);margin-bottom:18px}
-  .finthumbcap.hidden{display:none}
 
   .altlink{
     display:inline-block;font-size:13.5px;color:var(--accent);
@@ -836,10 +837,8 @@
 
   <section id="finish" class="hidden">
     <div class="done">
-      <h2>All done</h2>
+      <h2>Saved</h2>
       <img id="finThumb" class="finthumb hidden" alt="Front of the card you just saved" role="button" tabindex="0" title="View this card">
-      <p class="finthumbcap hidden" id="finThumbCap">Tap the photo to see this card</p>
-      <p id="tally"></p>
       <button class="go" id="again" style="max-width:210px;margin:0 auto">Choose More Photos</button>
     </div>
   </section>
@@ -2389,14 +2388,13 @@
   // URL alive at a time (revokes the previous), so a batch doesn't leak.
   var finThumbURL=null,finishCardId=null;
   function setFinishThumb(blob){
-    var el=$('finThumb'),cap=$('finThumbCap');
+    var el=$('finThumb');
     if(finThumbURL){URL.revokeObjectURL(finThumbURL);finThumbURL=null}
     if(!el)return;
-    if(!blob){el.classList.add('hidden');el.removeAttribute('src');if(cap)cap.classList.add('hidden');return}
+    if(!blob){el.classList.add('hidden');el.removeAttribute('src');return}
     finThumbURL=URL.createObjectURL(blob);
     el.src=finThumbURL;
     el.classList.remove('hidden');
-    if(cap)cap.classList.toggle('hidden',!finishCardId);   // only invite a tap if we know which card
   }
   // Tapping the finish thumbnail opens that card's detail in the archive.
   function viewSavedCard(){ if(finishCardId)location.href='cards.html?card='+encodeURIComponent(finishCardId); }
@@ -2438,13 +2436,14 @@
     $('crop').classList.add('hidden');document.body.classList.remove('cropping');
     $('meta').classList.add('hidden');
     $('finish').classList.remove('hidden');document.body.classList.remove('scanning');
-    var where=[];
-    if(useCloud)where.push(cloudFailed?'your cards could not be reached':'sent to your cards');
-    if(!where.length)where.push('nothing was kept on this device');
-    $('tally').textContent=savedCards+' card'+(savedCards===1?'':'s')+' saved so far'+
-      (savedFiles?' ('+savedFiles+' files)':'')+' — '+where.join(', ')+'.'+
-      (cloudFailed?' Your exported files are unaffected.':'');
     $('again').textContent=mode==='capture'?'Take Another Card':'Choose More Photos';
+    // The tally line was the only thing that reported a failed upload. With it
+    // gone a card that never reached the cloud would look identical to one that
+    // did, so say so outright instead of leaving the screen to imply success.
+    if(cloudFailed){
+      openAlert('Your cards could not be reached, so this card is not saved to the cloud yet. '+
+                'It will upload next time you open the app with a connection.','Not saved yet');
+    }
   }
 
   window.addEventListener('resize',function(){
