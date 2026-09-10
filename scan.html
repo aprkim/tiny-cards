@@ -1048,9 +1048,15 @@
     appId:"1:497477643272:web:9f8e43fbffd18003e5f5bd"
   };
   var CLOUD_KEY='tinyCards_useCloud';
-  /* All cards live in one shared space rather than under each account's uid.
-     Access is decided by the email allowlist in the security rules — keying
-     data by uid made viewer accounts point at their own empty documents. */
+  /* The space whose cards are on screen. Each signed-in user owns their own,
+     keyed by uid: SPACE is their uid for their own archive, or an owner's uid
+     when viewing one shared with them.
+
+     Access is not an allowlist in the rules. Sharing is by invitation: the
+     owner names an email, and once a verified account for it signs in, a
+     `viewOf` custom claim listing that owner's uid is set on the viewer. The
+     Firestore and Storage rules read that claim — owner writes their own
+     prefix, named viewers read it. */
   var SPACE=null;   // set to the signed-in user's uid (their own archive) in afterAuth
   var fbReady=false,fbDb=null,fbStore=null,authUser=null;
 

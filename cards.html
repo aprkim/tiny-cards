@@ -363,6 +363,11 @@
   button.set-row:hover,button.set-row:focus-visible{color:var(--accent)}
   button.set-row:focus-visible{outline:none}
   button.set-row.danger{color:var(--accent)}
+  /* While the export runs the row stays put and simply goes quiet: the label
+     changes, the progress sits beneath it, and the row itself stops responding
+     so a second export cannot be started on top of the first. */
+  button.set-row:disabled{cursor:default}
+  button.set-row:disabled:hover{color:var(--ink)}
   /* Disclosure chevron: marks a row that opens another screen (Share), so its
      right-side text isn't mistaken for a separate button. */
   .set-chev{color:var(--muted);font-size:20px;line-height:1;font-weight:400}
@@ -893,12 +898,12 @@
     if(owner&&isNativeApp()){
       // Native: a real backup — fetch the zip, write to cache, open the share sheet.
       $('setExport').classList.toggle('hidden',!(fromCloud&&cards.length>0));
-      $('setExportLabel').textContent='Export all cards';
+      $('setExportLabel').textContent=EXPORT_LABEL;
       $('setExportHint').textContent=exportSubtext();
       loadLastSaved();
     }else{
       $('setExport').classList.toggle('hidden',!canExport());        // owner + desktop
-      $('setExportLabel').textContent='Export all cards';
+      $('setExportLabel').textContent=EXPORT_LABEL;
       $('setExportHint').textContent=exportSubtext();
       $('exportLast').classList.add('hidden');
     }
@@ -972,10 +977,24 @@
   function exportSubtext(){
     return (isNativeApp()?'Save to Files':'ZIP backup')+' · about '+exportMB()+' MB';
   }
-  function exportReset(){$('exportProg').classList.add('hidden');$('setExport').classList.remove('hidden');$('setExportHint').textContent=exportSubtext();loadLastSaved();}
+  var EXPORT_LABEL='Export all cards';
+  /* Every terminal state repeated these two lines verbatim. Now that the row
+     stays visible while running, the label has to be restored at each of them
+     too, so they become one call. */
+  function endExportUI(){
+    $('exportProg').classList.add('hidden');
+    $('setExport').classList.remove('hidden');
+    $('setExport').disabled=false;
+    $('setExportLabel').textContent=EXPORT_LABEL;
+  }
+  function exportReset(){endExportUI();$('setExportHint').textContent=exportSubtext();loadLastSaved();}
 
   function beginExportUI(total){
-    $('setExport').classList.add('hidden');$('exportLast').classList.add('hidden');
+    // The row used to be hidden outright, which left the bar and Cancel floating
+    // between dividers with nothing saying what was running.
+    $('setExport').disabled=true;
+    $('setExportLabel').textContent='Exporting all cards\u2026';
+    $('exportLast').classList.add('hidden');
     $('exportFill').parentNode.classList.toggle('indet',!total);
     $('exportFill').style.width='0%';$('exportPct').textContent='Preparing…';
     $('exportCancel').disabled=false;$('exportProg').classList.remove('hidden');
@@ -1016,7 +1035,7 @@
       var msg=(e&&(e.message||(''+e)))||'';
       if(cancelled||(e&&e.name==='AbortError')||/cancel/i.test(msg)){exportReset();return;}  // cancel / share-dismiss → idle
       if(window.console)console.warn('export failed',e);
-      $('exportProg').classList.add('hidden');$('setExport').classList.remove('hidden');
+      endExportUI();
       $('setExportHint').textContent='Couldn’t save — tap to try again';loadLastSaved();
     });
   }
@@ -1034,10 +1053,10 @@
       var a=document.createElement('a');a.href=url;a.download='kept-backup-'+new Date().toISOString().slice(0,10)+'.zip';
       document.body.appendChild(a);a.click();a.remove();
       setTimeout(function(){URL.revokeObjectURL(url);},4000);
-      $('exportProg').classList.add('hidden');$('setExport').classList.remove('hidden');
+      endExportUI();
       $('setExportHint').textContent='Downloaded';
     }).catch(function(e){
-      $('exportProg').classList.add('hidden');$('setExport').classList.remove('hidden');
+      endExportUI();
       if(cancelled||(e&&e.name==='AbortError')){$('setExportHint').textContent=exportSubtext();return;}
       if(window.console)console.warn('export failed',e);
       $('setExportHint').textContent='Couldn’t download — tap to try again';
