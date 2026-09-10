@@ -1287,24 +1287,25 @@
   var EXPORT_URL='https://us-east1-tiny-wins25.cloudfunctions.net/exportAll';
   function canExport(){return !!(authUser&&window.matchMedia('(min-width:760px)').matches)}
   function isOwner(){return !!authUser;}   // every user owns their own space
+  /* Export needs cards to export — an empty archive would hand back an empty
+     zip. The native app can't stream a browser download either (WKWebView has
+     no download manager), so owners there see a note pointing at the computer
+     rather than a button that cannot work. */
+  function paintExportRow(hasCards){
+    var show=hasCards&&isOwner()&&(isNativeApp()||canExport());
+    $('setExport').classList.toggle('hidden',!show);
+    $('setExportHint').textContent=isNativeApp()?'On a computer':'ZIP backup';
+  }
   function openSettings(){
     $('setEmail').textContent=(authUser&&authUser.email)||'Signed in';
     var owner=isOwner();
     $('setShare').classList.toggle('hidden',!owner);             // share your own space
     $('setExport').disabled=false;
-    // Native app can't stream a browser download (no WKWebView download manager),
-    // so owners see a note pointing them to the computer instead of a broken
-    // button. Web keeps the real desktop-only export.
-    if(owner&&isNativeApp()){
-      $('setExport').classList.remove('hidden');
-      $('setExportHint').textContent='On a computer';
-    }else{
-      $('setExport').classList.toggle('hidden',!canExport());   // owner + desktop
-      $('setExportHint').textContent='ZIP backup';
-    }
-    // Library summary (subtext under email) + Delete All + viewer count — same
-    // sheet as the View tab. The scanner doesn't hold the archive in memory, so
-    // fetch it fresh when Settings opens.
+    // The scanner doesn't hold the archive in memory, so we don't yet know
+    // whether there is anything to export. Stay hidden until loadLibrary says.
+    paintExportRow(false);
+    // Library summary (subtext under email) + viewer count — same sheet as the
+    // View tab, fetched fresh each time Settings opens.
     $('setLibStats').textContent='';
     if(owner){loadLibrary();loadViewerCount();}
     $('settings').classList.remove('hidden');
@@ -1317,6 +1318,7 @@
       var photos=0,people={};
       rows.forEach(function(r){photos+=(r.paths||[]).length;people[r.sender||'Unknown']=1;});
       $('setLibStats').textContent=plur(rows.length,'card')+' · '+plur(photos,'photo')+' · '+plur(Object.keys(people).length,'person','people');
+      paintExportRow(true);
     }).catch(function(){});
   }
   // Family viewers count for the Settings row.

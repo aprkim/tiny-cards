@@ -884,7 +884,8 @@
      the second real use of that dialog. Click-outside and Escape dismiss, the
      same as the confirm. */
   // Export is owner-only and desktop-only (a whole-archive ZIP is a big download
-  // that doesn't belong on a phone). Shown only when both hold.
+  // that doesn't belong on a phone), and needs cards to export — an empty
+  // archive would hand back an empty zip. Shown only when all three hold.
   var EXPORT_URL='https://us-east1-tiny-wins25.cloudfunctions.net/exportAll';
   function canExport(){return isOwner()&&window.matchMedia('(min-width:760px)').matches}
   function openSettings(){
@@ -893,14 +894,15 @@
     $('setShare').classList.toggle('hidden',!owner);                 // share only your own space
     $('setExport').disabled=false;
     $('exportProg').classList.add('hidden');                          // reset any prior run
+    var hasCards=fromCloud&&cards.length>0;
     if(owner&&isNativeApp()){
       // Native: a real backup — fetch the zip, write to cache, open the share sheet.
-      $('setExport').classList.toggle('hidden',!(fromCloud&&cards.length>0));
+      $('setExport').classList.toggle('hidden',!hasCards);
       $('setExportLabel').textContent=EXPORT_LABEL;
       $('setExportHint').textContent=exportSubtext();
       loadLastSaved();
     }else{
-      $('setExport').classList.toggle('hidden',!canExport());        // owner + desktop
+      $('setExport').classList.toggle('hidden',!(canExport()&&hasCards));   // owner + desktop
       $('setExportLabel').textContent=EXPORT_LABEL;
       $('setExportHint').textContent=exportSubtext();
       $('exportLast').classList.add('hidden');
@@ -908,7 +910,6 @@
     // Library summary as a subtext under the email (whole archive, not filtered).
     var photos=0,ppl={};cards.forEach(function(x){photos+=x.pages.length;ppl[x.person]=1;});
     $('meta').textContent=cards.length?(plur(cards.length,'card')+' · '+plur(photos,'photo')+' · '+plur(Object.keys(ppl).length,'person','people')):'';
-    var hasCards=fromCloud&&cards.length>0;
     if(owner)loadViewerCount();          // "N" viewers, or "Invite" when none
     $('settings').classList.remove('hidden');
   }
