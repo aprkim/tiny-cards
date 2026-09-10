@@ -482,6 +482,13 @@
           <span>Sign in with Google</span>
         </button>
       </div>
+      <!-- The only way into the viewer for someone who never signs in. The viewer
+           needs no account, so a signed-out tap must go straight there: this is
+           an .altlink, which the signed-out tab-tap guard deliberately does not
+           match (it looks only at .tabbar a and .heroart). -->
+      <div class="footlink">
+        <a class="altlink" href="viewer.html">Someone shared cards with you? View them here &rarr;</a>
+      </div>
     </div>
 
     <div id="signedIn" class="homefill hidden">
@@ -686,6 +693,8 @@
     if(b.scrollIntoView)b.scrollIntoView({block:'center',behavior:'smooth'});
   }
   // Delegated from the document: the tab bar parses after this script runs.
+  // Scoped to the tab bar and hero on purpose — the viewer link under the
+  // sign-in button needs no account, so it must be left to navigate.
   document.addEventListener('click',function(e){
     if(!authReady||authUser)return;
     var a=e.target&&e.target.closest&&e.target.closest('.tabbar a,.heroart');

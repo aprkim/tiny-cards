@@ -601,6 +601,7 @@
      right-side text isn't mistaken for a separate button. */
   .set-chev{color:var(--muted);font-size:20px;line-height:1;font-weight:400}
   .set-row.set-acc{align-items:flex-start}
+  .set-stackv{display:flex;flex-direction:column;align-items:flex-start;gap:3px;min-width:0;text-align:left}
   .set-accv{display:flex;flex-direction:column;align-items:flex-end;gap:4px;min-width:0}
   .set-stats{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;text-align:right}
   .set-stats:empty{display:none}
@@ -912,6 +913,15 @@
       <button type="button" class="set-row hidden" id="setExport">
         <span>Export all</span><span class="set-hint" id="setExportHint">ZIP backup</span>
       </button>
+      <!-- File viewer: the export's reader. Same row on both tabs' Settings, and
+           shown whether or not there are cards — it reads files, not the archive. -->
+      <button type="button" class="set-row" id="setViewer">
+        <span class="set-stackv">
+          <span>File viewer</span>
+          <span class="set-hint">View exported card files</span>
+        </span>
+        <span class="set-chev" aria-hidden="true">&rsaquo;</span>
+      </button>
       <div class="set-sep"></div>
       <button type="button" class="set-row" id="setSignOut"><span>Sign out</span></button>
       <div class="set-sep"></div>
@@ -923,7 +933,7 @@
         <span>Delete Account</span>
       </button>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.10.1202</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.10.1255</span></p>
   </div>
 </div>
 
@@ -1372,6 +1382,8 @@
   }
   function closeSettings(){$('settings').classList.add('hidden')}
   $('setClose').onclick=closeSettings;
+  // viewer.html is self-contained (no Firebase), so this is plain navigation.
+  $('setViewer').onclick=function(){location.href='viewer.html';};
   $('gearBtn').onclick=openSettings;
 
   // ---- invites (owner sharing) — same as the View page ----
