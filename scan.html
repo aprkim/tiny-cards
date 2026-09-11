@@ -933,7 +933,7 @@
         <span>Delete Account</span>
       </button>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.10.1656</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.10.2129</span></p>
   </div>
 </div>
 
@@ -1511,6 +1511,62 @@
     });
   };
   $('inviteEmail').onkeydown=function(e){if(e.key==='Enter'){e.preventDefault();$('inviteBtn').click();}};
+  /* Export in two kinds of request. One starts the build: the server writes the
+     ZIP into Cloud Storage and records its progress. Short status polls then
+     follow that record every 3 seconds until it holds a link. Waiting on the
+     starting request instead failed on a phone: a 532 MB build takes about two
+     minutes, the app gave up on the silent request, and said it couldn't save
+     while the server finished anyway. The start may still answer with the link
+     (a small archive), or never; either is fine.
+     Duplicated verbatim in cards.html and scan.html. */
+  function exportCall(query,signal){
+    return authUser.getIdToken().then(function(tok){
+      return fetch(EXPORT_URL+'?token='+encodeURIComponent(tok)+(query||''),signal?{signal:signal}:{});
+    }).then(function(resp){
+      if(!resp.ok)throw new Error('http '+resp.status);
+      return resp.json();
+    });
+  }
+  function buildExport(controller,onProgress){
+    var signal=controller?controller.signal:null, deadline=Date.now()+30*60*1000;
+    return new Promise(function(resolve,reject){
+      var done=false,timer=null,first=true,staleBuilt=null,staleFailed=null;
+      function finish(err,info){
+        if(done)return;done=true;clearTimeout(timer);
+        if(err)return reject(err);
+        if(!info||!info.url||!(info.size>0)||!info.filename)return reject(new Error('bad export response'));
+        resolve(info);
+      }
+      if(signal)signal.addEventListener('abort',function(){var e=new Error('aborted');e.name='AbortError';finish(e);});
+      exportCall('',signal).then(function(j){
+        if(j&&j.state==='ready')finish(null,j);
+        else if(j&&j.state==='failed')finish(new Error('build failed'));
+      },function(e){
+        // A refused start (signed out, server error) is a real failure. A start
+        // the phone stopped waiting on is not: the polls will find the build.
+        if((e&&e.name==='AbortError')||/^http /.test((e&&e.message)||''))finish(e);
+      });
+      function poll(){
+        if(done)return;
+        exportCall('&status=1',signal).then(function(j){
+          if(done)return;
+          // A result already there on the first look belongs to an earlier
+          // export; only one that appears after it counts for this one.
+          if(first){first=false;if(j.state==='ready')staleBuilt=j.builtAt;if(j.state==='failed')staleFailed=j.failedAt;}
+          if(j.state==='ready'&&j.builtAt!==staleBuilt)return finish(null,j);
+          if(j.state==='failed'&&j.failedAt!==staleFailed)return finish(new Error('build failed'));
+          if(j.state==='building'&&j.total&&onProgress)onProgress(j.entries||0,j.total);
+          if(Date.now()>deadline)return finish(new Error('export timed out'));
+          timer=setTimeout(poll,3000);
+        },function(e){
+          if(done)return;
+          if((e&&e.name==='AbortError')||Date.now()>deadline)return finish(e);
+          timer=setTimeout(poll,3000);           // one dropped poll is not a failed build
+        });
+      }
+      timer=setTimeout(poll,4000);
+    });
+  }
   $('setExport').onclick=function(){
     if(!isOwner())return;
     if(isNativeApp()){
@@ -1520,15 +1576,11 @@
     if(!canExport())return;
     var btn=$('setExport'),hint=$('setExportHint');
     btn.disabled=true;hint.textContent='Preparing backup…';
-    // Same flow as the archive's sheet: the server builds the ZIP into Storage and
-    // returns a link; the browser downloads that finished file as an attachment.
-    authUser.getIdToken().then(function(tok){
-      return fetch(EXPORT_URL+'?token='+encodeURIComponent(tok));
-    }).then(function(resp){
-      if(!resp.ok)throw new Error('http '+resp.status);
-      return resp.json();
+    // Same flow as the archive's sheet: start the build, follow it, then hand the
+    // finished file to the browser, which downloads it as an attachment.
+    buildExport(null,function(done,total){
+      hint.textContent='Preparing backup… '+Math.min(99,Math.round(done/total*100))+'%';
     }).then(function(info){
-      if(!info||!info.url)throw new Error('bad export response');
       window.location.href=info.url;
       hint.textContent='Downloading — check your downloads';btn.disabled=false;
     }).catch(function(e){hint.textContent='Couldn’t start — try again';btn.disabled=false;if(window.console)console.warn(e)});

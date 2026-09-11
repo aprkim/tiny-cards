@@ -778,7 +778,7 @@
         <span>Delete Account</span>
       </button>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.10.1656</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.10.2129</span></p>
   </div>
 </div>
 
@@ -1023,33 +1023,78 @@
     $('exportFill').style.width='0%';$('exportPct').textContent='Preparing…';
     $('exportCancel').disabled=false;$('exportProg').classList.remove('hidden');
   }
-  /* The server builds the ZIP into Cloud Storage and answers with a link, the
-     exact size and a filename. It used to stream the ZIP straight back here, and
-     when the server died mid-build the early end of the response looked like a
-     finished download: 87 bytes were saved and shared as a backup. */
-  function buildExport(controller){
+  /* Export in two kinds of request. One starts the build: the server writes the
+     ZIP into Cloud Storage and records its progress. Short status polls then
+     follow that record every 3 seconds until it holds a link. Waiting on the
+     starting request instead failed on a phone: a 532 MB build takes about two
+     minutes, the app gave up on the silent request, and said it couldn't save
+     while the server finished anyway. The start may still answer with the link
+     (a small archive), or never; either is fine.
+     Duplicated verbatim in cards.html and scan.html. */
+  function exportCall(query,signal){
     return authUser.getIdToken().then(function(tok){
-      return fetch(EXPORT_URL+'?token='+encodeURIComponent(tok),controller?{signal:controller.signal}:{});
+      return fetch(EXPORT_URL+'?token='+encodeURIComponent(tok)+(query||''),signal?{signal:signal}:{});
     }).then(function(resp){
       if(!resp.ok)throw new Error('http '+resp.status);
       return resp.json();
-    }).then(function(info){
-      if(!info||!info.url||!(info.size>0)||!info.filename)throw new Error('bad export response');
-      return info;
     });
   }
-  // Building has no measurable progress, so the bar runs indeterminate until
-  // the download starts reporting bytes.
+  function buildExport(controller,onProgress){
+    var signal=controller?controller.signal:null, deadline=Date.now()+30*60*1000;
+    return new Promise(function(resolve,reject){
+      var done=false,timer=null,first=true,staleBuilt=null,staleFailed=null;
+      function finish(err,info){
+        if(done)return;done=true;clearTimeout(timer);
+        if(err)return reject(err);
+        if(!info||!info.url||!(info.size>0)||!info.filename)return reject(new Error('bad export response'));
+        resolve(info);
+      }
+      if(signal)signal.addEventListener('abort',function(){var e=new Error('aborted');e.name='AbortError';finish(e);});
+      exportCall('',signal).then(function(j){
+        if(j&&j.state==='ready')finish(null,j);
+        else if(j&&j.state==='failed')finish(new Error('build failed'));
+      },function(e){
+        // A refused start (signed out, server error) is a real failure. A start
+        // the phone stopped waiting on is not: the polls will find the build.
+        if((e&&e.name==='AbortError')||/^http /.test((e&&e.message)||''))finish(e);
+      });
+      function poll(){
+        if(done)return;
+        exportCall('&status=1',signal).then(function(j){
+          if(done)return;
+          // A result already there on the first look belongs to an earlier
+          // export; only one that appears after it counts for this one.
+          if(first){first=false;if(j.state==='ready')staleBuilt=j.builtAt;if(j.state==='failed')staleFailed=j.failedAt;}
+          if(j.state==='ready'&&j.builtAt!==staleBuilt)return finish(null,j);
+          if(j.state==='failed'&&j.failedAt!==staleFailed)return finish(new Error('build failed'));
+          if(j.state==='building'&&j.total&&onProgress)onProgress(j.entries||0,j.total);
+          if(Date.now()>deadline)return finish(new Error('export timed out'));
+          timer=setTimeout(poll,3000);
+        },function(e){
+          if(done)return;
+          if((e&&e.name==='AbortError')||Date.now()>deadline)return finish(e);
+          timer=setTimeout(poll,3000);           // one dropped poll is not a failed build
+        });
+      }
+      timer=setTimeout(poll,4000);
+    });
+  }
+  // Indeterminate until the first status poll reports how far the build has got.
   function preparingUI(){
     $('exportFill').parentNode.classList.add('indet');
     $('exportFill').style.width='0%';$('exportPct').textContent='Preparing backup…';
+  }
+  function buildProgress(done,total){
+    var pct=Math.min(99,Math.round(done/total*100));
+    $('exportFill').parentNode.classList.remove('indet');
+    $('exportFill').style.width=pct+'%';$('exportPct').textContent='Preparing backup… '+pct+'%';
   }
 
   function runNativeExport(Fs,Share,FT,total){
     beginExportUI(total);preparingUI();
     var controller=('AbortController' in window)?new AbortController():null, cancelled=false, handle=null, filename='';
     $('exportCancel').onclick=function(){cancelled=true;$('exportCancel').disabled=true;$('exportPct').textContent='Cancelling…';if(controller)controller.abort();};
-    buildExport(controller).then(function(info){
+    buildExport(controller,buildProgress).then(function(info){
       if(cancelled)throw new Error('cancelled');
       filename=info.filename;
       return Fs.getUri({path:filename,directory:'CACHE'}).then(function(u){
@@ -1058,11 +1103,11 @@
            file-transfer plugin has no cancel, so a cancel during the download
            lets it finish and then discards the file. */
         $('exportFill').parentNode.classList.remove('indet');
-        $('exportPct').textContent='0%';
+        $('exportFill').style.width='0%';$('exportPct').textContent='Downloading… 0%';
         return FT.addListener('progress',function(p){
           if(cancelled)return;
           var pct=Math.min(99,Math.round(p.bytes/info.size*100));
-          $('exportFill').style.width=pct+'%';$('exportPct').textContent=pct+'%';
+          $('exportFill').style.width=pct+'%';$('exportPct').textContent='Downloading… '+pct+'%';
         }).then(function(h){
           handle=h;
           return FT.downloadFile({url:info.url,path:u.uri,progress:true});
@@ -1097,7 +1142,7 @@
     beginExportUI(total);preparingUI();
     var controller=('AbortController' in window)?new AbortController():null, cancelled=false;
     $('exportCancel').onclick=function(){cancelled=true;$('exportCancel').disabled=true;$('exportPct').textContent='Cancelling…';if(controller)controller.abort();};
-    buildExport(controller).then(function(info){
+    buildExport(controller,buildProgress).then(function(info){
       endExportUI();
       if(cancelled){$('setExportHint').textContent=exportSubtext();return;}
       window.location.href=info.url;

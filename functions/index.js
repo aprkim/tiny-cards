@@ -179,6 +179,18 @@ const README = [
   ''
 ].join('\n');
 
+// A build that hasn't reported progress for this long is treated as dead, so a new
+// request may start over. Heartbeats land every 25 files, seconds apart.
+const EXPORT_STALE_MS = 2 * 60 * 1000;
+// What the app may see of an export job: only what it needs to follow or finish it.
+function publicJob(d) {
+  const o = {};
+  for (const k of ['state', 'entries', 'total', 'startedAt', 'builtAt', 'failedAt', 'url', 'size', 'filename']) {
+    if (d[k] !== undefined) o[k] = d[k];
+  }
+  return o;
+}
+
 exports.exportAll = onRequest({
   // 1GiB while the new path proves itself. The version that streamed the ZIP to
   // the phone was killed at 512MiB having delivered 87 bytes, and why was never
@@ -186,6 +198,9 @@ exports.exportAll = onRequest({
   // come back down once real exports show where it peaks.
   memory: '1GiB',
   timeoutSeconds: 3600,
+  // One build per instance. A build sits around 330-350 MB; the 1,294 MiB kill on
+  // 2026-09-11 was, most likely, retries stacking builds on one shared instance.
+  concurrency: 1,
   // The app fetches this cross-origin — from https://kept.cards on the web and
   // from capacitor://localhost inside the iOS webview — so without an
   // Access-Control-Allow-Origin the browser discards the response before the
@@ -211,8 +226,42 @@ exports.exportAll = onRequest({
     res.status(403).send('Sign in with a verified account to export.'); return;
   }
 
+  /* Export runs as a job the app follows, not one long request it waits on. A
+     532 MB archive takes about two minutes to build, and a phone won't hold a
+     silent request open that long: on 2026-09-11 two builds finished here while
+     the app had already given up and said it couldn't save. So ?status=1 answers
+     at once from exportJobs/{uid}, which only this Admin SDK code writes. */
+  const jobRef = admin.firestore().collection('exportJobs').doc(user.uid);
+  if (req.query.status) {
+    const j = await jobRef.get();
+    if (!j.exists) { res.json({state: 'none'}); return; }
+    const d = j.data();
+    // A build that stopped heartbeating died without reaching its catch (an
+    // out-of-memory kill can't be caught), so report it as failed rather than
+    // let the app wait out its deadline on a job that will never finish.
+    if (d.state === 'building' && Date.now() - (d.heartbeatAt || 0) >= EXPORT_STALE_MS) {
+      res.json(publicJob({state: 'failed', total: d.total, startedAt: d.startedAt, failedAt: d.heartbeatAt || d.startedAt}));
+      return;
+    }
+    res.json(publicJob(d));
+    return;
+  }
+
   const snap = await admin.firestore().collection('tinyCards').doc(user.uid).get();
   const cards = (snap.exists && snap.data().cards) || [];
+  const total = cards.reduce((n, c) => n + (c.paths || []).length, 0) + 2;   // + metadata.csv, README.txt
+
+  // Claim the job atomically. If a live build already holds it, report that one
+  // rather than starting another: a retry joins the build, it doesn't stack one.
+  const startedAt = Date.now();
+  const running = await admin.firestore().runTransaction(async (t) => {
+    const s = await t.get(jobRef);
+    const d = s.exists ? s.data() : null;
+    if (d && d.state === 'building' && startedAt - (d.heartbeatAt || 0) < EXPORT_STALE_MS) return d;
+    t.set(jobRef, {state: 'building', startedAt, heartbeatAt: startedAt, entries: 0, total});
+    return null;
+  });
+  if (running) { res.json(publicJob(running)); return; }
 
   /* Build the ZIP into Cloud Storage and answer with a link, instead of streaming
      it to the caller. Streaming put the phone's connection inside the build: a
@@ -229,6 +278,10 @@ exports.exportAll = onRequest({
   // only as long as the object — until the next export, cleanupExports, or
   // deleteAccount removes it.
   const downloadToken = crypto.randomUUID();
+  let entries = 0;
+  // Keeps the job alive between file-count heartbeats: through one slow file,
+  // and through the final upload after the last entry.
+  const beat = setInterval(() => jobRef.update({entries, heartbeatAt: Date.now()}).catch(() => {}), 15000);
 
   try {
     const out = dest.createWriteStream({
@@ -241,15 +294,17 @@ exports.exportAll = onRequest({
       },
     });
     const archive = archiver('zip', {store: true});   // images are already compressed
+    let fail;
     const written = new Promise((resolve, reject) => {
+      fail = reject;
       out.on('finish', resolve);
       out.on('error', reject);
       archive.on('error', reject);
     });
     archive.on('warning', (err) => logger.warn('archive warning: ' + err.message));
-    let entries = 0;
     archive.on('entry', () => {
       entries++;
+      if (entries % 25 === 0) jobRef.update({entries, heartbeatAt: Date.now()}).catch(() => {});
       if (entries % 100 === 0) {
         logger.info('export progress', {uid: user.uid, entries, bytes: archive.pointer(),
           rssMB: Math.round(process.memoryUsage().rss / 1048576)});
@@ -270,7 +325,13 @@ exports.exportAll = onRequest({
         const label = labels[i] || ('p' + (i + 1));
         const name = paths.length > 1 ? `${base} - ${label}.${ext}` : `${base}.${ext}`;
         names.push(name);
-        archive.append(bucket.file(p).createReadStream(), {name: `cards/${name}`});
+        // Every source stream gets its own error handler. Without one, a card file
+        // that can't be read emits an unhandled 'error' that crashes the process —
+        // no 500, no failed job, a job left 'building' — as the emulator test
+        // showed with a missing file. With it, the build fails through the catch.
+        const src = bucket.file(p).createReadStream();
+        src.on('error', (e) => { fail(e); archive.abort(); out.destroy(e); });
+        archive.append(src, {name: `cards/${name}`});
       }
       rows.push([
         csvCell(card.id), csvCell(card.sender), csvCell(card.recipient), csvCell(card.occasion),
@@ -281,8 +342,9 @@ exports.exportAll = onRequest({
 
     archive.append(rows.join('\n') + '\n', {name: 'metadata.csv'});
     archive.append(README, {name: 'README.txt'});
-    await archive.finalize();
-    await written;
+    // Awaited together, so a failure mid-build ends the wait: an aborted
+    // archive's finalize() need not settle on its own.
+    await Promise.all([archive.finalize(), written]);
 
     // The object has to be the whole archive, not most of it.
     const size = archive.pointer();
@@ -297,11 +359,16 @@ exports.exportAll = onRequest({
 
     const url = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/` +
       `${encodeURIComponent(dest.name)}?alt=media&token=${downloadToken}`;
-    res.json({url, size, filename, entries});
+    const ready = {state: 'ready', url, size, filename, entries, total, startedAt, builtAt: Date.now()};
+    await jobRef.set(ready);
+    res.json(publicJob(ready));
   } catch (err) {
     logger.error('export failed', {uid: user.uid, message: err.message});
     await dest.delete().catch(() => {});        // never leave a partial ZIP behind
+    await jobRef.set({state: 'failed', total, startedAt, failedAt: Date.now()}).catch(() => {});
     if (!res.headersSent) res.status(500).send('Could not build the backup. Please try again.');
+  } finally {
+    clearInterval(beat);
   }
 });
 
@@ -322,7 +389,15 @@ exports.cleanupExports = onSchedule({schedule: 'every 24 hours', timeoutSeconds:
       deleted++;
     }
   }
-  logger.info('export cleanup', {deleted, kept: files.length - deleted});
+  // Job records carry the download link, so they go on the same schedule.
+  const jobs = await admin.firestore().collection('exportJobs').get();
+  let jobsDeleted = 0;
+  for (const j of jobs.docs) {
+    const d = j.data() || {};
+    const last = Math.max(d.builtAt || 0, d.failedAt || 0, d.heartbeatAt || 0, d.startedAt || 0);
+    if (last && last < cutoff) { await j.ref.delete().catch(() => {}); jobsDeleted++; }
+  }
+  logger.info('export cleanup', {deleted, kept: files.length - deleted, jobsDeleted});
 });
 
 /**
@@ -537,6 +612,7 @@ exports.deleteAccount = onCall(async (req) => {
     await db.recursiveDelete(db.collection('viewerInvites').doc(uid));
     await db.recursiveDelete(db.collection('sharedWithMe').doc(uid));
     await db.recursiveDelete(db.collection('cardViewers').doc(uid));   // legacy, read-only in the client
+    await db.doc(`exportJobs/${uid}`).delete().catch(() => {});        // holds the export's download link
     await db.collection('transcriptions').doc(uid).delete().catch(() => {});
     await db.collection('tinyCards').doc(uid).delete().catch(() => {});
   });
