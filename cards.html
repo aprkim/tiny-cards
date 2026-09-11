@@ -778,7 +778,7 @@
         <span>Delete Account</span>
       </button>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.10.2129</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.10.2303</span></p>
   </div>
 </div>
 
@@ -1005,7 +1005,16 @@
   /* Every terminal state repeated these two lines verbatim. Now that the row
      stays visible while running, the label has to be restored at each of them
      too, so they become one call. */
+  /* Auto-lock would suspend the app mid-export, and iOS then cancels whatever
+     it was doing. Hold the screen for the few minutes an export takes, the way
+     video-export apps do. Optional: an app build without the plugin exports
+     without it, and on the web there is nothing to hold. */
+  function stayAwake(on){
+    var KA=capPlugin('KeepAwake');if(!KA)return;
+    (on?KA.keepAwake():KA.allowSleep()).catch(function(){});
+  }
   function endExportUI(){
+    stayAwake(false);
     $('exportProg').classList.add('hidden');
     $('setExport').classList.remove('hidden');
     $('setExport').disabled=false;
@@ -1022,6 +1031,9 @@
     $('exportFill').parentNode.classList.toggle('indet',!total);
     $('exportFill').style.width='0%';$('exportPct').textContent='Preparing…';
     $('exportCancel').disabled=false;$('exportProg').classList.remove('hidden');
+    stayAwake(true);
+    // The one thing a person can do to make this go wrong is leave, so say so.
+    if(isNativeApp())$('setExportHint').textContent='Keep Kept open \u2014 this can take a couple of minutes';
   }
   /* Export in two kinds of request. One starts the build: the server writes the
      ZIP into Cloud Storage and records its progress. Short status polls then
@@ -1042,30 +1054,21 @@
   function buildExport(controller,onProgress){
     var signal=controller?controller.signal:null, deadline=Date.now()+30*60*1000;
     return new Promise(function(resolve,reject){
-      var done=false,timer=null,first=true,staleBuilt=null,staleFailed=null;
+      var done=false,timer=null,baselined=false,staleReady=null,staleFailed=null;
       function finish(err,info){
         if(done)return;done=true;clearTimeout(timer);
         if(err)return reject(err);
         if(!info||!info.url||!(info.size>0)||!info.filename)return reject(new Error('bad export response'));
         resolve(info);
       }
+      function baseline(j){baselined=true;if(j.state==='ready')staleReady=j.readyAt;if(j.state==='failed')staleFailed=j.failedAt;}
       if(signal)signal.addEventListener('abort',function(){var e=new Error('aborted');e.name='AbortError';finish(e);});
-      exportCall('',signal).then(function(j){
-        if(j&&j.state==='ready')finish(null,j);
-        else if(j&&j.state==='failed')finish(new Error('build failed'));
-      },function(e){
-        // A refused start (signed out, server error) is a real failure. A start
-        // the phone stopped waiting on is not: the polls will find the build.
-        if((e&&e.name==='AbortError')||/^http /.test((e&&e.message)||''))finish(e);
-      });
       function poll(){
         if(done)return;
         exportCall('&status=1',signal).then(function(j){
           if(done)return;
-          // A result already there on the first look belongs to an earlier
-          // export; only one that appears after it counts for this one.
-          if(first){first=false;if(j.state==='ready')staleBuilt=j.builtAt;if(j.state==='failed')staleFailed=j.failedAt;}
-          if(j.state==='ready'&&j.builtAt!==staleBuilt)return finish(null,j);
+          if(!baselined)baseline(j);               // the look-before-start failed: this look stands in
+          if(j.state==='ready'&&j.readyAt!==staleReady)return finish(null,j);
           if(j.state==='failed'&&j.failedAt!==staleFailed)return finish(new Error('build failed'));
           if(j.state==='building'&&j.total&&onProgress)onProgress(j.entries||0,j.total);
           if(Date.now()>deadline)return finish(new Error('export timed out'));
@@ -1076,7 +1079,23 @@
           timer=setTimeout(poll,3000);           // one dropped poll is not a failed build
         });
       }
-      timer=setTimeout(poll,4000);
+      /* Look before starting: whatever the record holds now belongs to an
+         earlier export, and only a result newer than it counts for this one.
+         Taken here rather than on the first poll because the start itself can
+         finish before that poll — a small archive, or a reused export — and a
+         first poll would then mistake this export's result for an old one. */
+      exportCall('&status=1',signal).then(baseline,function(){}).then(function(){
+        if(done)return;
+        exportCall('',signal).then(function(j){
+          if(j&&j.state==='ready')finish(null,j);      // the start's own answer is never stale
+          else if(j&&j.state==='failed')finish(new Error('build failed'));
+        },function(e){
+          // A refused start (signed out, server error) is a real failure. A start
+          // the phone stopped waiting on is not: the polls will find the build.
+          if((e&&e.name==='AbortError')||/^http /.test((e&&e.message)||''))finish(e);
+        });
+        timer=setTimeout(poll,4000);
+      });
     });
   }
   // Indeterminate until the first status poll reports how far the build has got.
@@ -1092,7 +1111,7 @@
 
   function runNativeExport(Fs,Share,FT,total){
     beginExportUI(total);preparingUI();
-    var controller=('AbortController' in window)?new AbortController():null, cancelled=false, handle=null, filename='';
+    var controller=('AbortController' in window)?new AbortController():null, cancelled=false, handle=null, filename='', phase='build';
     $('exportCancel').onclick=function(){cancelled=true;$('exportCancel').disabled=true;$('exportPct').textContent='Cancelling…';if(controller)controller.abort();};
     buildExport(controller,buildProgress).then(function(info){
       if(cancelled)throw new Error('cancelled');
@@ -1109,7 +1128,7 @@
           var pct=Math.min(99,Math.round(p.bytes/info.size*100));
           $('exportFill').style.width=pct+'%';$('exportPct').textContent='Downloading… '+pct+'%';
         }).then(function(h){
-          handle=h;
+          handle=h;phase='download';
           return FT.downloadFile({url:info.url,path:u.uri,progress:true});
         }).then(function(){
           return Fs.stat({path:filename,directory:'CACHE'});
@@ -1118,6 +1137,7 @@
           if(Number(st.size)!==Number(info.size))throw new Error('incomplete: '+st.size+' of '+info.size+' bytes');
           if(cancelled)throw new Error('cancelled');
           $('exportFill').style.width='100%';$('exportPct').textContent='100%';
+          phase='share';
           return Share.share({title:'Kept backup',url:u.uri});
         });
       });
@@ -1126,12 +1146,19 @@
       openAlert('Your cards were saved to Files.','Saved to Files');
     }).catch(function(e){
       var msg=(e&&(e.message||(''+e)))||'';
-      if(filename)Fs.deleteFile({path:filename,directory:'CACHE'}).catch(function(){});
-      if(cancelled||(e&&e.name==='AbortError')||/cancel/i.test(msg)){exportReset();return;}  // cancel / share-dismiss → idle
+      if(phase!=='build')Fs.deleteFile({path:filename,directory:'CACHE'}).catch(function(){});   // a file can only exist past the build
+      /* Quiet only when the person chose it: tapping Cancel, or dismissing the
+         share sheet once the file was safely down. Everything else gets said.
+         This used to go quiet on any error mentioning "cancel", which is also
+         what iOS says when it suspends the app mid-download — so an interrupted
+         export vanished without a word, and looked like nothing had happened. */
+      if(cancelled||(phase==='share'&&/cancel/i.test(msg))){exportReset();return;}
       if(window.console)console.warn('export failed',e);
       endExportUI();
       $('setExportHint').textContent='Couldn’t save — tap to try again';loadLastSaved();
-      openAlert('Could not save the backup. Please try again.','Export failed');
+      openAlert(phase==='download'
+        ?'The download was interrupted. Keep Kept open and tap Export again \u2014 the backup is already built, so it should start downloading straight away.'
+        :'Could not save the backup. Please try again.','Export failed');
     }).then(function(){if(handle)handle.remove();});
   }
 

@@ -182,10 +182,22 @@ const README = [
 // A build that hasn't reported progress for this long is treated as dead, so a new
 // request may start over. Heartbeats land every 25 files, seconds apart.
 const EXPORT_STALE_MS = 2 * 60 * 1000;
+// A finished export is handed out again, instead of rebuilt, for this long —
+// provided the archive hasn't changed since. An interrupted download then
+// costs a retry, not another two-minute build.
+const EXPORT_REUSE_MS = 60 * 60 * 1000;
+// What an export contains, as one string: the card files in order. Any change
+// to the archive changes it, so a stored export is only reused for the archive
+// it was built from.
+function cardsSig(cards) {
+  const h = crypto.createHash('sha1');
+  for (const c of cards) h.update((c.id || '') + '\n' + (c.paths || []).join('\n') + '\n');
+  return h.digest('hex');
+}
 // What the app may see of an export job: only what it needs to follow or finish it.
 function publicJob(d) {
   const o = {};
-  for (const k of ['state', 'entries', 'total', 'startedAt', 'builtAt', 'failedAt', 'url', 'size', 'filename']) {
+  for (const k of ['state', 'entries', 'total', 'startedAt', 'builtAt', 'readyAt', 'failedAt', 'url', 'size', 'filename']) {
     if (d[k] !== undefined) o[k] = d[k];
   }
   return o;
@@ -232,6 +244,7 @@ exports.exportAll = onRequest({
      the app had already given up and said it couldn't save. So ?status=1 answers
      at once from exportJobs/{uid}, which only this Admin SDK code writes. */
   const jobRef = admin.firestore().collection('exportJobs').doc(user.uid);
+  const bucket = admin.storage().bucket();
   if (req.query.status) {
     const j = await jobRef.get();
     if (!j.exists) { res.json({state: 'none'}); return; }
@@ -253,15 +266,33 @@ exports.exportAll = onRequest({
 
   // Claim the job atomically. If a live build already holds it, report that one
   // rather than starting another: a retry joins the build, it doesn't stack one.
+  // If a recent finished export of this same archive is on record, hand that
+  // out instead — readyAt is bumped so the app sees it as this export's result.
   const startedAt = Date.now();
-  const running = await admin.firestore().runTransaction(async (t) => {
+  const sig = cardsSig(cards);
+  const claim = (allowReuse) => admin.firestore().runTransaction(async (t) => {
     const s = await t.get(jobRef);
     const d = s.exists ? s.data() : null;
-    if (d && d.state === 'building' && startedAt - (d.heartbeatAt || 0) < EXPORT_STALE_MS) return d;
+    if (d && d.state === 'building' && startedAt - (d.heartbeatAt || 0) < EXPORT_STALE_MS) return {running: d};
+    if (allowReuse && d && d.state === 'ready' && d.sig === sig && d.objectName &&
+        startedAt - (d.builtAt || 0) < EXPORT_REUSE_MS) return {reuse: d};
     t.set(jobRef, {state: 'building', startedAt, heartbeatAt: startedAt, entries: 0, total});
-    return null;
+    return {};
   });
-  if (running) { res.json(publicJob(running)); return; }
+  let claimed = await claim(true);
+  if (claimed.running) { res.json(publicJob(claimed.running)); return; }
+  if (claimed.reuse) {
+    const [stillThere] = await bucket.file(claimed.reuse.objectName).exists();
+    if (stillThere) {
+      const served = Object.assign({}, claimed.reuse, {readyAt: startedAt});
+      await jobRef.set(served);
+      logger.info('export reused', {uid: user.uid, objectName: served.objectName});
+      res.json(publicJob(served));
+      return;
+    }
+    claimed = await claim(false);                 // the object is gone: build it again
+    if (claimed.running) { res.json(publicJob(claimed.running)); return; }
+  }
 
   /* Build the ZIP into Cloud Storage and answer with a link, instead of streaming
      it to the caller. Streaming put the phone's connection inside the build: a
@@ -271,7 +302,6 @@ exports.exportAll = onRequest({
      backpressure, and the client downloads a finished object whose size it checks. */
   const stamp = new Date().toISOString().slice(0, 10);
   const filename = `kept-backup-${stamp}.zip`;
-  const bucket = admin.storage().bucket();
   const dest = bucket.file(`exports/${user.uid}/${Date.now()}-${filename}`);
   // A Firebase download token rather than a signed URL: signing needs signBlob on
   // the runtime service account, which this project doesn't grant. The link lives
@@ -359,7 +389,9 @@ exports.exportAll = onRequest({
 
     const url = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/` +
       `${encodeURIComponent(dest.name)}?alt=media&token=${downloadToken}`;
-    const ready = {state: 'ready', url, size, filename, entries, total, startedAt, builtAt: Date.now()};
+    const now = Date.now();
+    const ready = {state: 'ready', url, size, filename, entries, total, startedAt, builtAt: now, readyAt: now,
+      sig, objectName: dest.name};            // sig + objectName stay private: publicJob drops them
     await jobRef.set(ready);
     res.json(publicJob(ready));
   } catch (err) {

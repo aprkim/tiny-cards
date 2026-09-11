@@ -933,7 +933,7 @@
         <span>Delete Account</span>
       </button>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.10.2129</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.10.2303</span></p>
   </div>
 </div>
 
@@ -1530,30 +1530,21 @@
   function buildExport(controller,onProgress){
     var signal=controller?controller.signal:null, deadline=Date.now()+30*60*1000;
     return new Promise(function(resolve,reject){
-      var done=false,timer=null,first=true,staleBuilt=null,staleFailed=null;
+      var done=false,timer=null,baselined=false,staleReady=null,staleFailed=null;
       function finish(err,info){
         if(done)return;done=true;clearTimeout(timer);
         if(err)return reject(err);
         if(!info||!info.url||!(info.size>0)||!info.filename)return reject(new Error('bad export response'));
         resolve(info);
       }
+      function baseline(j){baselined=true;if(j.state==='ready')staleReady=j.readyAt;if(j.state==='failed')staleFailed=j.failedAt;}
       if(signal)signal.addEventListener('abort',function(){var e=new Error('aborted');e.name='AbortError';finish(e);});
-      exportCall('',signal).then(function(j){
-        if(j&&j.state==='ready')finish(null,j);
-        else if(j&&j.state==='failed')finish(new Error('build failed'));
-      },function(e){
-        // A refused start (signed out, server error) is a real failure. A start
-        // the phone stopped waiting on is not: the polls will find the build.
-        if((e&&e.name==='AbortError')||/^http /.test((e&&e.message)||''))finish(e);
-      });
       function poll(){
         if(done)return;
         exportCall('&status=1',signal).then(function(j){
           if(done)return;
-          // A result already there on the first look belongs to an earlier
-          // export; only one that appears after it counts for this one.
-          if(first){first=false;if(j.state==='ready')staleBuilt=j.builtAt;if(j.state==='failed')staleFailed=j.failedAt;}
-          if(j.state==='ready'&&j.builtAt!==staleBuilt)return finish(null,j);
+          if(!baselined)baseline(j);               // the look-before-start failed: this look stands in
+          if(j.state==='ready'&&j.readyAt!==staleReady)return finish(null,j);
           if(j.state==='failed'&&j.failedAt!==staleFailed)return finish(new Error('build failed'));
           if(j.state==='building'&&j.total&&onProgress)onProgress(j.entries||0,j.total);
           if(Date.now()>deadline)return finish(new Error('export timed out'));
@@ -1564,7 +1555,23 @@
           timer=setTimeout(poll,3000);           // one dropped poll is not a failed build
         });
       }
-      timer=setTimeout(poll,4000);
+      /* Look before starting: whatever the record holds now belongs to an
+         earlier export, and only a result newer than it counts for this one.
+         Taken here rather than on the first poll because the start itself can
+         finish before that poll — a small archive, or a reused export — and a
+         first poll would then mistake this export's result for an old one. */
+      exportCall('&status=1',signal).then(baseline,function(){}).then(function(){
+        if(done)return;
+        exportCall('',signal).then(function(j){
+          if(j&&j.state==='ready')finish(null,j);      // the start's own answer is never stale
+          else if(j&&j.state==='failed')finish(new Error('build failed'));
+        },function(e){
+          // A refused start (signed out, server error) is a real failure. A start
+          // the phone stopped waiting on is not: the polls will find the build.
+          if((e&&e.name==='AbortError')||/^http /.test((e&&e.message)||''))finish(e);
+        });
+        timer=setTimeout(poll,4000);
+      });
     });
   }
   $('setExport').onclick=function(){
