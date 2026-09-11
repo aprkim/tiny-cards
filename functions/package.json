@@ -1,7 +1,9 @@
 {
   "name": "tiny-cards-functions",
   "description": "Thumbnails and streaming export for Tiny Cards",
-  "engines": { "node": "20" },
+  "engines": {
+    "node": "22"
+  },
   "main": "index.js",
   "dependencies": {
     "archiver": "^7.0.1",
