@@ -167,6 +167,8 @@
   .card small{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
 
   .empty{text-align:center;padding:48px 20px;color:var(--muted);font-size:14px}
+  /* The what-to-do lines under an empty archive: tucked up under the headline, not a second 48px block. */
+  .empty.emptyhow{padding-top:0;font-size:13.5px;line-height:1.75}
 
   .box{
     position:fixed;inset:0;background:rgba(22,22,29,.94);z-index:50;
@@ -778,7 +780,7 @@
         <span>Delete Account</span>
       </button>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.11.1321</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.11.1422</span></p>
   </div>
 </div>
 
@@ -1199,6 +1201,14 @@
   // ---- sharing by email ----
   // Deep link from the scanner's finish thumbnail: ?card=<id> opens that card.
   var openCardId=(new URLSearchParams(location.search)).get('card');
+  // ?settings=1: the home screen's gear lands here with the sheet already up.
+  var openSettingsOnLoad=(new URLSearchParams(location.search)).get('settings')==='1';
+  function openSettingsFromURL(){
+    if(!openSettingsOnLoad)return;
+    openSettingsOnLoad=false;
+    try{history.replaceState({},'',location.pathname);}catch(e){}
+    openSettings();
+  }
   function fns(){return firebase.app().functions('us-east1');}
   function openCardFromURL(){
     if(!openCardId)return;
@@ -1506,7 +1516,17 @@
         $('start').classList.add('hidden');
         $('view').classList.remove('hidden');
         $('people').innerHTML='';$('meta').textContent='';
-        $('groups').innerHTML='<p class="empty">'+(isOwner()?'No cards yet — scan your first from the home screen.':'No cards shared with you yet.')+'</p>';
+        /* An empty archive is where two different people land: the owner who
+           hasn't scanned yet, and someone who was told "I shared my cards with
+           you" and can't see them. Say what each should do — invites appear
+           here on their own; a backup file opens in the viewer, not here. */
+        $('groups').innerHTML=isOwner()
+          ?'<p class="empty">No cards here yet.</p>'+
+           '<p class="empty emptyhow">Scan your first card from the home screen.<br>'+
+           'Someone shared cards with you? Ask them to invite you by email \u2014 their cards will appear here.<br>'+
+           'Have a backup file? <a class="altlink" href="viewer.html">Open the File viewer \u2192</a></p>'
+          :'<p class="empty">No cards shared with you yet.</p>';
+        openSettingsFromURL();
         loadSpaces().then(function(shared){
           // Pure viewer (own space empty) → land on the space shared with them.
           if(SPACE===myUid&&shared&&shared.length){SPACE=shared[0].uid;authUser.getIdToken(true).then(loadCloud,loadCloud);}
@@ -1552,7 +1572,7 @@
         }
         if(--pending<=0){
           if(paintTimer){clearTimeout(paintTimer);paintTimer=null;}
-          sortCards();people();render();loadSpaces();openCardFromURL();
+          sortCards();people();render();loadSpaces();openCardFromURL();openSettingsFromURL();
         }else paintSoon();
       }
       rows.forEach(function(row){

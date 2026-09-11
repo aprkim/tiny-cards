@@ -339,6 +339,14 @@
   }
   // App: range-fetch each image and write it to the cache, one at a time.
   var ZIP_DIR='kept-viewer';
+  // Remove the unpacked images, only if there are any: rmdir on a missing
+  // folder is refused, and the plugin logs every refusal as an error.
+  function dropZipDir(FS){
+    return FS.readdir({path:'',directory:'CACHE'}).then(function(r){
+      var has=(r.files||[]).some(function(e){return (e.name||e)===ZIP_DIR;});
+      return has?FS.rmdir({path:ZIP_DIR,directory:'CACHE',recursive:true}):null;
+    }).catch(function(){});
+  }
   function openZipNative(p){
     var FS=window.Capacitor.Plugins.Filesystem, C=window.Capacitor;
     var readRange=function(a,b){
@@ -353,7 +361,7 @@
       r.onload=function(){var s=String(r.result||'');res(s.slice(s.indexOf(',')+1));};
       r.readAsDataURL(new Blob([buf]));
     });};
-    return FS.rmdir({path:ZIP_DIR,directory:'CACHE',recursive:true}).catch(function(){}).then(function(){
+    return dropZipDir(FS).then(function(){
       return readZipIndex(readRange,p.size);
     }).then(function(entries){
       var imgs=zipImages(entries),list=[],i=0;
@@ -408,7 +416,7 @@
     if(!FS)return;
     lastPicks.forEach(function(p){FS.deleteFile({path:p}).catch(function(){});});
     lastPicks=[];
-    FS.rmdir({path:ZIP_DIR,directory:'CACHE',recursive:true}).catch(function(){});   // unpacked backup images
+    dropZipDir(FS);   // unpacked backup images
   }
   window.addEventListener('pagehide',dropPicks);
   var picking=false;

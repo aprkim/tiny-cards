@@ -72,7 +72,18 @@
   header p{font-size:13.5px;color:var(--muted);margin-top:3px}
   /* On the home screen everything below is centred, so the title matches.
      The scanner keeps its conventional left-aligned header. */
-  body.view-home header{text-align:center}
+  body.view-home header{text-align:center;position:relative}
+  /* Same gear, same corner, as the Scan and View tabs — the one control that
+     is in the same place on every signed-in screen. Positioned off the header
+     so the centred title stays centred. */
+  .gear{
+    flex-shrink:0;width:40px;height:40px;margin:-6px -8px 0 0;
+    display:inline-flex;align-items:center;justify-content:center;
+    background:none;border:none;cursor:pointer;color:var(--muted);border-radius:10px;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .gear:hover,.gear:focus-visible{color:var(--ink);background:rgba(0,0,0,.05)}
+  body.view-home .gear{position:absolute;right:-8px;top:-6px;margin:0}
 
   /* Both entry points are equal-weight choices, so they get identical boxes.
      Flex centring plus a min-height keeps them matched even though the camera
@@ -456,6 +467,11 @@
   <header>
     <h1 id="pageTitle">Kept</h1>
     <p id="pageSub">Your greeting cards, scanned and shared with family.</p>
+    <!-- Settings lives on the View tab (one sheet to maintain, not a third
+         copy); this opens it there. Shown only once signed in. -->
+    <button type="button" class="gear hidden" id="homeGear" aria-label="Settings">
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+    </button>
   </header>
 
   <!-- Landing screen. A tall flex column: the illustration and the running
@@ -627,6 +643,7 @@
     var signedIn=!!authUser;
     $('signedIn').classList.toggle('hidden',!signedIn);
     $('signedOut').classList.toggle('hidden',signedIn);
+    if($('homeGear'))$('homeGear').classList.toggle('hidden',!signedIn);
     // Everyone owns their own archive, so scanning is always available.
     if($('tabScan'))$('tabScan').style.display='';
     // Explain the app before login (what Nathan and Hazel first see); tagline once in.
@@ -680,6 +697,7 @@
     });
   };
   $('signOutBtn').onclick=function(){signOutUser().then(paintHome)};
+  $('homeGear').onclick=function(){location.href='cards.html?settings=1';};
 
   /* Every route to the scanner or the archive — both tabs and the hero
      illustration — turns a signed-out visitor straight back here, since
