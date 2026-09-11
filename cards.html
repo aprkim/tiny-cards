@@ -778,7 +778,7 @@
         <span>Delete Account</span>
       </button>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.11.1255</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.11.1313</span></p>
   </div>
 </div>
 
@@ -1113,6 +1113,13 @@
     beginExportUI(total);preparingUI();
     var controller=('AbortController' in window)?new AbortController():null, cancelled=false, handle=null, filename='', phase='build';
     $('exportCancel').onclick=function(){cancelled=true;$('exportCancel').disabled=true;$('exportPct').textContent='Cancelling…';if(controller)controller.abort();};
+    /* Earlier backups are not kept in the app's own storage: the share sheet
+       has already handed the file to Files, AirDrop or wherever it went, and a
+       532 MB copy sitting in the cache was doubling the space a backup takes.
+       Best-effort, before this one starts. */
+    Fs.readdir({path:'',directory:'CACHE'}).then(function(r){
+      (r.files||[]).forEach(function(e){var n=e.name||e;if(/^kept-backup-.*\.zip$/.test(n))Fs.deleteFile({path:n,directory:'CACHE'}).catch(function(){});});
+    }).catch(function(){});
     buildExport(controller,buildProgress).then(function(info){
       if(cancelled)throw new Error('cancelled');
       filename=info.filename;
@@ -1146,6 +1153,8 @@
         });
       });
     }).then(function(){
+      // Shared out, so the cached copy has done its job.
+      Fs.deleteFile({path:filename,directory:'CACHE'}).catch(function(){});
       persistLastSaved();exportReset();
       openAlert('Your cards were saved to Files.','Saved to Files');
     }).catch(function(e){

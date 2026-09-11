@@ -186,6 +186,10 @@ const EXPORT_STALE_MS = 2 * 60 * 1000;
 // provided the archive hasn't changed since. An interrupted download then
 // costs a retry, not another two-minute build.
 const EXPORT_REUSE_MS = 60 * 60 * 1000;
+// A build whose output hasn't grown for this long is stuck — on 2026-09-11 an
+// upload to Storage stalled for six minutes of library retries while the app
+// watched 75% — so it is abandoned, recorded as failed, and a retry starts clean.
+const EXPORT_STALL_MS = 90 * 1000;
 // What an export contains, as one string: the card files in order. Any change
 // to the archive changes it, so a stored export is only reused for the archive
 // it was built from.
@@ -308,13 +312,25 @@ exports.exportAll = onRequest({
   // only as long as the object — until the next export, cleanupExports, or
   // deleteAccount removes it.
   const downloadToken = crypto.randomUUID();
-  let entries = 0;
-  // Keeps the job alive between file-count heartbeats: through one slow file,
-  // and through the final upload after the last entry.
-  const beat = setInterval(() => jobRef.update({entries, heartbeatAt: Date.now()}).catch(() => {}), 15000);
+  let entries = 0, archive = null, out = null, fail = null;
+  // Heartbeat only while bytes are actually moving, so a stalled build goes
+  // quiet and the status check can call it dead; and past EXPORT_STALL_MS with
+  // no growth, end it here rather than wait for the library to give up.
+  let lastBytes = -1, lastGrowth = Date.now();
+  const beat = setInterval(() => {
+    const bytes = archive ? archive.pointer() : 0;
+    if (bytes !== lastBytes) {
+      lastBytes = bytes; lastGrowth = Date.now();
+      jobRef.update({entries, heartbeatAt: lastGrowth}).catch(() => {});
+    } else if (Date.now() - lastGrowth > EXPORT_STALL_MS && fail) {
+      fail(new Error(`stalled: no progress for ${Math.round((Date.now() - lastGrowth) / 1000)}s at ${bytes} bytes`));
+      try { archive.abort(); } catch (_) {}
+      try { out.destroy(); } catch (_) {}
+    }
+  }, 15000);
 
   try {
-    const out = dest.createWriteStream({
+    out = dest.createWriteStream({
       resumable: true,
       metadata: {
         contentType: 'application/zip',
@@ -323,8 +339,7 @@ exports.exportAll = onRequest({
         metadata: {firebaseStorageDownloadTokens: downloadToken},
       },
     });
-    const archive = archiver('zip', {store: true});   // images are already compressed
-    let fail;
+    archive = archiver('zip', {store: true});   // images are already compressed
     const written = new Promise((resolve, reject) => {
       fail = reject;
       out.on('finish', resolve);
@@ -334,7 +349,6 @@ exports.exportAll = onRequest({
     archive.on('warning', (err) => logger.warn('archive warning: ' + err.message));
     archive.on('entry', () => {
       entries++;
-      if (entries % 25 === 0) jobRef.update({entries, heartbeatAt: Date.now()}).catch(() => {});
       if (entries % 100 === 0) {
         logger.info('export progress', {uid: user.uid, entries, bytes: archive.pointer(),
           rssMB: Math.round(process.memoryUsage().rss / 1048576)});
@@ -395,7 +409,8 @@ exports.exportAll = onRequest({
     await jobRef.set(ready);
     res.json(publicJob(ready));
   } catch (err) {
-    logger.error('export failed', {uid: user.uid, message: err.message});
+    // Not `message`: the logger treats that key as its own and swallows the text.
+    logger.error('export failed', {uid: user.uid, error: err.message});
     await dest.delete().catch(() => {});        // never leave a partial ZIP behind
     await jobRef.set({state: 'failed', total, startedAt, failedAt: Date.now()}).catch(() => {});
     if (!res.headersSent) res.status(500).send('Could not build the backup. Please try again.');

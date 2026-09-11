@@ -280,16 +280,29 @@
     return !!(C&&typeof C.isNativePlatform==='function'&&C.isNativePlatform()&&
               typeof C.isPluginAvailable==='function'&&C.isPluginAvailable('FilePicker'));
   }
+  /* The picker copies each chosen file into the app's cache and never removes
+     it, so every session of browsing left its photos behind. Drop the previous
+     picks when new ones arrive and when the page is left. Native only: on the
+     web there are no copies. */
+  var lastPicks=[];
+  function dropPicks(){
+    var FS=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.Filesystem;
+    if(!FS||!lastPicks.length)return;
+    lastPicks.forEach(function(p){FS.deleteFile({path:p}).catch(function(){});});
+    lastPicks=[];
+  }
+  window.addEventListener('pagehide',dropPicks);
   var picking=false;
   function openFiles(){
     if(!nativePicker()){picker.value='';picker.click();return;}
     if(picking)return;                     // one picker at a time
     picking=true;
     window.Capacitor.Plugins.FilePicker.pickFiles({types:['image/*'],limit:0}).then(function(r){
-      var picked=((r&&r.files)||[]).map(function(p){
+      var files=(r&&r.files)||[];
+      var picked=files.map(function(p){
         return {name:p.name||'',type:p.mimeType||'',url:p.webPath||''};
       }).filter(function(p){return p.url;});
-      if(picked.length)ingest(picked);
+      if(picked.length){dropPicks();ingest(picked);lastPicks=files.map(function(p){return p.path;}).filter(Boolean);}
     }).catch(function(e){
       var m=(e&&(e.message||(''+e)))||'';
       if(/cancel/i.test(m))return;           // closed the picker without choosing
