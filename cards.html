@@ -762,6 +762,19 @@
         <div class="exp-row"><span class="exp-pct" id="exportPct">Preparing…</span><button type="button" class="exp-cancel" id="exportCancel">Cancel</button></div>
       </div>
       <p class="exp-last hidden" id="exportLast"></p>
+      <!-- The restore half of export: a Kept backup .zip goes back into this
+           person's own archive. Owner only; shown with or without cards. -->
+      <button type="button" class="set-row set-stack hidden" id="setImport">
+        <span class="set-stackv">
+          <span id="setImportLabel">Import backup</span>
+          <span class="set-hint" id="setImportHint">Add cards from a Kept backup .zip</span>
+        </span>
+      </button>
+      <input type="file" id="importPicker" accept=".zip,application/zip" class="hidden">
+      <div class="exp-prog hidden" id="importProg">
+        <div class="exp-bar"><div class="exp-fill" id="importFill"></div></div>
+        <div class="exp-row"><span class="exp-pct" id="importPct">Reading…</span><button type="button" class="exp-cancel" id="importCancel">Cancel</button></div>
+      </div>
       <!-- File viewer: the export's reader. Same row on both tabs' Settings, and
            shown whether or not there are cards — it reads files, not the archive. -->
       <button type="button" class="set-row" id="setViewer">
@@ -780,7 +793,7 @@
         <span>Delete Account</span>
       </button>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.11.1423</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.11.1546</span></p>
   </div>
 </div>
 
@@ -917,6 +930,7 @@
     $('setEmail').textContent=(authUser&&authUser.email)||'Signed in';
     var owner=isOwner();
     $('setShare').classList.toggle('hidden',!owner);                 // share only your own space
+    $('setImport').classList.toggle('hidden',!owner);                // restore into your own space only
     $('setExport').disabled=false;
     $('exportProg').classList.add('hidden');                          // reset any prior run
     var hasCards=EXPORT_ENABLED&&fromCloud&&cards.length>0;
@@ -947,6 +961,187 @@
     }).catch(function(){});
   }
   function closeSettings(){$('settings').classList.add('hidden')}
+
+  /* ---- Import backup: the restore half of export ----
+     A Kept backup .zip goes back into this person's own archive. The ZIP's
+     metadata.csv says which files make up which card (ids, sender, recipient,
+     occasion, date), and every page is uploaded exactly the way the scanner
+     uploads one — same paths, same record shape — so an imported card is
+     indistinguishable from a scanned one, and the thumbnail trigger fires for
+     it as usual. Cards whose id is already in the archive are skipped, which
+     is what makes a re-run after an interruption resume rather than repeat.
+     Uploads are sequential, one page in memory at a time. Transcriptions are
+     not part of a backup, so they are not restored. */
+  function isZipPick(name,type){return /\.zip$/i.test(name||'')||/zip/i.test(type||'');}
+  function u32(dv,o){return dv.getUint32(o,true)}
+  function u16(dv,o){return dv.getUint16(o,true)}
+  function utf8(buf,o,n){return new TextDecoder().decode(new Uint8Array(buf,o,n))}
+  function baseName(n){return n.split('/').pop()}
+  function imageType(n){return /\.png$/i.test(n)?'image/png':/\.jpe?g$/i.test(n)?'image/jpeg':/\.hei[cf]$/i.test(n)?'image/heic':''}
+  // readRange(a,b) → ArrayBuffer of bytes [a,b). Reads only the end-of-file
+  // record and the central directory: two small reads for any size of backup.
+  function readZipIndex(readRange,size){
+    var tailLen=Math.min(size,66000);
+    return readRange(size-tailLen,size).then(function(tail){
+      var dv=new DataView(tail),i=tail.byteLength-22;
+      while(i>=0&&u32(dv,i)!==0x06054b50)i--;
+      if(i<0)throw new Error('not a zip');
+      var count=u16(dv,i+10),cdSize=u32(dv,i+12),cdOff=u32(dv,i+16);
+      return readRange(cdOff,cdOff+cdSize).then(function(cd){
+        var d=new DataView(cd),p=0,out=[];
+        for(var k=0;k<count&&p+46<=cd.byteLength;k++){
+          if(u32(d,p)!==0x02014b50)break;
+          var nlen=u16(d,p+28),xlen=u16(d,p+30),clen=u16(d,p+32);
+          out.push({name:utf8(cd,p+46,nlen),method:u16(d,p+10),size:u32(d,p+20),lho:u32(d,p+42)});
+          p+=46+nlen+xlen+clen;
+        }
+        return out;
+      });
+    });
+  }
+  // Where an entry's bytes start: past its local header, whose name and extra
+  // fields can be sized differently from the index's copy.
+  function entryDataOffset(readRange,e){
+    return readRange(e.lho,e.lho+30).then(function(h){
+      var dv=new DataView(h);
+      if(u32(dv,0)!==0x04034b50)throw new Error('bad entry');
+      return e.lho+30+u16(dv,26)+u16(dv,28);
+    });
+  }
+  // metadata.csv, as exportAll writes it: RFC-4180 quoting, files joined by " | ".
+  function parseCsv(text){
+    var rows=[],row=[],cell='',q=false,i=0;
+    for(;i<text.length;i++){
+      var ch=text[i];
+      if(q){
+        if(ch==='"'){if(text[i+1]==='"'){cell+='"';i++;}else q=false;}
+        else cell+=ch;
+      }else if(ch==='"')q=true;
+      else if(ch===','){row.push(cell);cell='';}
+      else if(ch==='\n'){row.push(cell);rows.push(row);row=[];cell='';}
+      else if(ch!=='\r')cell+=ch;
+    }
+    if(cell!==''||row.length){row.push(cell);rows.push(row);}
+    if(!rows.length)return [];
+    var head=rows[0];
+    return rows.slice(1).filter(function(r){return r.length>1;}).map(function(r){
+      var o={};head.forEach(function(h,k){o[h]=r[k]||'';});return o;
+    });
+  }
+  var PAGE_LABEL=/\s+-\s+(front|inside|back|p\d+)$/i;
+  function pageLabel(name){var m=name.replace(/\.[^.]+$/,'').match(PAGE_LABEL);return m?m[1].toLowerCase():'';}
+  // What the ZIP holds, as cards to create: from the CSV rows, each with the
+  // entries for its pages in order. Pure: nothing is uploaded here.
+  function planImport(entries,csvRows,existingIds){
+    var byName={};entries.forEach(function(e){if(e.method===0)byName[baseName(e.name)]=e;});
+    var plan=[],skipped=0,missing=0;
+    csvRows.forEach(function(r){
+      var id=(r.id||'').trim();if(!id)return;
+      if(existingIds[id]){skipped++;return;}
+      var names=(r.files||'').split(' | ').map(function(s){return s.trim();}).filter(Boolean);
+      var pages=[];
+      names.forEach(function(n){var e=byName[n];if(e&&imageType(n))pages.push({entry:e,name:n,type:imageType(n),label:pageLabel(n)});else missing++;});
+      if(!pages.length)return;
+      plan.push({id:id,date:r.date||'',occasion:r.occasion||'',sender:r.sender||'',recipient:r.recipient||'',
+                 savedAt:(/^\d+$/.test(r.savedAt||'')?Number(r.savedAt):Date.now()),pages:pages});
+    });
+    return {plan:plan,skipped:skipped,missing:missing};
+  }
+  function importUI(on){
+    $('setImport').disabled=on;
+    $('setImportLabel').textContent=on?'Importing backup\u2026':'Import backup';
+    $('importProg').classList.toggle('hidden',!on);
+    if(on){$('importFill').style.width='0%';$('importPct').textContent='Reading backup\u2026';$('importCancel').disabled=false;}
+    stayAwake(on);
+  }
+  // source: {size, readRange(a,b)→ArrayBuffer, blobOf(off,len,type)→Blob, done()}
+  var importing=false;
+  function runImport(src){
+    if(importing)return;importing=true;
+    var cancelled=false,imported=0,report={skipped:0,missing:0};
+    importUI(true);
+    $('importCancel').onclick=function(){cancelled=true;$('importCancel').disabled=true;$('importPct').textContent='Stopping after this card\u2026';};
+    var existing={};cards.forEach(function(x){existing[x.id]=1;});
+    readZipIndex(src.readRange,src.size).then(function(entries){
+      var csv=entries.filter(function(e){return baseName(e.name)==='metadata.csv';})[0];
+      if(!csv)throw new Error('not a Kept backup');
+      return entryDataOffset(src.readRange,csv).then(function(off){return src.readRange(off,off+csv.size);}).then(function(buf){
+        var p=planImport(entries,parseCsv(new TextDecoder().decode(buf)),existing);
+        report=p;
+        var total=0;p.plan.forEach(function(k){k.pages.forEach(function(pg){total+=pg.entry.size;});});
+        var doneBytes=0,i=0;
+        function pct(extra){var v=Math.min(99,Math.round((doneBytes+(extra||0))/(total||1)*100));$('importFill').style.width=v+'%';$('importPct').textContent='Importing\u2026 '+(i)+' of '+p.plan.length+' cards \u00b7 '+v+'%';}
+        function next(){
+          if(cancelled||i>=p.plan.length)return;
+          var k=p.plan[i];pct(0);
+          var paths=[],bytes=[],labels=[],pi=0;
+          function page(){
+            if(pi>=k.pages.length)return;
+            var pg=k.pages[pi],ext=pg.type==='image/png'?'png':'jpg';
+            var path='cards/'+SPACE+'/'+k.id+'/p'+(pi+1)+'.'+ext;
+            return entryDataOffset(src.readRange,pg.entry).then(function(off){return src.blobOf(off,pg.entry.size,pg.type);}).then(function(bl){
+              return new Promise(function(res,rej){
+                var task=fbStore.ref().child(path).put(bl,{contentType:pg.type});
+                task.on('state_changed',function(s){pct(s.bytesTransferred);},rej,function(){
+                  paths[pi]=path;bytes[pi]=bl.size;labels[pi]=pg.label||('p'+(pi+1));doneBytes+=bl.size;pi++;res();
+                });
+              });
+            }).then(page);
+          }
+          return page().then(function(){
+            var rec={id:k.id,date:k.date,occasion:k.occasion,sender:k.sender,recipient:k.recipient,
+                     labels:labels,paths:paths,savedAt:k.savedAt,bytes:bytes,totalBytes:bytes.reduce(function(a,b){return a+(b||0)},0)};
+            var ref=fbDb.collection('tinyCards').doc(SPACE);
+            return ref.get().then(function(doc){
+              var rows=(doc.exists&&doc.data().cards)||[],found=false;
+              rows=rows.map(function(x){if(x&&x.id===k.id){found=true;return rec}return x});
+              if(!found)rows.push(rec);
+              return ref.set({cards:rows,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+            });
+          }).then(function(){imported++;i++;return next();});
+        }
+        return next();
+      });
+    }).then(function(){
+      importUI(false);importing=false;src.done();
+      var msg=imported+' card'+(imported===1?'':'s')+' imported.';
+      if(report.skipped)msg+=' '+report.skipped+' already in your archive, skipped.';
+      if(report.missing)msg+=' '+report.missing+' file'+(report.missing===1?'':'s')+' listed in the backup were not in it.';
+      if(cancelled)msg+=' Stopped early \u2014 tap Import again to continue.';
+      openAlert(msg,'Import backup');
+      if(imported){closeSettings();loadCloud();}
+    }).catch(function(e){
+      importUI(false);importing=false;src.done();
+      if(window.console)console.warn('import failed',e);
+      var notKept=/not a Kept backup|not a zip/.test((e&&e.message)||'');
+      openAlert(notKept?'That file isn\u2019t a Kept backup. Choose the .zip that Export all cards made.'
+        :(imported?imported+' cards were imported before it stopped. Tap Import again to continue \u2014 finished cards are skipped.':'Could not import that backup. Please try again.'),'Import backup');
+      if(imported){closeSettings();loadCloud();}
+    });
+  }
+  // Web: the File itself, sliced lazily.
+  $('importPicker').onchange=function(){
+    var f=$('importPicker').files[0];if(!f)return;
+    runImport({size:f.size,readRange:function(a,b){return f.slice(a,b).arrayBuffer();},
+      blobOf:function(off,len,type){return Promise.resolve(f.slice(off,off+len,type));},done:function(){$('importPicker').value='';}});
+  };
+  // App: the picker's copy of the ZIP, read by Range (Capacitor serves them),
+  // one page at a time, and deleted afterwards.
+  $('setImport').onclick=function(){
+    if(!authUser||!isOwner()||importing)return;
+    if(!fbInit()){openAlert('You appear to be offline. Reconnect and try again.','Import backup');return;}
+    var FP=capPlugin('FilePicker'),FS=capPlugin('Filesystem');
+    if(!isNativeApp()||!FP){$('importPicker').value='';$('importPicker').click();return;}
+    FP.pickFiles({types:['application/zip'],limit:1}).then(function(r){
+      var p=(r&&r.files&&r.files[0])||null;
+      if(!p||!p.webPath)return;
+      var readRange=function(a,b){return fetch(p.webPath,{headers:{Range:'bytes='+a+'-'+(b-1)}}).then(function(x){
+        if(x.status!==206)throw new Error('range unsupported ('+x.status+')');return x.arrayBuffer();});};
+      runImport({size:p.size,readRange:readRange,
+        blobOf:function(off,len,type){return readRange(off,off+len).then(function(buf){return new Blob([buf],{type:type});});},
+        done:function(){if(FS&&p.path)FS.deleteFile({path:p.path}).catch(function(){});}});
+    }).catch(function(e){if(!/cancel/i.test((e&&e.message)||'')){if(window.console)console.warn('import pick',e);openAlert('Could not open that file. Please try again.','Import backup');}});
+  };
   $('setClose').onclick=closeSettings;
   // viewer.html is self-contained (no Firebase), so this is plain navigation.
   $('setViewer').onclick=function(){location.href='viewer.html';};
