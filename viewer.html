@@ -182,7 +182,7 @@
       <strong>Open Card Files</strong>
       <span>Select files</span>
     </div>
-    <input type="file" id="picker" accept="image/*" multiple class="hidden">
+    <input type="file" id="picker" accept="image/*,.zip,application/zip" multiple class="hidden">
 
     <div class="footlink">
       <!-- Starts as the signed-out link, which is right for everyone; the
@@ -259,8 +259,126 @@
 
   picker.onchange=function(){
     if(!picker.files.length)return;
+    var f=picker.files[0];
+    if(picker.files.length===1&&isZipPick(f.name,f.type)){
+      openZipFile(f).then(function(r){ingest(r.list);}).catch(zipFailed);
+      return;
+    }
     ingest(picker.files);
   };
+
+  /* ---- reading a backup ZIP directly ----
+     The export is written uncompressed (archiver {store:true}), so the images
+     sit in the file whole with an index at the end, and no library is needed:
+     read the index, then hand each image over as a slice of the file. On the
+     web that slice is lazy (File.slice), so a 532 MB backup costs nothing in
+     memory. In the app the picked file is reachable by URL with Range requests
+     (Capacitor's asset handler serves them), so each image is fetched by range
+     and written to the cache one at a time and shown from there — memory holds
+     one image, never the backup. Compressed entries, which Kept never writes,
+     are skipped and counted. */
+  function isZipPick(name,type){return /\.zip$/i.test(name||'')||/zip/i.test(type||'');}
+  function u32(dv,o){return dv.getUint32(o,true)}
+  function u16(dv,o){return dv.getUint16(o,true)}
+  function utf8(buf,o,n){return new TextDecoder().decode(new Uint8Array(buf,o,n))}
+  function baseName(n){return n.split('/').pop()}
+  function imageType(n){return /\.png$/i.test(n)?'image/png':/\.jpe?g$/i.test(n)?'image/jpeg':/\.hei[cf]$/i.test(n)?'image/heic':''}
+  // readRange(a,b) → ArrayBuffer of bytes [a,b). Reads only the end-of-file
+  // record and the central directory: two small reads for any size of backup.
+  function readZipIndex(readRange,size){
+    var tailLen=Math.min(size,66000);
+    return readRange(size-tailLen,size).then(function(tail){
+      var dv=new DataView(tail),i=tail.byteLength-22;
+      while(i>=0&&u32(dv,i)!==0x06054b50)i--;
+      if(i<0)throw new Error('not a zip');
+      var count=u16(dv,i+10),cdSize=u32(dv,i+12),cdOff=u32(dv,i+16);
+      return readRange(cdOff,cdOff+cdSize).then(function(cd){
+        var d=new DataView(cd),p=0,out=[];
+        for(var k=0;k<count&&p+46<=cd.byteLength;k++){
+          if(u32(d,p)!==0x02014b50)break;
+          var nlen=u16(d,p+28),xlen=u16(d,p+30),clen=u16(d,p+32);
+          out.push({name:utf8(cd,p+46,nlen),method:u16(d,p+10),size:u32(d,p+20),lho:u32(d,p+42)});
+          p+=46+nlen+xlen+clen;
+        }
+        return out;
+      });
+    });
+  }
+  // Where an entry's bytes start: past its local header, whose name and extra
+  // fields can be sized differently from the index's copy.
+  function entryDataOffset(readRange,e){
+    return readRange(e.lho,e.lho+30).then(function(h){
+      var dv=new DataView(h);
+      if(u32(dv,0)!==0x04034b50)throw new Error('bad entry');
+      return e.lho+30+u16(dv,26)+u16(dv,28);
+    });
+  }
+  function zipImages(entries){
+    var imgs=[],skipped=0;
+    entries.forEach(function(e){
+      var n=baseName(e.name);
+      if(!imageType(n))return;
+      if(e.method!==0){skipped++;return;}
+      imgs.push(e);
+    });
+    if(skipped&&window.console)console.warn('backup: '+skipped+' compressed entr'+(skipped===1?'y':'ies')+' skipped');
+    return imgs;
+  }
+  // Web: every image is a lazy slice of the File.
+  function openZipFile(file){
+    var readRange=function(a,b){return file.slice(a,b).arrayBuffer();};
+    return readZipIndex(readRange,file.size).then(function(entries){
+      var imgs=zipImages(entries);
+      return Promise.all(imgs.map(function(e){
+        return entryDataOffset(readRange,e).then(function(off){
+          var t=imageType(baseName(e.name));
+          return {name:baseName(e.name),type:t,url:URL.createObjectURL(file.slice(off,off+e.size,t))};
+        });
+      })).then(function(list){return {list:list};});
+    });
+  }
+  // App: range-fetch each image and write it to the cache, one at a time.
+  var ZIP_DIR='kept-viewer';
+  function openZipNative(p){
+    var FS=window.Capacitor.Plugins.Filesystem, C=window.Capacitor;
+    var readRange=function(a,b){
+      return fetch(p.webPath,{headers:{Range:'bytes='+a+'-'+(b-1)}}).then(function(r){
+        // 206 only: a 200 here would be the whole backup arriving in memory.
+        if(r.status!==206)throw new Error('range unsupported ('+r.status+')');
+        return r.arrayBuffer();
+      });
+    };
+    var toB64=function(buf){return new Promise(function(res,rej){
+      var r=new FileReader();r.onerror=function(){rej(r.error)};
+      r.onload=function(){var s=String(r.result||'');res(s.slice(s.indexOf(',')+1));};
+      r.readAsDataURL(new Blob([buf]));
+    });};
+    return FS.rmdir({path:ZIP_DIR,directory:'CACHE',recursive:true}).catch(function(){}).then(function(){
+      return readZipIndex(readRange,p.size);
+    }).then(function(entries){
+      var imgs=zipImages(entries),list=[],i=0;
+      function next(){
+        if(i>=imgs.length)return {list:list};
+        var e=imgs[i++],n=baseName(e.name);
+        opening(i,imgs.length);
+        return entryDataOffset(readRange,e)
+          .then(function(off){return readRange(off,off+e.size);})
+          .then(toB64)
+          .then(function(b64){return FS.writeFile({path:ZIP_DIR+'/'+n,directory:'CACHE',data:b64,recursive:true});})
+          .then(function(w){list.push({name:n,type:imageType(n),url:C.convertFileSrc(w.uri)});return next();});
+      }
+      return next();
+    });
+  }
+  // The button doubles as the progress line while a backup is being unpacked.
+  var dropStrong=drop.querySelector('strong'),dropSpan=drop.querySelector('span');
+  var dropLabels=[dropStrong.textContent,dropSpan.textContent];
+  function opening(i,n){dropStrong.textContent='Opening backup\u2026';dropSpan.textContent=n?(i+' of '+n):'Reading';}
+  function zipFailed(e){
+    dropStrong.textContent=dropLabels[0];dropSpan.textContent=dropLabels[1];
+    if(window.console)console.warn('backup open failed',e);
+    alert('Could not read that backup file. Please try again.');
+  }
 
   /* iOS app only. A web <input type="file" accept="image/*"> makes iOS ask
      Photo Library / Take Photo / Choose Files first, but exported cards live in
@@ -287,9 +405,10 @@
   var lastPicks=[];
   function dropPicks(){
     var FS=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.Filesystem;
-    if(!FS||!lastPicks.length)return;
+    if(!FS)return;
     lastPicks.forEach(function(p){FS.deleteFile({path:p}).catch(function(){});});
     lastPicks=[];
+    FS.rmdir({path:ZIP_DIR,directory:'CACHE',recursive:true}).catch(function(){});   // unpacked backup images
   }
   window.addEventListener('pagehide',dropPicks);
   var picking=false;
@@ -297,8 +416,13 @@
     if(!nativePicker()){picker.value='';picker.click();return;}
     if(picking)return;                     // one picker at a time
     picking=true;
-    window.Capacitor.Plugins.FilePicker.pickFiles({types:['image/*'],limit:0}).then(function(r){
+    window.Capacitor.Plugins.FilePicker.pickFiles({types:['image/*','application/zip'],limit:0}).then(function(r){
       var files=(r&&r.files)||[];
+      if(files.length===1&&isZipPick(files[0].name,files[0].mimeType)&&files[0].webPath){
+        dropPicks();lastPicks=[files[0].path].filter(Boolean);
+        opening(0,0);
+        return openZipNative(files[0]).then(function(res){ingest(res.list);}).catch(zipFailed);
+      }
       var picked=files.map(function(p){
         return {name:p.name||'',type:p.mimeType||'',url:p.webPath||''};
       }).filter(function(p){return p.url;});
