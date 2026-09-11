@@ -1,5 +1,5 @@
 {
-  "originHash" : "3575dc1050a842435ca63b77b1fb9cea5c60c61fac9860f39b7979ef0ae00eb5",
+  "originHash" : "f0deac1dbb138d2155e243dfe8e7cbdcc8098309ed45608d9a4feec9aa8e6c59",
   "pins" : [
     {
       "identity" : "abseil-cpp-binary",
@@ -152,6 +152,15 @@
       "state" : {
         "revision" : "0d81e26e828ff9582807e2339112cedf2e0fab85",
         "version" : "1.1.2"
+      }
+    },
+    {
+      "identity" : "ion-ios-filetransfer",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/ionic-team/ion-ios-filetransfer.git",
+      "state" : {
+        "revision" : "3694f729844bf65134203cfda03b07ccca8977a9",
+        "version" : "1.0.3"
       }
     },
     {
