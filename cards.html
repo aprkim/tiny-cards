@@ -778,7 +778,7 @@
         <span>Delete Account</span>
       </button>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.10.2303</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.11.1255</span></p>
   </div>
 </div>
 
@@ -1123,11 +1123,15 @@
            lets it finish and then discards the file. */
         $('exportFill').parentNode.classList.remove('indet');
         $('exportFill').style.width='0%';$('exportPct').textContent='Downloading… 0%';
-        return FT.addListener('progress',function(p){
+        /* The bridge-injected plugin object's addListener returns a plain
+           {remove} handle, not a promise — .then() on it threw before the
+           download was ever requested, and every "Couldn't save" after a
+           successful build was this line. Promise.resolve takes either shape. */
+        return Promise.resolve(FT.addListener('progress',function(p){
           if(cancelled)return;
           var pct=Math.min(99,Math.round(p.bytes/info.size*100));
           $('exportFill').style.width=pct+'%';$('exportPct').textContent='Downloading… '+pct+'%';
-        }).then(function(h){
+        })).then(function(h){
           handle=h;phase='download';
           return FT.downloadFile({url:info.url,path:u.uri,progress:true});
         }).then(function(){
