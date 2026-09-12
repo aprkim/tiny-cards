@@ -793,7 +793,7 @@
         <span>Delete Account</span>
       </button>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.12.0054</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.12.0057</span></p>
   </div>
 </div>
 
@@ -1106,7 +1106,7 @@
     }).then(function(){
       importUI(false);importing=false;src.done();
       var msg=imported+' card'+(imported===1?'':'s')+' imported.';
-      if(report.skipped)msg+=' '+report.skipped+' already in your archive, skipped.';
+      if(report.skipped)msg+=' '+report.skipped+' already in your collection, skipped.';
       if(report.missing)msg+=' '+report.missing+' file'+(report.missing===1?'':'s')+' listed in the backup were not in it.';
       if(cancelled)msg+=' Stopped early \u2014 tap Import again to continue.';
       openAlert(msg,'Import backup');
