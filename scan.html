@@ -562,6 +562,12 @@
   #modalConfirm{background:var(--field);color:var(--ink);border-color:var(--rule)}
   #modalConfirm.danger{background:var(--field);color:#C62828;border-color:#C62828}
   #modalConfirm.danger:hover,#modalConfirm.danger:focus-visible{background:#FBEBEA}
+  /* filledConfirm: the confirm is the safe, wanted action, so it takes the fill
+     (as on the View tab). */
+  #modal.filled-confirm #modalConfirm{background:var(--ink);color:#fff;border-color:var(--ink)}
+  #modal.filled-confirm #modalConfirm:hover,#modal.filled-confirm #modalConfirm:focus-visible{background:#000}
+  #modal.filled-confirm #modalCancel{background:none;color:var(--muted);border-color:transparent}
+  #modal.filled-confirm #modalCancel:hover,#modal.filled-confirm #modalCancel:focus-visible{background:var(--paper)}
   /* Discard-style dialogs only: destructive action on top as plain red text, with
      the dark default ("Keep Editing") dominant below. Scoped by .confirm-top so
      other confirms (delete, sign-out) keep the standard outlined-danger look. */
@@ -939,7 +945,7 @@
         <span>Delete Account</span>
       </button>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.12.0128</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.12.0135</span></p>
   </div>
 </div>
 
@@ -1275,7 +1281,7 @@
      routes through openConfirm and then returns to the home page, since the
      scanner needs an account and cannot run signed out. Cancel is the safe
      default; click-outside and Escape cancel. */
-  var onConfirm=null;
+  var onConfirm=null,onCancel=null;
   function openConfirm(opts){
     opts=opts||{};
     var t=$('modalTitle'),bd=$('modalBody'),inp=$('modalInput'),c=$('modalConfirm'),x=$('modalCancel');
@@ -1291,7 +1297,8 @@
     x.style.display=opts.alert?'none':'';        // alert = single button, no Cancel
     // confirmTop: destructive action on top, safe default below (see .confirm-top CSS)
     $('modal').classList.toggle('confirm-top',!!opts.confirmTop);
-    onConfirm=opts.onConfirm||null;
+    $('modal').classList.toggle('filled-confirm',!!opts.filledConfirm);
+    onConfirm=opts.onConfirm||null;onCancel=opts.onCancel||null;
     function sync(){c.disabled=!!(needInput&&req)&&(inp.value.trim().toUpperCase()!==req.toUpperCase());}
     if(inp)inp.oninput=needInput?sync:null;
     sync();
@@ -1300,8 +1307,10 @@
   }
   // Designed replacement for window.alert — one button, matches the app.
   function openAlert(body,title){openConfirm({title:title||'',body:body,confirmText:'OK',alert:true});}
-  function closeConfirm(){$('modal').classList.add('hidden');onConfirm=null}
-  $('modalCancel').onclick=closeConfirm;
+  function closeConfirm(){$('modal').classList.add('hidden');onConfirm=null;onCancel=null}
+  // The Cancel button may carry a next step (onCancel); tapping outside and
+  // Escape never do, so those keep meaning "abort".
+  $('modalCancel').onclick=function(){var fn=onCancel;closeConfirm();if(fn)fn()};
   $('modalConfirm').onclick=function(){var fn=onConfirm;closeConfirm();if(fn)fn()};
   $('modal').onclick=function(e){if(e.target===$('modal'))closeConfirm()};
 
@@ -1358,17 +1367,47 @@
      type-to-confirm as the archive's Settings sheet. */
   $('setDeleteAccount').onclick=function(){
     if(!authUser)return;
-    closeSettings();
-    openConfirm({
-      title:'Delete your account?',
-      body:'This permanently deletes your account, all your cards, and your shared '+
-           'viewers. This cannot be undone. Files you\u2019ve already exported are '+
-           'not affected.',
-      input:true,requireText:'DELETE',inputLabel:'Type DELETE to confirm.',
-      confirmText:'Delete account',danger:true,
-      onConfirm:doDeleteAccount
-    });
+    // Export lives on the View tab: land in its Settings with the sheet open.
+    confirmDeleteAccount(function(){location.href='cards.html?settings=1';});
   };
+  /* Deleting an account is the one moment the backup safety net has to fire,
+     so it comes in two steps: an offer to export first, then the type-to-
+     confirm. The count is people who currently have access (Active); a pending
+     invite never had any, so it isn't counted. If the count can't be read the
+     dialogs still open with a generic line — deletion is never blocked.
+     Duplicated verbatim in cards.html and scan.html; each page supplies
+     startExport, since export lives on the View tab. */
+  function activeViewerCount(){
+    return fbDb.collection('viewerInvites').doc(authUser.uid).collection('emails').get().then(function(qs){
+      var n=0;qs.forEach(function(d){if((d.data()||{}).status==='active')n++;});return n;
+    });
+  }
+  function lostAccessLine(n){
+    if(n===null)return 'People you\u2019ve shared with will lose access to your cards. ';
+    if(!n)return '';
+    return n+(n===1?' person':' people')+' will lose access to your shared cards. ';
+  }
+  function confirmDeleteAccount(startExport){
+    closeSettings();
+    activeViewerCount().then(function(n){return n;},function(){return null;}).then(function(n){
+      openConfirm({
+        title:'Before you delete',
+        body:lostAccessLine(n)+'Want a copy of your cards first?',
+        confirmText:'Export a backup',cancelText:'Continue',filledConfirm:true,
+        onConfirm:startExport,
+        onCancel:function(){
+          openConfirm({
+            title:'Delete your account?',
+            body:'This permanently deletes your account and all your cards. '+lostAccessLine(n)+
+                 'This cannot be undone. Files you\u2019ve already exported are not affected.',
+            input:true,requireText:'DELETE',inputLabel:'Type DELETE to confirm.',
+            confirmText:'Delete account',danger:true,
+            onConfirm:doDeleteAccount
+          });
+        }
+      });
+    });
+  }
   /* What the app keeps on this device about an account, so deleting one leaves
      the phone as a new install would: the export's "Last saved" date and the
      scanner's upload preference. Duplicated verbatim in cards.html and scan.html. */
