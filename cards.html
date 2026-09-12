@@ -799,7 +799,7 @@
         <span>Delete Account</span>
       </button>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.12.0125</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.12.0128</span></p>
   </div>
 </div>
 
@@ -931,7 +931,9 @@
   /* One switch for the export row and everything that hangs off it (progress
      bar, last-saved line), so hiding it again is a one-word change. */
   var EXPORT_ENABLED=true;
-  function canExport(){return isOwner()&&window.matchMedia('(min-width:760px)').matches}
+  // Reading is free: a viewer may export the cards shared with them as well as
+  // their own — the server checks the viewOf claim. Desktop-only on the web.
+  function canExport(){return !!authUser&&window.matchMedia('(min-width:760px)').matches}
   function openSettings(){
     $('setEmail').textContent=(authUser&&authUser.email)||'Signed in';
     var owner=isOwner();
@@ -940,14 +942,14 @@
     $('setExport').disabled=false;
     $('exportProg').classList.add('hidden');                          // reset any prior run
     var hasCards=EXPORT_ENABLED&&fromCloud&&cards.length>0;
-    if(owner&&isNativeApp()){
+    if(isNativeApp()){
       // Native: a real backup — fetch the zip, write to cache, open the share sheet.
       $('setExport').classList.toggle('hidden',!hasCards);
       $('setExportLabel').textContent=EXPORT_LABEL;
       $('setExportHint').textContent=exportSubtext();
       loadLastSaved();
     }else{
-      $('setExport').classList.toggle('hidden',!(canExport()&&hasCards));   // owner + desktop
+      $('setExport').classList.toggle('hidden',!(canExport()&&hasCards));   // desktop
       $('setExportLabel').textContent=EXPORT_LABEL;
       $('setExportHint').textContent=exportSubtext();
       $('exportLast').classList.add('hidden');
@@ -1159,7 +1161,7 @@
   // browser streams the ZIP straight to disk. Content-Disposition:attachment
   // keeps the current page put (it just downloads).
   $('setExport').onclick=function(){
-    if(!authUser||!isOwner())return;
+    if(!authUser)return;
     if(isNativeApp()){nativeExport();return;}
     if(!canExport())return;
     runWebExport();
@@ -1206,6 +1208,7 @@
     return (isNativeApp()?'Save to Files':'ZIP backup')+' · about '+exportMB()+' MB';
   }
   var EXPORT_LABEL='Export all cards';
+  function exportSpaceQuery(){return (authUser&&SPACE&&myUid&&SPACE!==myUid)?'&space='+encodeURIComponent(SPACE):'';}
   /* Every terminal state repeated these two lines verbatim. Now that the row
      stays visible while running, the label has to be restored at each of them
      too, so they become one call. */
@@ -1247,9 +1250,11 @@
      while the server finished anyway. The start may still answer with the link
      (a small archive), or never; either is fine.
      Duplicated verbatim in cards.html and scan.html. */
+  // exportSpaceQuery() is the page's: '' for one's own cards, '&space=<uid>'
+  // when the collection on screen is one shared with this person.
   function exportCall(query,signal){
     return authUser.getIdToken().then(function(tok){
-      return fetch(EXPORT_URL+'?token='+encodeURIComponent(tok)+(query||''),signal?{signal:signal}:{});
+      return fetch(EXPORT_URL+'?token='+encodeURIComponent(tok)+(query||'')+exportSpaceQuery(),signal?{signal:signal}:{});
     }).then(function(resp){
       if(!resp.ok)throw new Error('http '+resp.status);
       return resp.json();
@@ -1360,7 +1365,7 @@
       // Shared out, so the cached copy has done its job.
       Fs.deleteFile({path:filename,directory:'CACHE'}).catch(function(){});
       persistLastSaved();exportReset();
-      openAlert('Your cards were saved to Files.','Saved to Files');
+      openAlert((isOwner()?'Your cards':'The shared cards')+' were saved to Files.','Saved to Files');
     }).catch(function(e){
       var msg=(e&&(e.message||(''+e)))||'';
       if(phase!=='build')Fs.deleteFile({path:filename,directory:'CACHE'}).catch(function(){});   // a file can only exist past the build
@@ -1373,7 +1378,8 @@
       if(window.console)console.warn('export failed',e);
       endExportUI();
       $('setExportHint').textContent='Couldn’t save — tap to try again';loadLastSaved();
-      openAlert(phase==='download'
+      openAlert(/http 409/.test(msg)?'Another export of yours is still running. Let it finish, then try again.'
+        :phase==='download'
         ?'The download was interrupted. Keep Kept open and tap Export again \u2014 the backup is already built, so it should start downloading straight away.'
         :'Could not save the backup. Please try again.','Export failed');
     }).then(function(){if(handle)handle.remove();});
@@ -1396,7 +1402,7 @@
       if(cancelled||(e&&e.name==='AbortError')){$('setExportHint').textContent=exportSubtext();return;}
       if(window.console)console.warn('export failed',e);
       $('setExportHint').textContent='Couldn’t download — tap to try again';
-      openAlert('Could not download the backup. Please try again.','Export failed');
+      openAlert(/http 409/.test((e&&e.message)||'')?'Another export of yours is still running. Let it finish, then try again.':'Could not download the backup. Please try again.','Export failed');
     });
   }
 

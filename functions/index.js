@@ -158,10 +158,12 @@ function cardBase(card) {
     (card.recipient ? ' - ' + clean(card.recipient) : '') +
     ' from ' + (clean(card.sender) || 'Sender');
 }
-const README = [
-  'Kept — backup export',
+// Two openings: the owner's own backup, or a viewer's copy of cards shared
+// with them. Everything after the opening applies to both.
+const readmeFor = (shared, ownerEmail) => [
+  shared ? 'Kept — cards shared with you' : 'Kept — backup export',
   '',
-  'A complete backup of your cards.',
+  shared ? `A copy of the cards ${ownerEmail || 'someone'} shared with you.` : 'A complete backup of your cards.',
   '',
   "WHAT'S HERE",
   '  cards/         Every card image at full quality. Each filename describes the',
@@ -242,6 +244,15 @@ exports.exportAll = onRequest({
   if (!user.email_verified) {
     res.status(403).send('Sign in with a verified account to export.'); return;
   }
+  /* Whose cards: the caller's own unless ?space names a collection shared with
+     them. Reading is free and a share is a window, not a copy, so a viewer needs
+     a way to keep what they can see — allowed when their token carries a viewOf
+     claim for that collection, the same claim the storage rules check. */
+  const space = String(req.query.space || user.uid);
+  const shared = space !== user.uid;
+  if (shared && !(Array.isArray(user.viewOf) && user.viewOf.includes(space))) {
+    res.status(403).send('Those cards are not shared with you.'); return;
+  }
 
   /* Export runs as a job the app follows, not one long request it waits on. A
      532 MB archive takes about two minutes to build, and a phone won't hold a
@@ -265,7 +276,7 @@ exports.exportAll = onRequest({
     return;
   }
 
-  const snap = await admin.firestore().collection('tinyCards').doc(user.uid).get();
+  const snap = await admin.firestore().collection('tinyCards').doc(space).get();
   const cards = (snap.exists && snap.data().cards) || [];
   const total = cards.reduce((n, c) => n + (c.paths || []).length, 0) + 2;   // + metadata.csv, README.txt
 
@@ -278,13 +289,18 @@ exports.exportAll = onRequest({
   const claim = (allowReuse) => admin.firestore().runTransaction(async (t) => {
     const s = await t.get(jobRef);
     const d = s.exists ? s.data() : null;
-    if (d && d.state === 'building' && startedAt - (d.heartbeatAt || 0) < EXPORT_STALE_MS) return {running: d};
+    // One job per person. A live build of a different collection can't be
+    // joined or replaced, so it's reported as busy rather than handed out.
+    if (d && d.state === 'building' && startedAt - (d.heartbeatAt || 0) < EXPORT_STALE_MS) {
+      return (d.space || user.uid) === space ? {running: d} : {busy: d};
+    }
     if (allowReuse && d && d.state === 'ready' && d.sig === sig && d.objectName &&
-        startedAt - (d.builtAt || 0) < EXPORT_REUSE_MS) return {reuse: d};
-    t.set(jobRef, {state: 'building', startedAt, heartbeatAt: startedAt, entries: 0, total});
+        (d.space || user.uid) === space && startedAt - (d.builtAt || 0) < EXPORT_REUSE_MS) return {reuse: d};
+    t.set(jobRef, {state: 'building', startedAt, heartbeatAt: startedAt, entries: 0, total, space});
     return {};
   });
   let claimed = await claim(true);
+  if (claimed.busy) { res.status(409).send('Another export is still running. Let it finish, then try again.'); return; }
   if (claimed.running) { res.json(publicJob(claimed.running)); return; }
   if (claimed.reuse) {
     const [stillThere] = await bucket.file(claimed.reuse.objectName).exists();
@@ -296,6 +312,7 @@ exports.exportAll = onRequest({
       return;
     }
     claimed = await claim(false);                 // the object is gone: build it again
+    if (claimed.busy) { res.status(409).send('Another export is still running. Let it finish, then try again.'); return; }
     if (claimed.running) { res.json(publicJob(claimed.running)); return; }
   }
 
@@ -306,7 +323,8 @@ exports.exportAll = onRequest({
      Now the build is Storage to Storage in one region, the upload stream applies
      backpressure, and the client downloads a finished object whose size it checks. */
   const stamp = new Date().toISOString().slice(0, 10);
-  const filename = `kept-backup-${stamp}.zip`;
+  const filename = shared ? `kept-shared-${stamp}.zip` : `kept-backup-${stamp}.zip`;
+  const ownerEmail = shared ? ((await admin.auth().getUser(space).catch(() => null)) || {}).email : '';
   const dest = bucket.file(`exports/${user.uid}/${Date.now()}-${filename}`);
   // A Firebase download token rather than a signed URL: signing needs signBlob on
   // the runtime service account, which this project doesn't grant. The link lives
@@ -389,7 +407,7 @@ exports.exportAll = onRequest({
     }
 
     archive.append(rows.join('\n') + '\n', {name: 'metadata.csv'});
-    archive.append(README, {name: 'README.txt'});
+    archive.append(readmeFor(shared, ownerEmail), {name: 'README.txt'});
     // Awaited together, so a failure mid-build ends the wait: an aborted
     // archive's finalize() need not settle on its own.
     await Promise.all([archive.finalize(), written]);
@@ -398,7 +416,7 @@ exports.exportAll = onRequest({
     const size = archive.pointer();
     const [meta] = await dest.getMetadata();
     if (Number(meta.size) !== size) throw new Error(`stored ${meta.size} bytes, expected ${size}`);
-    logger.info('export built', {uid: user.uid, entries, bytes: size,
+    logger.info('export built', {uid: user.uid, space, shared, entries, bytes: size,
       rssMB: Math.round(process.memoryUsage().rss / 1048576)});
 
     // One export per person: drop the earlier ones now that this one is complete.
@@ -409,7 +427,7 @@ exports.exportAll = onRequest({
       `${encodeURIComponent(dest.name)}?alt=media&token=${downloadToken}`;
     const now = Date.now();
     const ready = {state: 'ready', url, size, filename, entries, total, startedAt, builtAt: now, readyAt: now,
-      sig, objectName: dest.name};            // sig + objectName stay private: publicJob drops them
+      sig, objectName: dest.name, space};     // sig, objectName, space stay private: publicJob drops them
     await jobRef.set(ready);
     res.json(publicJob(ready));
   } catch (err) {
