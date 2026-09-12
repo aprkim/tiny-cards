@@ -793,7 +793,7 @@
         <span>Delete Account</span>
       </button>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.11.1546</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.11.2340</span></p>
   </div>
 </div>
 
@@ -2258,17 +2258,32 @@
       onConfirm:doDeleteAccount
     });
   };
+  /* What the app keeps on this device about an account, so deleting one leaves
+     the phone as a new install would: the export's "Last saved" date and the
+     scanner's upload preference. Duplicated verbatim in cards.html and scan.html. */
+  function forgetAccountLocally(){
+    ['tinycards_export_last','tinyCards_useCloud','tinyCards_exportFiles'].forEach(function(k){try{localStorage.removeItem(k)}catch(e){}});
+  }
   function doDeleteAccount(){
     if(!fbInit()){openAlert('You appear to be offline. Reconnect and try again.','Delete account');return;}
     openConfirm({title:'Deleting your account…',body:'This may take a moment.',alert:true,confirmText:'Please wait'});
     $('modalConfirm').disabled=true;
     fns().httpsCallable('deleteAccount')({}).then(function(){
       closeConfirm();
-      // The account is gone; doSignOut clears local session state and returns
-      // to the start screen. Any signOut error is moot at this point.
-      return Promise.resolve(doSignOut()).catch(function(){});
-    }).then(function(){
-      openAlert('Your account and all your cards have been deleted.','Account deleted');
+      /* The account is gone, so leave the phone as a new install would: no
+         session, none of the per-account leftovers, and the home screen —
+         where someone with no account starts — with the confirmation handed to
+         it the way the Scan tab already does. Signing out of Google on the
+         device too, so the next sign-in shows the account picker. Any sign-out
+         error is moot at this point: the account no longer exists. */
+      forgetAccountLocally();
+      try{sessionStorage.setItem('accountDeleted','1')}catch(e){}
+      var go=function(){location.replace('./');};
+      var jsOut=function(){return firebase.auth().signOut();};
+      var flow=isNativeApp()
+        ? window.Capacitor.Plugins.FirebaseAuthentication.signOut().catch(function(){}).then(jsOut)
+        : jsOut();
+      return flow.then(go,go);
     }).catch(function(e){
       closeConfirm();
       if(window.console)console.warn('deleteAccount',e);

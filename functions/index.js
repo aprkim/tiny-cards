@@ -600,6 +600,8 @@ exports.deleteAccount = onCall(async (req) => {
   const myKey = normEmail(auth.token.email || '');
   const db = admin.firestore();
   const failures = [];
+  // Counted so the log can say what went, not only what failed.
+  const removed = {cardFiles: 0, exportFiles: 0, invites: 0, sharedSpaces: 0};
   const step = async (label, fn) => {
     try { await fn(); }
     catch (e) { failures.push(label); logger.error(`deleteAccount:${label}`, {uid, err: e.message}); }
@@ -609,8 +611,11 @@ exports.deleteAccount = onCall(async (req) => {
   //    export ZIP still waiting to be downloaded: that is a full copy of the
   //    archive, so it goes with the account rather than lingering until cleanup.
   await step('storage', async () => {
-    await admin.storage().bucket().deleteFiles({prefix: `cards/${uid}/`, force: true});
-    await admin.storage().bucket().deleteFiles({prefix: `exports/${uid}/`, force: true});
+    const bucket = admin.storage().bucket();
+    removed.cardFiles = (await bucket.getFiles({prefix: `cards/${uid}/`}))[0].length;
+    removed.exportFiles = (await bucket.getFiles({prefix: `exports/${uid}/`}))[0].length;
+    await bucket.deleteFiles({prefix: `cards/${uid}/`, force: true});
+    await bucket.deleteFiles({prefix: `exports/${uid}/`, force: true});
   });
 
   // 2a) Viewers this person invited: strip the claim that points at them, drop
@@ -618,6 +623,7 @@ exports.deleteAccount = onCall(async (req) => {
   //     revokeViewer, run for every outstanding invite.
   await step('revoke-viewers', async () => {
     const invites = await db.collection('viewerInvites').doc(uid).collection('emails').get();
+    removed.invites = invites.size;
     for (const d of invites.docs) {
       const viewerUid = (d.data() || {}).viewerUid || null;
       if (viewerUid) {
@@ -643,6 +649,7 @@ exports.deleteAccount = onCall(async (req) => {
   //     with list as invited, so they can see it and revoke it deliberately.
   await step('leave-shared', async () => {
     const spaces = await db.collection('sharedWithMe').doc(uid).collection('spaces').get();
+    removed.sharedSpaces = spaces.size;
     for (const d of spaces.docs) {
       const ownerUid = d.id;
       if (myKey) {
@@ -677,7 +684,8 @@ exports.deleteAccount = onCall(async (req) => {
     // reporting a success that would leave them signed in to a hollow account.
     throw new HttpsError('internal', 'Could not finish deleting your account. Please try again.');
   }
-  if (failures.length) logger.warn('deleteAccount: partial', {uid, failures});
+  // Success used to log nothing at all, so "did it clean up?" had no answer.
+  logger.info('deleteAccount: done', {uid, removed, failures});
   return {ok: true};
 });
 
