@@ -793,7 +793,7 @@
         <span>Delete Account</span>
       </button>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.12.0049</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.12.0054</span></p>
   </div>
 </div>
 
@@ -2183,6 +2183,11 @@
       setTimeout(function(){URL.revokeObjectURL(u)},1500);
     };
 
+    /* In the app a browser download link does nothing — WKWebView ignores
+       it — so this button was dead on the phone. There, the pages go through
+       the share sheet instead, which is how iOS saves to Photos or Files. */
+    if(nativeCardShare(c,base,nameFor))return;
+
     c.pages.forEach(function(pg,i){
       setTimeout(function(){
         pageUrl(pg).then(function(u){return fetch(u)}).then(function(r){return r.blob()})
@@ -2191,6 +2196,40 @@
       },i*350);
     });
   };
+  /* Phone path for the Download button: fetch each page into the app's cache
+     with the file-transfer plugin (native HTTP — no browser download, no CORS),
+     then open the share sheet with all the pages at once. Works for viewers as
+     well as owners: the storage rules already let them read the pages. The
+     files are removed again once the sheet closes. Returns false where the
+     plugins aren't there, so the web path runs instead. */
+  function nativeCardShare(c,base,nameFor){
+    var FT=capPlugin('FileTransfer'),Fs=capPlugin('Filesystem'),Share=capPlugin('Share');
+    if(!isNativeApp()||!FT||!Fs||!Share)return false;
+    var btn=$('boxDl'),old=btn.textContent,dir='kept-share',uris=[];
+    btn.disabled=true;btn.textContent='Preparing\u2026';
+    var typeOf=function(pg){return /\.png$/i.test((pg&&pg.path)||'')?'image/png':'image/jpeg';};
+    var cleanup=function(){Fs.rmdir({path:dir,directory:'CACHE',recursive:true}).catch(function(){});btn.disabled=false;btn.textContent=old;};
+    Fs.mkdir({path:dir,directory:'CACHE',recursive:true}).catch(function(){}).then(function(){
+      return c.pages.reduce(function(chain,pg,i){
+        return chain.then(function(){
+          var name=dir+'/'+nameFor(i,typeOf(pg));
+          return pageUrl(pg).then(function(u){
+            return Fs.getUri({path:name,directory:'CACHE'}).then(function(r){
+              return FT.downloadFile({url:u,path:r.uri}).then(function(){uris.push(r.uri);});
+            });
+          });
+        });
+      },Promise.resolve());
+    }).then(function(){
+      return Share.share({title:base,files:uris,dialogTitle:'Save card'});
+    }).then(cleanup,function(e){
+      cleanup();
+      if(/cancel/i.test((e&&(e.message||''+e))||''))return;      // closed the sheet: nothing to say
+      if(window.console)console.warn('card share',e);
+      openAlert('Could not save that card. Check your connection and try again.','Download failed');
+    });
+    return true;
+  }
 
   $('boxClose').onclick=close;
   $('box').onclick=function(e){if(e.target===$('box'))close()};
