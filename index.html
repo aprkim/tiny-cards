@@ -446,6 +446,7 @@
   /* Designed dialog (matches View/Scan): cream sheet centred on desktop, bottom
      sheet on mobile. Used for sign-in messages so they aren't native alerts. */
   .scrim{position:fixed;inset:0;z-index:60;background:rgba(22,22,29,.45);display:flex;justify-content:center;align-items:center;padding:20px}
+  #modal{z-index:80}   /* dialogs sit above every sheet, same as on the other pages */
   .sheet{background:var(--paper);border-radius:18px;width:100%;max-width:400px;padding:26px 22px 20px;box-shadow:0 16px 48px rgba(22,22,29,.28)}
   .sheet h2{font-size:18px;font-weight:700;letter-spacing:-.01em;margin-bottom:8px}
   .sheet p{font-size:14px;color:var(--muted);line-height:1.55;margin-bottom:22px}

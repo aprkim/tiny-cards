@@ -528,6 +528,12 @@
     position:fixed;inset:0;z-index:60;background:rgba(22,22,29,.45);
     display:flex;justify-content:center;align-items:center;padding:20px;
   }
+  /* The dialog is the one overlay that must win: it is raised from inside the
+     Settings and Share sheets (import and export results, invite errors) and
+     from the transcription sheet, all of which share this layer or sit above
+     it — and equal z-index falls back to page order, where #modal comes first.
+     An import result once spent a whole test hidden behind Settings. */
+  #modal{z-index:80}
   .sheet{
     position:relative;
     background:var(--paper);border-radius:18px;width:100%;max-width:400px;
@@ -933,7 +939,7 @@
         <span>Delete Account</span>
       </button>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.12.0057</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.12.0125</span></p>
   </div>
 </div>
 
