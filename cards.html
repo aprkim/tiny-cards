@@ -793,7 +793,7 @@
         <span>Delete Account</span>
       </button>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.11.2340</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.12.0049</span></p>
   </div>
 </div>
 
@@ -1042,7 +1042,7 @@
       var pages=[];
       names.forEach(function(n){var e=byName[n];if(e&&imageType(n))pages.push({entry:e,name:n,type:imageType(n),label:pageLabel(n)});else missing++;});
       if(!pages.length)return;
-      plan.push({id:id,date:r.date||'',occasion:r.occasion||'',sender:r.sender||'',recipient:r.recipient||'',
+      plan.push({id:id,date:r.date||'',occasion:r.occasion||'',sender:r.sender||'',recipient:r.recipient||'',transcription:r.transcription||'',
                  savedAt:(/^\d+$/.test(r.savedAt||'')?Number(r.savedAt):Date.now()),pages:pages});
     });
     return {plan:plan,skipped:skipped,missing:missing};
@@ -1091,6 +1091,7 @@
           return page().then(function(){
             var rec={id:k.id,date:k.date,occasion:k.occasion,sender:k.sender,recipient:k.recipient,
                      labels:labels,paths:paths,savedAt:k.savedAt,bytes:bytes,totalBytes:bytes.reduce(function(a,b){return a+(b||0)},0)};
+            if(k.transcription)rec.transcription=k.transcription;   // restored, not re-read: no API call, no cap
             var ref=fbDb.collection('tinyCards').doc(SPACE);
             return ref.get().then(function(doc){
               var rows=(doc.exists&&doc.data().cards)||[],found=false;

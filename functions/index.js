@@ -167,7 +167,8 @@ const README = [
   '  cards/         Every card image at full quality. Each filename describes the',
   '                 card: "<date> <occasion> - <recipient> from <sender> - <page>".',
   '  metadata.csv   Every card\'s details (sender, recipient, occasion, date, pages,',
-  '                 filenames). Opens in any spreadsheet app.',
+  '                 filenames, and the transcription of its handwriting where one',
+  '                 was made). Opens in any spreadsheet app.',
   '',
   'BROWSE IT OFFLINE',
   '  Open  https://kept.cards/viewer.html  and choose this folder. It',
@@ -356,7 +357,9 @@ exports.exportAll = onRequest({
     });
     archive.pipe(out);
 
-    const rows = [['id', 'sender', 'recipient', 'occasion', 'date', 'pages', 'files', 'storagePaths', 'totalBytes', 'savedAt'].join(',')];
+    // transcription last, so older readers of this file are unaffected; csvCell
+    // quotes the newlines and commas handwriting tends to have.
+    const rows = [['id', 'sender', 'recipient', 'occasion', 'date', 'pages', 'files', 'storagePaths', 'totalBytes', 'savedAt', 'transcription'].join(',')];
 
     for (const card of cards) {
       const paths = card.paths || [];
@@ -380,7 +383,8 @@ exports.exportAll = onRequest({
       rows.push([
         csvCell(card.id), csvCell(card.sender), csvCell(card.recipient), csvCell(card.occasion),
         csvCell(card.date), csvCell(paths.length), csvCell(names.join(' | ')),
-        csvCell(paths.join(' | ')), csvCell(card.totalBytes || ''), csvCell(card.savedAt || '')
+        csvCell(paths.join(' | ')), csvCell(card.totalBytes || ''), csvCell(card.savedAt || ''),
+        csvCell(card.transcription || '')
       ].join(','));
     }
 
