@@ -930,9 +930,6 @@
         <span>Shared with</span>
         <span class="set-end"><span class="set-count" id="setShareCount"></span><span class="set-chev" aria-hidden="true">&rsaquo;</span></span>
       </button>
-      <button type="button" class="set-row hidden" id="setExport">
-        <span>Export all</span><span class="set-hint" id="setExportHint">ZIP backup</span>
-      </button>
       <!-- File viewer: the export's reader. Same row on both tabs' Settings, and
            shown whether or not there are cards — it reads files, not the archive. -->
       <button type="button" class="set-row" id="setViewer">
@@ -953,7 +950,7 @@
         <span>Delete Account</span>
       </button>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.13.1450</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.13.1506</span></p>
   </div>
 </div>
 
@@ -1325,28 +1322,11 @@
 
   // Same Settings as the View page: Account, Export all (owner + desktop),
   // Sign out. Export streams a ZIP backup via the exportAll function.
-  var EXPORT_URL='https://us-east1-tiny-wins25.cloudfunctions.net/exportAll';
-  function exportSpaceQuery(){return '';}      // the scanner only ever exports one's own cards
-  var EXPORT_ENABLED=true;               // same switch as the archive's sheet
-  function canExport(){return !!(authUser&&window.matchMedia('(min-width:760px)').matches)}
   function isOwner(){return !!authUser;}   // every user owns their own space
-  /* Export needs cards to export — an empty archive would hand back an empty
-     zip. The native app can't stream a browser download either (WKWebView has
-     no download manager), so owners there see a note pointing at the computer
-     rather than a button that cannot work. */
-  function paintExportRow(hasCards){
-    var show=EXPORT_ENABLED&&hasCards&&isOwner()&&(isNativeApp()||canExport());
-    $('setExport').classList.toggle('hidden',!show);
-    $('setExportHint').textContent=isNativeApp()?'On a computer':'ZIP backup';
-  }
   function openSettings(){
     $('setEmail').textContent=(authUser&&authUser.email)||'Signed in';
     var owner=isOwner();
     $('setShare').classList.toggle('hidden',!owner);             // share your own space
-    $('setExport').disabled=false;
-    // The scanner doesn't hold the archive in memory, so we don't yet know
-    // whether there is anything to export. Stay hidden until loadLibrary says.
-    paintExportRow(false);
     // Library summary (subtext under email) + viewer count — same sheet as the
     // View tab, fetched fresh each time Settings opens.
     $('setLibStats').textContent='';
@@ -1361,7 +1341,6 @@
       var photos=0,people={};
       rows.forEach(function(r){photos+=(r.paths||[]).length;people[r.sender||'Unknown']=1;});
       $('setLibStats').textContent=plur(rows.length,'card')+' · '+plur(photos,'photo')+' · '+plur(Object.keys(people).length,'person','people');
-      paintExportRow(true);
     }).catch(function(){});
   }
   // Family viewers count for the Settings row.
@@ -1574,94 +1553,6 @@
     });
   };
   $('inviteEmail').onkeydown=function(e){if(e.key==='Enter'){e.preventDefault();$('inviteBtn').click();}};
-  /* Export in two kinds of request. One starts the build: the server writes the
-     ZIP into Cloud Storage and records its progress. Short status polls then
-     follow that record every 3 seconds until it holds a link. Waiting on the
-     starting request instead failed on a phone: a 532 MB build takes about two
-     minutes, the app gave up on the silent request, and said it couldn't save
-     while the server finished anyway. The start may still answer with the link
-     (a small archive), or never; either is fine.
-     Duplicated verbatim in cards.html and scan.html. */
-  // exportSpaceQuery() is the page's: '' for one's own cards, '&space=<uid>'
-  // when the collection on screen is one shared with this person.
-  function exportCall(query,signal){
-    return authUser.getIdToken().then(function(tok){
-      return fetch(EXPORT_URL+'?token='+encodeURIComponent(tok)+(query||'')+exportSpaceQuery(),signal?{signal:signal}:{});
-    }).then(function(resp){
-      // A refusal carries the server's own words (403 "not shared with you",
-      // 409 "another export is running", 500 with the build's failure reason).
-      // Keep them on the error so the app can say them instead of a generic line.
-      if(!resp.ok)return resp.text().then(function(t){var e=new Error('http '+resp.status);e.status=resp.status;e.serverText=(t||'').trim().slice(0,200);throw e;});
-      return resp.json();
-    });
-  }
-  // A failed job carries the server's reason; it travels the same way a refusal's text does.
-  function failedError(j){var e=new Error('build failed');e.serverText=(j&&j.reason)||'';return e;}
-  function buildExport(controller,onProgress){
-    var signal=controller?controller.signal:null, deadline=Date.now()+30*60*1000;
-    return new Promise(function(resolve,reject){
-      var done=false,timer=null,baselined=false,staleReady=null,staleFailed=null;
-      function finish(err,info){
-        if(done)return;done=true;clearTimeout(timer);
-        if(err)return reject(err);
-        if(!info||!info.url||!(info.size>0)||!info.filename)return reject(new Error('bad export response'));
-        resolve(info);
-      }
-      function baseline(j){baselined=true;if(j.state==='ready')staleReady=j.readyAt;if(j.state==='failed')staleFailed=j.failedAt;}
-      if(signal)signal.addEventListener('abort',function(){var e=new Error('aborted');e.name='AbortError';finish(e);});
-      function poll(){
-        if(done)return;
-        exportCall('&status=1',signal).then(function(j){
-          if(done)return;
-          if(!baselined)baseline(j);               // the look-before-start failed: this look stands in
-          if(j.state==='ready'&&j.readyAt!==staleReady)return finish(null,j);
-          if(j.state==='failed'&&j.failedAt!==staleFailed)return finish(failedError(j));
-          if(j.state==='building'&&j.total&&onProgress)onProgress(j.entries||0,j.total);
-          if(Date.now()>deadline)return finish(new Error('export timed out'));
-          timer=setTimeout(poll,3000);
-        },function(e){
-          if(done)return;
-          if((e&&e.name==='AbortError')||Date.now()>deadline)return finish(e);
-          timer=setTimeout(poll,3000);           // one dropped poll is not a failed build
-        });
-      }
-      /* Look before starting: whatever the record holds now belongs to an
-         earlier export, and only a result newer than it counts for this one.
-         Taken here rather than on the first poll because the start itself can
-         finish before that poll — a small archive, or a reused export — and a
-         first poll would then mistake this export's result for an old one. */
-      exportCall('&status=1',signal).then(baseline,function(){}).then(function(){
-        if(done)return;
-        exportCall('',signal).then(function(j){
-          if(j&&j.state==='ready')finish(null,j);      // the start's own answer is never stale
-          else if(j&&j.state==='failed')finish(failedError(j));
-        },function(e){
-          // A refused start (signed out, server error) is a real failure. A start
-          // the phone stopped waiting on is not: the polls will find the build.
-          if((e&&e.name==='AbortError')||/^http /.test((e&&e.message)||''))finish(e);
-        });
-        timer=setTimeout(poll,4000);
-      });
-    });
-  }
-  $('setExport').onclick=function(){
-    if(!isOwner())return;
-    if(isNativeApp()){
-      openAlert('A full backup is a large ZIP download. Open kept.cards on a computer and use Settings → Export all.','Back up on a computer');
-      return;
-    }
-    if(!canExport())return;
-    var btn=$('setExport'),hint=$('setExportHint');
-    btn.disabled=true;hint.textContent='Preparing backup…';
-    // Same flow as the archive's sheet: start the build, follow it, then hand the
-    // finished file to the browser, which downloads it as an attachment.
-    buildExport(null,function(done,total){
-      hint.textContent='Preparing backup… '+Math.min(99,Math.round(done/total*100))+'%';
-    }).then(function(info){
-      window.location.href=info.url;
-      hint.textContent='Downloading — check your downloads';btn.disabled=false;
-    }).catch(function(e){hint.textContent='Couldn’t start — try again';btn.disabled=false;if(window.console)console.warn(e);if(e&&e.serverText)openAlert(e.serverText,'Export failed');});
-  };
   $('settings').onclick=function(e){if(e.target===$('settings'))closeSettings()};
   document.addEventListener('keydown',function(e){
     if(e.key!=='Escape')return;
