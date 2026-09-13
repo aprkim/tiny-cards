@@ -167,8 +167,18 @@
   .card small{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
 
   .empty{text-align:center;padding:48px 20px;color:var(--muted);font-size:14px}
-  /* The what-to-do lines under an empty archive: tucked up under the headline, not a second 48px block. */
-  .empty.emptyhow{padding-top:0;font-size:13.5px;line-height:1.75}
+  /* Owner empty state: one heading, one pink action, two quiet stacked links.
+     Reuses the app's own link style (.altlink.quiet, muted, no underline) —
+     no browser-default link anywhere in it. */
+  .empty-state{text-align:center;padding:56px 20px 40px}
+  .empty-state h2{font-size:22px;font-weight:700;letter-spacing:-.02em;color:var(--ink);margin-bottom:20px}
+  .empty-scan{display:inline-block;font:inherit;font-size:15.5px;font-weight:600;padding:13px 26px;border-radius:12px;
+    background:var(--accent);color:#fff;text-decoration:none;-webkit-tap-highlight-color:transparent}
+  .empty-scan:hover,.empty-scan:focus-visible{background:#8E1340}
+  /* The two secondary links: each on its own line, stacked, with breathing room. */
+  .empty-links{margin-top:40px;display:flex;flex-direction:column;align-items:center;gap:16px}
+  /* Both are buttons (they trigger JS): strip the button chrome, keep the link look. */
+  .empty-links button.altlink{background:none;border:none;border-bottom:1px solid transparent;padding:0;font:inherit;font-size:13.5px;cursor:pointer}
 
   .box{
     position:fixed;inset:0;background:rgba(22,22,29,.94);z-index:50;
@@ -799,7 +809,7 @@
         <span>Delete Account</span>
       </button>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.13.0938</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.13.1040</span></p>
   </div>
 </div>
 
@@ -1732,14 +1742,24 @@
         $('people').innerHTML='';$('meta').textContent='';
         /* An empty archive is where two different people land: the owner who
            hasn't scanned yet, and someone who was told "I shared my cards with
-           you" and can't see them. Say what each should do — invites appear
-           here on their own; a backup file opens in the viewer, not here. */
+           you" and can't see them. The owner gets one action (scan) and two
+           quiet exits — restore a backup, or learn how shared cards arrive.
+           The viewer just waits. */
         $('groups').innerHTML=isOwner()
-          ?'<p class="empty">No cards here yet.</p>'+
-           '<p class="empty emptyhow">Scan your first card from the home screen.<br>'+
-           'Someone shared cards with you? Ask them to invite you by email \u2014 their cards will appear here.<br>'+
-           'Have a backup file? <a class="altlink" href="viewer.html">Open the File viewer \u2192</a></p>'
+          ?'<div class="empty-state">'+
+           '<h2>No cards yet</h2>'+
+           '<a class="empty-scan" href="scan.html">Scan a card</a>'+
+           '<div class="empty-links">'+
+           '<button type="button" class="altlink quiet" id="emptyRestore">Restore from backup \u2192</button>'+
+           '<button type="button" class="altlink quiet" id="emptyShared">Waiting on shared cards? \u2192</button>'+
+           '</div></div>'
           :'<p class="empty">No cards shared with you yet.</p>';
+        var er=$('emptyRestore');
+        // The label promises the outcome; Settings → Import backup delivers it,
+        // fired in the same tap so no one has to go hunting for the row.
+        if(er)er.onclick=function(){openSettings();$('setImport').click();};
+        var es=$('emptyShared');
+        if(es)es.onclick=function(){openAlert('Ask the person who has the cards to invite you by email \u2014 their cards will appear here on their own. There is nothing to download.','Waiting on shared cards?');};
         openSettingsFromURL();
         loadSpaces().then(function(shared){
           // Pure viewer (own space empty) → land on the space shared with them.
