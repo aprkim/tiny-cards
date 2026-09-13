@@ -390,10 +390,18 @@ exports.exportAll = onRequest({
       // quotes the newlines and commas handwriting tends to have.
       const rows = [['id', 'sender', 'recipient', 'occasion', 'date', 'pages', 'files', 'storagePaths', 'totalBytes', 'savedAt', 'transcription'].join(',')];
 
+      // Two cards with the same date, occasion, recipient and sender produce the
+      // same base, and so identical page filenames — which collide in the zip
+      // (a hand-unzip drops the duplicates), merge in the File viewer, and made
+      // import assign one card's images to both. Disambiguate the second and
+      // later such cards, so every page name in the backup is unique.
+      const baseSeen = {};
       for (const card of cards) {
         const paths = card.paths || [];
         const labels = card.labels || [];
-        const base = cardBase(card);
+        let base = cardBase(card);
+        const nth = (baseSeen[base] || 0) + 1; baseSeen[base] = nth;
+        if (nth > 1) base = `${base} (${nth})`;
         const names = [];
         for (let i = 0; i < paths.length; i++) {
           const p = paths[i];

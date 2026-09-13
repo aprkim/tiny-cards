@@ -809,7 +809,7 @@
         <span>Delete Account</span>
       </button>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.13.1040</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.13.1110</span></p>
   </div>
 </div>
 
@@ -1053,16 +1053,30 @@
   // What the ZIP holds, as cards to create: from the CSV rows, each with the
   // entries for its pages in order. Pure: nothing is uploaded here.
   function planImport(entries,csvRows,existingIds){
-    var byName={};entries.forEach(function(e){if(e.method===0)byName[baseName(e.name)]=e;});
+    /* Match each CSV file to a zip entry by name — but a name can repeat, in
+       backups made before export disambiguated them. Both the entries for a
+       repeated name (in write order) and the cards that list it (in row order)
+       follow the same card sequence, so hand them out first-come-first-served:
+       each card gets its own image instead of the last one overwriting the
+       rest. Every row consumes its entries even when skipped, to stay aligned. */
+    var byName={};
+    entries.slice().sort(function(a,b){return a.lho-b.lho;}).forEach(function(e){
+      var n=baseName(e.name);
+      if(e.method!==0||!imageType(n))return;
+      (byName[n]||(byName[n]=[])).push(e);
+    });
     var plan=[],skipped=0,missing=0;
     csvRows.forEach(function(r){
       var id=(r.id||'').trim();if(!id)return;
-      if(existingIds[id]){skipped++;return;}
       var names=(r.files||'').split(' | ').map(function(s){return s.trim();}).filter(Boolean);
       var pages=[];
-      names.forEach(function(n){var e=byName[n];if(e&&imageType(n))pages.push({entry:e,name:n,type:imageType(n),label:pageLabel(n)});else missing++;});
-      if(!pages.length)return;
-      plan.push({id:id,date:r.date||'',occasion:r.occasion||'',sender:r.sender||'',recipient:r.recipient||'',transcription:r.transcription||'',
+      names.forEach(function(n){
+        var q=byName[n],e=(q&&q.length)?q.shift():null;   // consume regardless, to keep the order aligned
+        if(e)pages.push({entry:e,name:n,type:imageType(n),label:pageLabel(n)});
+        else if(!existingIds[id])missing++;
+      });
+      if(existingIds[id]){skipped++;return;}
+      if(pages.length)plan.push({id:id,date:r.date||'',occasion:r.occasion||'',sender:r.sender||'',recipient:r.recipient||'',transcription:r.transcription||'',
                  savedAt:(/^\d+$/.test(r.savedAt||'')?Number(r.savedAt):Date.now()),pages:pages});
     });
     return {plan:plan,skipped:skipped,missing:missing};
