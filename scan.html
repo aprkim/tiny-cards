@@ -653,19 +653,21 @@
   .share-busy{min-height:180px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:14px}
   .share-people-h{font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px}
   .share-list{display:flex;flex-direction:column;gap:14px;margin-bottom:18px;max-height:240px;overflow-y:auto}
-  /* Email on its own line, controls beneath. Measured: with the status tag
-     and two buttons on one line the address had 115px left and wrapped to
-     three lines; stacked, every address tested fits on one at 280px. */
-  .share-row{display:flex;flex-direction:column;align-items:stretch;gap:7px;font-size:14px}
-  .share-row .who{overflow-wrap:anywhere}
+  /* Two lines per person: the email with its status pill, then the actions.
+     Stacking keeps a long address from crowding the buttons — all on one line
+     once left the address ~115px and wrapped it to three. */
+  .share-row{display:flex;flex-direction:column;gap:8px;font-size:14px}
+  /* Email + status pill on one line; actions on their own line below. */
+  .share-line{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .share-line .who{overflow-wrap:anywhere;min-width:0}
   .share-row button{font:inherit;font-size:12.5px;padding:5px 12px;border-radius:100px;border:1px solid var(--rule);background:var(--field);color:var(--muted);cursor:pointer;flex-shrink:0}
   .share-row button:hover{border-color:#BF3143;color:#BF3143;background:#FEF2F2}
   /* Not destructive, so it must not borrow Remove's red hover. */
   .share-row button.share-again:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
-  .share-rowr{display:flex;align-items:center;gap:8px;flex-shrink:0}
-  .share-status{font-size:11px;font-weight:600;padding:2px 8px;border-radius:100px}
+  .share-acts{display:flex;justify-content:flex-end;gap:8px}
+  .share-status{font-size:10.5px;font-weight:700;letter-spacing:.02em;padding:1px 7px;border-radius:100px;flex-shrink:0}
   .share-status.is-active{color:#1B7A43;background:#E7F5EC}
-  .share-status.is-invited{color:var(--muted);background:var(--paper);border:1px solid var(--rule)}
+  .share-status.is-invited{color:var(--muted);background:var(--rule)}   /* gray tint, no border */
   .share-invite{display:flex;gap:8px;margin-top:4px;align-items:center}
   .share-invite input{flex:1 1 0;min-width:0;width:0;font:inherit;font-size:16px;padding:11px 12px;border:1px solid var(--rule);border-radius:10px;background:var(--field);color:var(--ink);-webkit-appearance:none;appearance:none}
   .share-invite input:focus{outline:none;border-color:var(--accent)}
@@ -952,7 +954,7 @@
         <span>Delete Account</span>
       </button>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.13.1300</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.13.1306</span></p>
   </div>
 </div>
 
@@ -1489,7 +1491,8 @@
     list.forEach(function(v){
       var row=document.createElement('div');row.className='share-row';
       var who=document.createElement('span');who.className='who';who.textContent=v.email;
-      var right=document.createElement('div');right.className='share-rowr';
+      var line=document.createElement('div');line.className='share-line';
+      var acts=document.createElement('div');acts.className='share-acts';
       var tag=document.createElement('span');tag.className='share-status '+(v.status==='active'?'is-active':'is-invited');
       tag.textContent=v.status==='active'?'Active':'Invited';
       var rm=document.createElement('button');rm.type='button';rm.textContent='Remove';
@@ -1498,17 +1501,17 @@
         fns().httpsCallable('revokeViewer')({email:v.email}).then(refreshInvites)
           .catch(function(e){rm.disabled=false;rm.textContent='Remove';openAlert('Could not remove that person. Please try again.','Shared with');if(window.console)console.warn(e);});
       };
-      right.appendChild(tag);
+      line.appendChild(who);line.appendChild(tag);
       // Still waiting on them: let the owner send the message again, since
       // dismissing the share sheet at invite time leaves no other trace of it.
       if(v.status!=='active'){
         var sh=document.createElement('button');sh.type='button';sh.className='share-again';
         sh.textContent='Share invite';
         sh.onclick=function(){shareInvite(v.email);};
-        right.appendChild(sh);
+        acts.appendChild(sh);
       }
-      right.appendChild(rm);
-      row.appendChild(who);row.appendChild(right);ul.appendChild(row);
+      acts.appendChild(rm);
+      row.appendChild(line);row.appendChild(acts);ul.appendChild(row);
     });
   }
   function refreshInvites(){return fetchInvites().catch(function(){return [];}).then(renderInvites);}
