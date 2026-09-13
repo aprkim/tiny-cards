@@ -179,6 +179,9 @@
   .empty-links{margin-top:40px;display:flex;flex-direction:column;align-items:center;gap:16px}
   /* Both are buttons (they trigger JS): strip the button chrome, keep the link look. */
   .empty-links button.altlink{background:none;border:none;border-bottom:1px solid transparent;padding:0;font:inherit;font-size:13.5px;cursor:pointer}
+  /* Press feedback on touch (no hover there): the same gray → ink as the web
+     hover on .altlink.quiet, never pink — these stay visually secondary. */
+  .empty-links button.altlink:active{color:var(--ink)}
 
   .box{
     position:fixed;inset:0;background:rgba(22,22,29,.94);z-index:50;
@@ -809,7 +812,7 @@
         <span>Delete Account</span>
       </button>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.13.1110</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.13.1128</span></p>
   </div>
 </div>
 
@@ -1754,6 +1757,7 @@
         $('start').classList.add('hidden');
         $('view').classList.remove('hidden');
         $('people').innerHTML='';$('meta').textContent='';
+        $('q').classList.add('hidden');   // no bar over an empty state; render() brings it back once a card exists
         /* An empty archive is where two different people land: the owner who
            hasn't scanned yet, and someone who was told "I shared my cards with
            you" and can't see them. The owner gets one action (scan) and two
@@ -1764,8 +1768,8 @@
            '<h2>No cards yet</h2>'+
            '<a class="empty-scan" href="scan.html">Scan a card</a>'+
            '<div class="empty-links">'+
-           '<button type="button" class="altlink quiet" id="emptyRestore">Restore from backup \u2192</button>'+
-           '<button type="button" class="altlink quiet" id="emptyShared">Waiting on shared cards? \u2192</button>'+
+           '<button type="button" class="altlink quiet" id="emptyRestore">Restore from backup</button>'+
+           '<button type="button" class="altlink quiet" id="emptyShared">Waiting on shared cards?</button>'+
            '</div></div>'
           :'<p class="empty">No cards shared with you yet.</p>';
         var er=$('emptyRestore');
@@ -1971,6 +1975,7 @@
   }
 
   function render(){
+    $('q').classList.toggle('hidden',!cards.length);   // present whenever this space has any cards
     var q=$('q').value.trim().toLowerCase();
     var list=cards.filter(function(x){
       if(filter&&x.person!==filter)return false;
