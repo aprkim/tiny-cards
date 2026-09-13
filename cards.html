@@ -348,6 +348,13 @@
   #modal.filled-confirm #modalConfirm:hover,#modal.filled-confirm #modalConfirm:focus-visible{background:#000}
   #modal.filled-confirm #modalCancel{background:none;color:var(--muted);border-color:transparent}
   #modal.filled-confirm #modalCancel:hover,#modal.filled-confirm #modalCancel:focus-visible{background:var(--paper)}
+  /* Delete-flow step 1 ("Export a backup" / "Continue"): the confirm is the
+     wanted, safe action, so it takes the app's pink fill (like the invite
+     button); the cancel is the bordered secondary (like the OK button). */
+  #modal.accent-confirm #modalConfirm{background:var(--accent);color:#fff;border-color:var(--accent)}
+  #modal.accent-confirm #modalConfirm:hover,#modal.accent-confirm #modalConfirm:focus-visible{background:#8E1340;border-color:#8E1340}
+  #modal.accent-confirm #modalCancel{background:var(--field);color:var(--ink);border-color:var(--rule)}
+  #modal.accent-confirm #modalCancel:hover,#modal.accent-confirm #modalCancel:focus-visible{background:var(--paper)}
   /* Delete-style dialogs: destructive action on top as plain red text, with the
      dark default ("Keep Card") dominant below. Scoped by .confirm-top so the
      Delete-All / sign-out confirms keep the standard outlined-danger look. */
@@ -827,7 +834,7 @@
       </button>
       <p class="set-delnote hidden" id="delNote">Deletes your account, not the cards shared with you.</p>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.13.1209</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.13.1238</span></p>
   </div>
 </div>
 
@@ -926,6 +933,7 @@
     // confirmTop: destructive action on top, safe default below (see .confirm-top CSS)
     $('modal').classList.toggle('confirm-top',!!opts.confirmTop);
     $('modal').classList.toggle('filled-confirm',!!opts.filledConfirm);
+    $('modal').classList.toggle('accent-confirm',!!opts.accentConfirm);
     onConfirm=opts.onConfirm||null;onCancel=opts.onCancel||null;
     function sync(){c.disabled=!!(needInput&&req)&&(inp.value.trim().toUpperCase()!==req.toUpperCase());}
     if(inp)inp.oninput=needInput?sync:null;
@@ -2392,7 +2400,7 @@
       openConfirm({
         title:'Before you delete',
         body:lostAccessLine(n)+'Want a copy of your cards first?',
-        confirmText:'Export a backup',cancelText:'Continue',filledConfirm:true,
+        confirmText:'Export a backup',cancelText:'Continue',accentConfirm:true,
         onConfirm:startExport,
         onCancel:function(){
           openConfirm({
