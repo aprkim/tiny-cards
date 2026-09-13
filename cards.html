@@ -799,7 +799,7 @@
         <span>Delete Account</span>
       </button>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.12.0135</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.13.0938</span></p>
   </div>
 </div>
 
@@ -1258,10 +1258,15 @@
     return authUser.getIdToken().then(function(tok){
       return fetch(EXPORT_URL+'?token='+encodeURIComponent(tok)+(query||'')+exportSpaceQuery(),signal?{signal:signal}:{});
     }).then(function(resp){
-      if(!resp.ok)throw new Error('http '+resp.status);
+      // A refusal carries the server's own words (403 "not shared with you",
+      // 409 "another export is running", 500 with the build's failure reason).
+      // Keep them on the error so the app can say them instead of a generic line.
+      if(!resp.ok)return resp.text().then(function(t){var e=new Error('http '+resp.status);e.status=resp.status;e.serverText=(t||'').trim().slice(0,200);throw e;});
       return resp.json();
     });
   }
+  // A failed job carries the server's reason; it travels the same way a refusal's text does.
+  function failedError(j){var e=new Error('build failed');e.serverText=(j&&j.reason)||'';return e;}
   function buildExport(controller,onProgress){
     var signal=controller?controller.signal:null, deadline=Date.now()+30*60*1000;
     return new Promise(function(resolve,reject){
@@ -1280,7 +1285,7 @@
           if(done)return;
           if(!baselined)baseline(j);               // the look-before-start failed: this look stands in
           if(j.state==='ready'&&j.readyAt!==staleReady)return finish(null,j);
-          if(j.state==='failed'&&j.failedAt!==staleFailed)return finish(new Error('build failed'));
+          if(j.state==='failed'&&j.failedAt!==staleFailed)return finish(failedError(j));
           if(j.state==='building'&&j.total&&onProgress)onProgress(j.entries||0,j.total);
           if(Date.now()>deadline)return finish(new Error('export timed out'));
           timer=setTimeout(poll,3000);
@@ -1299,7 +1304,7 @@
         if(done)return;
         exportCall('',signal).then(function(j){
           if(j&&j.state==='ready')finish(null,j);      // the start's own answer is never stale
-          else if(j&&j.state==='failed')finish(new Error('build failed'));
+          else if(j&&j.state==='failed')finish(failedError(j));
         },function(e){
           // A refused start (signed out, server error) is a real failure. A start
           // the phone stopped waiting on is not: the polls will find the build.
@@ -1380,10 +1385,9 @@
       if(window.console)console.warn('export failed',e);
       endExportUI();
       $('setExportHint').textContent='Couldn’t save — tap to try again';loadLastSaved();
-      openAlert(/http 409/.test(msg)?'Another export of yours is still running. Let it finish, then try again.'
-        :phase==='download'
+      openAlert((e&&e.serverText)||(phase==='download'
         ?'The download was interrupted. Keep Kept open and tap Export again \u2014 the backup is already built, so it should start downloading straight away.'
-        :'Could not save the backup. Please try again.','Export failed');
+        :'Could not save the backup. Please try again.'),'Export failed');
     }).then(function(){if(handle)handle.remove();});
   }
 
@@ -1404,7 +1408,7 @@
       if(cancelled||(e&&e.name==='AbortError')){$('setExportHint').textContent=exportSubtext();return;}
       if(window.console)console.warn('export failed',e);
       $('setExportHint').textContent='Couldn’t download — tap to try again';
-      openAlert(/http 409/.test((e&&e.message)||'')?'Another export of yours is still running. Let it finish, then try again.':'Could not download the backup. Please try again.','Export failed');
+      openAlert((e&&e.serverText)||'Could not download the backup. Please try again.','Export failed');
     });
   }
 

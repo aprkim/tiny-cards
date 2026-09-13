@@ -202,9 +202,16 @@ function cardsSig(cards) {
   return h.digest('hex');
 }
 // What the app may see of an export job: only what it needs to follow or finish it.
+// One readable line about why a build failed, for the app to show: the
+// underlying message with URLs stripped, so "socket hang up" reaches the
+// person instead of a generic sentence the log then has to be read to explain.
+function failReason(err) {
+  const m = String((err && err.message) || err || 'unknown error').replace(/https?:\/\/\S+/g, '\u2026').replace(/\s+/g, ' ').trim();
+  return 'Could not build the backup: ' + m.slice(0, 90) + (m.length > 90 ? '\u2026' : '');
+}
 function publicJob(d) {
   const o = {};
-  for (const k of ['state', 'entries', 'total', 'startedAt', 'builtAt', 'readyAt', 'failedAt', 'url', 'size', 'filename']) {
+  for (const k of ['state', 'entries', 'total', 'startedAt', 'builtAt', 'readyAt', 'failedAt', 'reason', 'url', 'size', 'filename']) {
     if (d[k] !== undefined) o[k] = d[k];
   }
   return o;
@@ -348,94 +355,112 @@ exports.exportAll = onRequest({
     }
   }, 15000);
 
+  /* The build, as one attempt. Opening the upload session to Storage has
+     failed at zero bytes twice in a row on fresh instances ("socket hang up",
+     2026-09-13), with nothing of ours involved yet; a second attempt a few
+     seconds later is cheap, and the alternative is the person retrying by hand. */
+  const attempt = async () => {
+      out = dest.createWriteStream({
+        resumable: true,
+        metadata: {
+          contentType: 'application/zip',
+          // Makes a browser save it as a file instead of trying to display it.
+          contentDisposition: `attachment; filename="${filename}"`,
+          metadata: {firebaseStorageDownloadTokens: downloadToken},
+        },
+      });
+      archive = archiver('zip', {store: true});   // images are already compressed
+      const written = new Promise((resolve, reject) => {
+        fail = reject;
+        out.on('finish', resolve);
+        out.on('error', reject);
+        archive.on('error', reject);
+      });
+      archive.on('warning', (err) => logger.warn('archive warning: ' + err.message));
+      archive.on('entry', () => {
+        entries++;
+        if (entries % 100 === 0) {
+          logger.info('export progress', {uid: user.uid, entries, bytes: archive.pointer(),
+            rssMB: Math.round(process.memoryUsage().rss / 1048576)});
+        }
+      });
+      archive.pipe(out);
+
+      // transcription last, so older readers of this file are unaffected; csvCell
+      // quotes the newlines and commas handwriting tends to have.
+      const rows = [['id', 'sender', 'recipient', 'occasion', 'date', 'pages', 'files', 'storagePaths', 'totalBytes', 'savedAt', 'transcription'].join(',')];
+
+      for (const card of cards) {
+        const paths = card.paths || [];
+        const labels = card.labels || [];
+        const base = cardBase(card);
+        const names = [];
+        for (let i = 0; i < paths.length; i++) {
+          const p = paths[i];
+          const ext = /\.png$/i.test(p) ? 'png' : 'jpg';
+          const label = labels[i] || ('p' + (i + 1));
+          const name = paths.length > 1 ? `${base} - ${label}.${ext}` : `${base}.${ext}`;
+          names.push(name);
+          // Every source stream gets its own error handler. Without one, a card file
+          // that can't be read emits an unhandled 'error' that crashes the process —
+          // no 500, no failed job, a job left 'building' — as the emulator test
+          // showed with a missing file. With it, the build fails through the catch.
+          const src = bucket.file(p).createReadStream();
+          src.on('error', (e) => { fail(e); archive.abort(); out.destroy(e); });
+          archive.append(src, {name: `cards/${name}`});
+        }
+        rows.push([
+          csvCell(card.id), csvCell(card.sender), csvCell(card.recipient), csvCell(card.occasion),
+          csvCell(card.date), csvCell(paths.length), csvCell(names.join(' | ')),
+          csvCell(paths.join(' | ')), csvCell(card.totalBytes || ''), csvCell(card.savedAt || ''),
+          csvCell(card.transcription || '')
+        ].join(','));
+      }
+
+      archive.append(rows.join('\n') + '\n', {name: 'metadata.csv'});
+      archive.append(readmeFor(shared, ownerEmail), {name: 'README.txt'});
+      // Awaited together, so a failure mid-build ends the wait: an aborted
+      // archive's finalize() need not settle on its own.
+      await Promise.all([archive.finalize(), written]);
+
+      // The object has to be the whole archive, not most of it.
+      const size = archive.pointer();
+      const [meta] = await dest.getMetadata();
+      if (Number(meta.size) !== size) throw new Error(`stored ${meta.size} bytes, expected ${size}`);
+      logger.info('export built', {uid: user.uid, space, shared, entries, bytes: size,
+        rssMB: Math.round(process.memoryUsage().rss / 1048576)});
+
+      // One export per person: drop the earlier ones now that this one is complete.
+      const [existing] = await bucket.getFiles({prefix: `exports/${user.uid}/`});
+      await Promise.all(existing.filter((x) => x.name !== dest.name).map((x) => x.delete().catch(() => {})));
+
+      const url = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/` +
+        `${encodeURIComponent(dest.name)}?alt=media&token=${downloadToken}`;
+      const now = Date.now();
+      const ready = {state: 'ready', url, size, filename, entries, total, startedAt, builtAt: now, readyAt: now,
+        sig, objectName: dest.name, space};     // sig, objectName, space stay private: publicJob drops them
+      await jobRef.set(ready);
+      res.json(publicJob(ready));
+  };
   try {
-    out = dest.createWriteStream({
-      resumable: true,
-      metadata: {
-        contentType: 'application/zip',
-        // Makes a browser save it as a file instead of trying to display it.
-        contentDisposition: `attachment; filename="${filename}"`,
-        metadata: {firebaseStorageDownloadTokens: downloadToken},
-      },
-    });
-    archive = archiver('zip', {store: true});   // images are already compressed
-    const written = new Promise((resolve, reject) => {
-      fail = reject;
-      out.on('finish', resolve);
-      out.on('error', reject);
-      archive.on('error', reject);
-    });
-    archive.on('warning', (err) => logger.warn('archive warning: ' + err.message));
-    archive.on('entry', () => {
-      entries++;
-      if (entries % 100 === 0) {
-        logger.info('export progress', {uid: user.uid, entries, bytes: archive.pointer(),
-          rssMB: Math.round(process.memoryUsage().rss / 1048576)});
+    for (let n = 0; ; n++) {
+      try { await attempt(); break; } catch (err) {
+        if (n === 0 && entries === 0) {
+          logger.warn('export retry', {uid: user.uid, error: err.message});
+          await dest.delete().catch(() => {});
+          await new Promise((r) => setTimeout(r, 10000));
+          continue;
+        }
+        throw err;
       }
-    });
-    archive.pipe(out);
-
-    // transcription last, so older readers of this file are unaffected; csvCell
-    // quotes the newlines and commas handwriting tends to have.
-    const rows = [['id', 'sender', 'recipient', 'occasion', 'date', 'pages', 'files', 'storagePaths', 'totalBytes', 'savedAt', 'transcription'].join(',')];
-
-    for (const card of cards) {
-      const paths = card.paths || [];
-      const labels = card.labels || [];
-      const base = cardBase(card);
-      const names = [];
-      for (let i = 0; i < paths.length; i++) {
-        const p = paths[i];
-        const ext = /\.png$/i.test(p) ? 'png' : 'jpg';
-        const label = labels[i] || ('p' + (i + 1));
-        const name = paths.length > 1 ? `${base} - ${label}.${ext}` : `${base}.${ext}`;
-        names.push(name);
-        // Every source stream gets its own error handler. Without one, a card file
-        // that can't be read emits an unhandled 'error' that crashes the process —
-        // no 500, no failed job, a job left 'building' — as the emulator test
-        // showed with a missing file. With it, the build fails through the catch.
-        const src = bucket.file(p).createReadStream();
-        src.on('error', (e) => { fail(e); archive.abort(); out.destroy(e); });
-        archive.append(src, {name: `cards/${name}`});
-      }
-      rows.push([
-        csvCell(card.id), csvCell(card.sender), csvCell(card.recipient), csvCell(card.occasion),
-        csvCell(card.date), csvCell(paths.length), csvCell(names.join(' | ')),
-        csvCell(paths.join(' | ')), csvCell(card.totalBytes || ''), csvCell(card.savedAt || ''),
-        csvCell(card.transcription || '')
-      ].join(','));
     }
-
-    archive.append(rows.join('\n') + '\n', {name: 'metadata.csv'});
-    archive.append(readmeFor(shared, ownerEmail), {name: 'README.txt'});
-    // Awaited together, so a failure mid-build ends the wait: an aborted
-    // archive's finalize() need not settle on its own.
-    await Promise.all([archive.finalize(), written]);
-
-    // The object has to be the whole archive, not most of it.
-    const size = archive.pointer();
-    const [meta] = await dest.getMetadata();
-    if (Number(meta.size) !== size) throw new Error(`stored ${meta.size} bytes, expected ${size}`);
-    logger.info('export built', {uid: user.uid, space, shared, entries, bytes: size,
-      rssMB: Math.round(process.memoryUsage().rss / 1048576)});
-
-    // One export per person: drop the earlier ones now that this one is complete.
-    const [existing] = await bucket.getFiles({prefix: `exports/${user.uid}/`});
-    await Promise.all(existing.filter((x) => x.name !== dest.name).map((x) => x.delete().catch(() => {})));
-
-    const url = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/` +
-      `${encodeURIComponent(dest.name)}?alt=media&token=${downloadToken}`;
-    const now = Date.now();
-    const ready = {state: 'ready', url, size, filename, entries, total, startedAt, builtAt: now, readyAt: now,
-      sig, objectName: dest.name, space};     // sig, objectName, space stay private: publicJob drops them
-    await jobRef.set(ready);
-    res.json(publicJob(ready));
   } catch (err) {
     // Not `message`: the logger treats that key as its own and swallows the text.
     logger.error('export failed', {uid: user.uid, error: err.message});
     await dest.delete().catch(() => {});        // never leave a partial ZIP behind
-    await jobRef.set({state: 'failed', total, startedAt, failedAt: Date.now()}).catch(() => {});
-    if (!res.headersSent) res.status(500).send('Could not build the backup. Please try again.');
+    const reason = failReason(err);
+    await jobRef.set({state: 'failed', total, startedAt, failedAt: Date.now(), reason}).catch(() => {});
+    if (!res.headersSent) res.status(500).send(reason);
   } finally {
     clearInterval(beat);
   }
