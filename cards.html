@@ -174,11 +174,13 @@
   /* Empty state centred between the header and the tab bar (mirrors the Scan
      landing). Only when empty — the populated view keeps its top-down scroll. */
   .wrap.is-empty{display:flex;flex-direction:column;min-height:calc(100dvh - env(safe-area-inset-top) - var(--barh));padding-bottom:16px}
-  .wrap.is-empty #view{flex:1 1 auto;display:flex;flex-direction:column;justify-content:center}
+  .wrap.is-empty #view:not(.hidden),.wrap.is-empty #start:not(.hidden){flex:1 1 auto;display:flex;flex-direction:column;justify-content:center}
   .wrap.is-empty .empty-state{padding-top:0;padding-bottom:0}
   .empty-state h2{font-size:22px;font-weight:700;letter-spacing:-.02em;color:var(--ink);margin-bottom:20px}
-  .empty-scan{display:inline-block;font:inherit;font-size:15.5px;font-weight:600;padding:13px 26px;border-radius:12px;
+  .empty-scan{display:inline-block;font:inherit;font-size:15.5px;font-weight:600;padding:13px 26px;border-radius:12px;border:none;cursor:pointer;
     background:var(--accent);color:#fff;text-decoration:none;-webkit-tap-highlight-color:transparent}
+  /* Gray sub-line directly under the sign-in button (the signed-out View tab). */
+  .empty-sub{margin-top:12px;font-size:13px;color:var(--muted)}
   .empty-scan:hover,.empty-scan:focus-visible{background:#8E1340}
   /* The two secondary links: each on its own line, stacked, with breathing room. */
   .empty-links{margin-top:40px;display:flex;flex-direction:column;align-items:center}
@@ -191,7 +193,7 @@
   .empty-links button.altlink + button.altlink{margin-top:-22px}
   /* Press feedback on touch (no hover there): the same gray → ink as the web
      hover on .altlink.quiet, never pink — these stay visually secondary. */
-  .empty-links button.altlink:active{color:var(--ink)}
+  .empty-links .altlink:active{color:var(--ink)}   /* press → ink on the link too (covers the <a> on #start) */
 
   .box{
     position:fixed;inset:0;background:rgba(22,22,29,.94);z-index:50;
@@ -636,15 +638,14 @@
   <!-- Signed-in visitors skip this and load straight into #view. It only shows
        when signed out, as a sign-in prompt. -->
   <section id="start" class="hidden">
-    <div class="drop primary" id="cloudOpen" tabindex="0" role="button">
-      <strong id="cloudTitle">Sign in to view your cards</strong>
-      <span id="cloudSub">Google sign-in — nothing to remember</span>
-    </div>
-
-    <!-- The viewer needs no account, so every signed-out screen has a way in,
-         in the same words as the home screen. -->
-    <div class="footlink">
-      <a class="altlink quiet" href="viewer.html">View shared cards &rarr;</a>
+    <!-- Same shape as the empty state: a pink action, a gray sub-line, a gray
+         secondary link, centred below the header. -->
+    <div class="empty-state">
+      <button type="button" class="empty-scan" id="cloudOpen"><span id="cloudTitle">Sign in to view your cards</span></button>
+      <p class="empty-sub" id="cloudSub">Google sign-in — nothing to remember</p>
+      <div class="empty-links">
+        <a class="altlink quiet" href="viewer.html">View shared cards</a>
+      </div>
     </div>
   </section>
 
@@ -834,7 +835,7 @@
       </button>
       <p class="set-delnote hidden" id="delNote">Deletes your account, not the cards shared with you.</p>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.13.1238</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.13.1300</span></p>
   </div>
 </div>
 
@@ -1610,6 +1611,7 @@
       $('gearBtn').classList.add('hidden');
       $('view').classList.add('hidden');
       $('start').classList.remove('hidden');
+      document.querySelector('.wrap').classList.add('is-empty');   // centre the sign-in prompt
       paintCloudButton();paintScanTab();
     };
     if(!fbInit()){reset();return}
@@ -1735,8 +1737,7 @@
     loadCloud();
   }
 
-  $('cloudOpen').onclick=loadCloud;
-  $('cloudOpen').onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();loadCloud()}};
+  $('cloudOpen').onclick=loadCloud;   // a real button now, so Enter/Space work natively
 
   /* A cancelled sign-in is not a failure. The web SDK reports it as an error
      code; the native plugin surfaces the platform's own wording instead, so the
