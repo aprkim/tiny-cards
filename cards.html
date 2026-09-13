@@ -422,6 +422,10 @@
   .share-hero h3{font-size:17px;font-weight:700;letter-spacing:-.01em;margin-bottom:6px}
   .share-hero p{font-size:13.5px;color:var(--muted)}
   .set-hint{color:var(--muted);font-weight:400;font-size:13px}
+  /* Shown only when viewing a shared collection: the Delete Account row is not
+     owner-gated, so a viewer needs telling it removes their account, not the
+     cards someone shared with them. */
+  .set-delnote{margin:4px 2px 0;font-size:12.5px;color:var(--muted);line-height:1.4}
   /* Native "Save to Files" export progress + last-saved line */
   .exp-prog{margin:2px 2px 8px}
   .exp-bar{height:6px;border-radius:100px;background:var(--rule);overflow:hidden}
@@ -821,8 +825,9 @@
       <button type="button" class="set-row danger" id="setDeleteAccount">
         <span>Delete Account</span>
       </button>
+      <p class="set-delnote hidden" id="delNote">Deletes your account, not the cards shared with you.</p>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.13.1204</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.13.1209</span></p>
   </div>
 </div>
 
@@ -964,6 +969,7 @@
     var owner=isOwner();
     $('setShare').classList.toggle('hidden',!owner);                 // share only your own space
     $('setImport').classList.toggle('hidden',!owner);                // restore into your own space only
+    $('delNote').classList.toggle('hidden',owner);                   // viewer only: clarify what Delete Account removes
     $('setExport').disabled=false;
     $('exportProg').classList.add('hidden');                          // reset any prior run
     var hasCards=EXPORT_ENABLED&&fromCloud&&cards.length>0;
