@@ -822,7 +822,7 @@
         <span>Delete Account</span>
       </button>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.13.1201</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.13.1204</span></p>
   </div>
 </div>
 
@@ -1219,8 +1219,9 @@
        nothing, in an archive with nothing to save. Every other caller runs
        after endExportUI has restored the row, so one guard here covers them. */
     if($('setExport').classList.contains('hidden')){el.classList.add('hidden');return;}
+    if(!isOwner()){el.classList.add('hidden');return;}   // shared collection: this date isn't about it
     var ts=0;try{ts=parseInt(localStorage.getItem(EXPORT_LAST_KEY)||'0',10);}catch(e){}
-    if(ts){el.textContent='Last saved: '+new Date(ts).toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'});el.classList.remove('hidden');}
+    if(ts){el.textContent='Last backup: '+new Date(ts).toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'});el.classList.remove('hidden');}
     else el.classList.add('hidden');
   }
   function persistLastSaved(){try{localStorage.setItem(EXPORT_LAST_KEY,String(Date.now()));}catch(e){}loadLastSaved();}
