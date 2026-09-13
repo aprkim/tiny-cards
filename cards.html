@@ -171,14 +171,24 @@
      Reuses the app's own link style (.altlink.quiet, muted, no underline) —
      no browser-default link anywhere in it. */
   .empty-state{text-align:center;padding:56px 20px 40px}
+  /* Empty state centred between the header and the tab bar (mirrors the Scan
+     landing). Only when empty — the populated view keeps its top-down scroll. */
+  .wrap.is-empty{display:flex;flex-direction:column;min-height:calc(100dvh - env(safe-area-inset-top) - var(--barh));padding-bottom:16px}
+  .wrap.is-empty #view{flex:1 1 auto;display:flex;flex-direction:column;justify-content:center}
+  .wrap.is-empty .empty-state{padding-top:0;padding-bottom:0}
   .empty-state h2{font-size:22px;font-weight:700;letter-spacing:-.02em;color:var(--ink);margin-bottom:20px}
   .empty-scan{display:inline-block;font:inherit;font-size:15.5px;font-weight:600;padding:13px 26px;border-radius:12px;
     background:var(--accent);color:#fff;text-decoration:none;-webkit-tap-highlight-color:transparent}
   .empty-scan:hover,.empty-scan:focus-visible{background:#8E1340}
   /* The two secondary links: each on its own line, stacked, with breathing room. */
-  .empty-links{margin-top:40px;display:flex;flex-direction:column;align-items:center;gap:16px}
-  /* Both are buttons (they trigger JS): strip the button chrome, keep the link look. */
-  .empty-links button.altlink{background:none;border:none;border-bottom:1px solid transparent;padding:0;font:inherit;font-size:13.5px;cursor:pointer}
+  .empty-links{margin-top:40px;display:flex;flex-direction:column;align-items:center}
+  /* Both are buttons (they trigger JS): strip the chrome, keep the link look.
+     Vertical padding makes each a 44pt+ tap target; the two texts still read as
+     one group (~7px apart) because the generous hit-slop overlaps via the
+     negative margin — the visible spacing is tight without dropping to a tiny
+     touch target. line-height:1 keeps the padding math predictable. */
+  .empty-links button.altlink{background:none;border:none;border-bottom:1px solid transparent;padding:15px 16px;font:inherit;font-size:13.5px;line-height:1;cursor:pointer}
+  .empty-links button.altlink + button.altlink{margin-top:-22px}
   /* Press feedback on touch (no hover there): the same gray → ink as the web
      hover on .altlink.quiet, never pink — these stay visually secondary. */
   .empty-links button.altlink:active{color:var(--ink)}
@@ -812,7 +822,7 @@
         <span>Delete Account</span>
       </button>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.13.1128</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.13.1141</span></p>
   </div>
 </div>
 
@@ -1758,6 +1768,7 @@
         $('view').classList.remove('hidden');
         $('people').innerHTML='';$('meta').textContent='';
         $('q').classList.add('hidden');   // no bar over an empty state; render() brings it back once a card exists
+        document.querySelector('.wrap').classList.add('is-empty');   // centre the block; render() clears it once cards exist
         /* An empty archive is where two different people land: the owner who
            hasn't scanned yet, and someone who was told "I shared my cards with
            you" and can't see them. The owner gets one action (scan) and two
@@ -1976,6 +1987,7 @@
 
   function render(){
     $('q').classList.toggle('hidden',!cards.length);   // present whenever this space has any cards
+    document.querySelector('.wrap').classList.toggle('is-empty',!cards.length);
     var q=$('q').value.trim().toLowerCase();
     var list=cards.filter(function(x){
       if(filter&&x.person!==filter)return false;
