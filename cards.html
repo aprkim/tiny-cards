@@ -822,7 +822,7 @@
         <span>Delete Account</span>
       </button>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.13.1141</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.13.1201</span></p>
   </div>
 </div>
 
@@ -1780,15 +1780,12 @@
            '<a class="empty-scan" href="scan.html">Scan a card</a>'+
            '<div class="empty-links">'+
            '<button type="button" class="altlink quiet" id="emptyRestore">Restore from backup</button>'+
-           '<button type="button" class="altlink quiet" id="emptyShared">Waiting on shared cards?</button>'+
            '</div></div>'
           :'<p class="empty">No cards shared with you yet.</p>';
         var er=$('emptyRestore');
         // The label promises the outcome; Settings → Import backup delivers it,
         // fired in the same tap so no one has to go hunting for the row.
         if(er)er.onclick=function(){openSettings();$('setImport').click();};
-        var es=$('emptyShared');
-        if(es)es.onclick=function(){openAlert('Ask the person who has the cards to invite you by email \u2014 their cards will appear here on their own. There is nothing to download.','Waiting on shared cards?');};
         openSettingsFromURL();
         loadSpaces().then(function(shared){
           // Pure viewer (own space empty) → land on the space shared with them.
