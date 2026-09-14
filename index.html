@@ -422,6 +422,7 @@
      Settings footer links. Keyboard focus still gets a visible ring. */
   .altlink.quiet{color:var(--muted)}
   .altlink.quiet:hover{color:var(--ink);border-bottom-color:transparent}
+  .altlink.quiet:active{color:var(--ink)}
   .altlink.quiet:focus-visible{border-bottom-color:transparent;outline:2px solid var(--accent);outline-offset:3px;border-radius:4px}
 
   .opt{
@@ -535,13 +536,12 @@
           <span>Sign in with Google</span>
         </button>
       </div>
-      <p class="signin-note">Using Sign in with Apple? Choose <b>Share My Email</b> so cards shared with you can appear.</p>
       <!-- The only way into the viewer for someone who never signs in. The viewer
            needs no account, so a signed-out tap must go straight there: this is
            an .altlink, which the signed-out tab-tap guard deliberately does not
            match (it looks only at .tabbar a and .heroart). -->
       <div class="footlink">
-        <a class="altlink quiet" href="viewer.html">View shared cards &rarr;</a>
+        <a class="altlink quiet" href="viewer.html">View shared cards</a>
       </div>
     </div>
 

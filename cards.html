@@ -674,7 +674,7 @@
           <span id="cloudTitle">Sign in with Google</span>
         </button>
       </div>
-      <p class="empty-sub" id="cloudSub">Using Apple? Choose “Share My Email” so shared cards appear.</p>
+      <p class="empty-sub" id="cloudSub"></p>
       <div class="empty-links">
         <a class="altlink quiet" href="viewer.html">View shared cards</a>
       </div>
@@ -871,7 +871,7 @@
       </button>
       <p class="set-delnote hidden" id="delNote">Deletes your account, not the cards shared with you.</p>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.13.2240</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.13.2317</span></p>
   </div>
 </div>
 
@@ -1770,7 +1770,7 @@
       s.textContent=(authUser.email||authUser.displayName||'Signed in')+' · tap to open';
     }else{
       t.textContent='Sign in with Google';
-      s.textContent='Using Apple? Choose “Share My Email” so shared cards appear.';
+      s.textContent='';
     }
   }
   // A relay (Hide-My-Email) viewer's shares won't match their address, so show
