@@ -502,6 +502,8 @@
   #inviteBtn:hover{background:#8E1340}
   #inviteBtn:disabled{opacity:.6;cursor:progress}
   .share-acts{display:flex;justify-content:flex-end;gap:8px}
+  /* Single-action (Active) rows: Remove sits on the email line, pushed right. */
+  .share-line .share-rm{margin-left:auto}
   .share-status{font-size:10.5px;font-weight:700;letter-spacing:.02em;padding:1px 7px;border-radius:100px;flex-shrink:0}
   .share-status.is-active{color:#1B7A43;background:#E7F5EC}
   .share-status.is-invited{color:var(--muted);background:var(--rule)}   /* gray tint, no border */
@@ -871,7 +873,7 @@
       </button>
       <p class="set-delnote hidden" id="delNote">Deletes your account, not the cards shared with you.</p>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.14.0203</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.14.0907</span></p>
   </div>
 </div>
 
@@ -1566,16 +1568,22 @@
           .catch(function(e){rm.disabled=false;rm.textContent='Remove';openAlert('Could not remove that person. Please try again.','Shared with');if(window.console)console.warn(e);});
       };
       line.appendChild(who);line.appendChild(tag);
-      // Still waiting on them: let the owner send the message again, since
-      // dismissing the share sheet at invite time leaves no other trace of it.
-      if(v.status!=='active'){
+      row.appendChild(line);
+      if(v.status==='active'){
+        // One action: keep Remove on the email line, right-aligned, so it reads
+        // as "remove this person" rather than a control floating on its own row.
+        rm.className='share-rm';
+        line.appendChild(rm);
+      }else{
+        // Two actions (Share invite + Remove): stack them below, where a long
+        // address can't crowd them.
         var sh=document.createElement('button');sh.type='button';sh.className='share-again';
         sh.textContent='Share invite';
         sh.onclick=function(){shareInvite(v.email);};
-        acts.appendChild(sh);
+        acts.appendChild(sh);acts.appendChild(rm);
+        row.appendChild(acts);
       }
-      acts.appendChild(rm);
-      row.appendChild(line);row.appendChild(acts);ul.appendChild(row);
+      ul.appendChild(row);
     });
   }
   function refreshInvites(){return fetchInvites().catch(function(){return [];}).then(renderInvites);}
