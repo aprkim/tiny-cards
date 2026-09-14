@@ -871,7 +871,7 @@
       </button>
       <p class="set-delnote hidden" id="delNote">Deletes your account, not the cards shared with you.</p>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.14.0117</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.14.0203</span></p>
   </div>
 </div>
 
@@ -1587,7 +1587,6 @@
      Duplicated verbatim in cards.html and scan.html. These pages are standalone
      documents with no module system, so "shared" means identical, and a change
      to one belongs in the other. */
-  var APP_STORE_URL='https://apps.apple.com/app/kept/id0000000000';   // TODO: real id once approved
   function inviteMessage(email){
     return 'I saved our cards in Kept and shared them with you! Download Kept from '+
            'the App Store, then sign in with Google using this email: '+email+
@@ -1599,15 +1598,16 @@
     var n=(e&&e.name)||'', m=(e&&(e.message||(''+e)))||'';
     return /abort/i.test(n)||/cancel|abort|dismiss/i.test(m);
   }
-  /* The link rides in `url` rather than inside the sentence so Messages and
-     Mail render the App Store card, which tells someone who has never heard of
-     the app far more than a bare URL would. */
+  /* No App Store link until the app is approved and has a real id — a
+     placeholder id ships a dead link. Post-approval, add
+     url:'https://apps.apple.com/app/kept/id<REAL_ID>' back onto the share()
+     calls (and onto `full`) so Messages and Mail render the App Store card. */
   function shareInvite(email){
-    var text=inviteMessage(email), full=text+' '+APP_STORE_URL;
+    var text=inviteMessage(email), full=text;
     var S=(window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.Share)||null;
     var go;
-    if(S&&S.share)go=S.share({title:'Kept',text:text,url:APP_STORE_URL,dialogTitle:'Tell them'});
-    else if(navigator.share)go=navigator.share({title:'Kept',text:text,url:APP_STORE_URL});
+    if(S&&S.share)go=S.share({title:'Kept',text:text,dialogTitle:'Tell them'});
+    else if(navigator.share)go=navigator.share({title:'Kept',text:text});
     else go=Promise.reject(new Error('no share target'));
     return go.catch(function(e){
       if(isShareCancel(e))return;
