@@ -182,6 +182,22 @@
   /* Gray sub-line directly under the sign-in button (the signed-out View tab). */
   .empty-sub{margin-top:12px;font-size:13px;color:var(--muted)}
   .empty-scan:hover,.empty-scan:focus-visible{background:#8E1340}
+  /* Sign-in buttons on the signed-out View: Apple + Google, equal weight, same
+     shape (App Store 4.8). Matches the home screen's buttons. */
+  .signin-btns{display:flex;flex-direction:column;gap:10px;max-width:320px;margin:0 auto}
+  .abtn,.gbtn{display:inline-flex;align-items:center;justify-content:center;gap:10px;width:100%;font:inherit;font-size:15.5px;font-weight:600;padding:14px 18px;border-radius:12px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+  .abtn{border:1px solid #000;background:#000;color:#fff;transition:box-shadow .15s}
+  .abtn:hover,.abtn:focus-visible{box-shadow:0 1px 6px rgba(0,0,0,.25)}
+  .abtn svg{fill:currentColor}
+  .gbtn{border:1px solid var(--rule);background:#fff;color:var(--ink);transition:border-color .15s,box-shadow .15s}
+  .gbtn:hover,.gbtn:focus-visible{border-color:#BFBAAE;box-shadow:0 1px 4px rgba(0,0,0,.07)}
+  .abtn[disabled],.gbtn[disabled]{opacity:.55;cursor:progress}
+  /* Relay-email note (A): a Hide-My-Email viewer sees the address to have invited. */
+  .relaynote{margin:0 auto 20px;max-width:520px;padding:12px 14px;border:1px solid var(--rule);border-radius:12px;background:var(--accent-soft);color:var(--ink);font-size:13px;line-height:1.5;text-align:left}
+  .relaynote code{font-size:12.5px;word-break:break-all}
+  .relayrow{display:flex;align-items:center;gap:10px;margin-top:8px}
+  .relayrow code{flex:1}
+  .relaynote button{font:inherit;font-size:12.5px;font-weight:600;color:var(--accent);background:none;border:none;cursor:pointer;padding:6px 8px;flex-shrink:0}
   /* The two secondary links: each on its own line, stacked, with breathing room. */
   .empty-links{margin-top:40px;display:flex;flex-direction:column;align-items:center}
   /* Both are buttons (they trigger JS): strip the chrome, keep the link look.
@@ -643,8 +659,22 @@
     <!-- Same shape as the empty state: a pink action, a gray sub-line, a gray
          secondary link, centred below the header. -->
     <div class="empty-state">
-      <button type="button" class="empty-scan" id="cloudOpen"><span id="cloudTitle">Sign in to view your cards</span></button>
-      <p class="empty-sub" id="cloudSub">Google sign-in — nothing to remember</p>
+      <div class="signin-btns">
+        <button type="button" class="abtn" id="appleOpen">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M17.05 12.04c-.03-2.85 2.33-4.21 2.44-4.28-1.33-1.94-3.4-2.21-4.13-2.24-1.76-.18-3.43 1.03-4.32 1.03-.89 0-2.26-1.01-3.72-.98-1.91.03-3.68 1.11-4.66 2.82-1.99 3.45-.51 8.56 1.42 11.36.94 1.37 2.07 2.91 3.53 2.86 1.42-.06 1.96-.92 3.67-.92 1.71 0 2.19.92 3.69.89 1.53-.03 2.49-1.4 3.42-2.78.65-.95.92-1.44 1.44-2.51-3.78-1.44-3.19-6.63-.02-8.13zM14.13 4.02c.79-.95 1.32-2.28 1.18-3.6-1.13.05-2.5.76-3.31 1.71-.73.84-1.36 2.19-1.19 3.48 1.26.1 2.54-.64 3.32-1.59z"/></svg>
+          <span>Sign in with Apple</span>
+        </button>
+        <button type="button" class="gbtn" id="cloudOpen">
+          <svg viewBox="0 0 18 18" width="18" height="18" aria-hidden="true">
+            <path fill="#4285F4" d="M17.6 9.2c0-.6-.1-1.3-.2-1.9H9v3.5h4.8a4.1 4.1 0 01-1.8 2.7v2.2h2.9c1.7-1.6 2.7-3.9 2.7-6.5z"/>
+            <path fill="#34A853" d="M9 18c2.4 0 4.5-.8 6-2.2l-2.9-2.3c-.8.5-1.8.9-3.1.9-2.4 0-4.4-1.6-5.1-3.8H.9v2.3A9 9 0 009 18z"/>
+            <path fill="#FBBC05" d="M3.9 10.6a5.4 5.4 0 010-3.4V4.9H.9a9 9 0 000 8.1l3-2.4z"/>
+            <path fill="#EA4335" d="M9 3.6c1.3 0 2.5.5 3.4 1.3l2.6-2.6A9 9 0 00.9 4.9l3 2.3C4.6 5.1 6.6 3.6 9 3.6z"/>
+          </svg>
+          <span id="cloudTitle">Sign in with Google</span>
+        </button>
+      </div>
+      <p class="empty-sub" id="cloudSub">Using Apple? Choose “Share My Email” so shared cards appear.</p>
       <div class="empty-links">
         <a class="altlink quiet" href="viewer.html">View shared cards</a>
       </div>
@@ -652,6 +682,10 @@
   </section>
 
   <section id="view" class="hidden">
+    <div id="relayNote" class="relaynote hidden">
+      Your Apple email is hidden, so cards shared with your real address won’t appear here. To receive shared cards, ask the sender to invite this exact address:
+      <div class="relayrow"><code id="relayAddr"></code><button type="button" id="relayCopy">Copy</button></div>
+    </div>
     <select id="spaceSwitcher" class="switcher hidden" aria-label="Choose whose cards to view"></select>
     <input type="search" id="q" placeholder="Search a name or occasion" autocomplete="off">
     <div class="chips" id="people"></div>
@@ -837,7 +871,7 @@
       </button>
       <p class="set-delnote hidden" id="delNote">Deletes your account, not the cards shared with you.</p>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.13.1506</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.13.2240</span></p>
   </div>
 </div>
 
@@ -1696,6 +1730,34 @@
       throw e;
     });
   }
+  // Sign in with Apple — mirror of the Google flow (App Store 4.8 alternative).
+  function nativeAppleSignIn(){
+    var FA=window.Capacitor.Plugins.FirebaseAuthentication;
+    return FA.signInWithApple().then(function(res){
+      var c=(res&&res.credential)||{};
+      if(!c.idToken)throw new Error('No Apple credential returned');
+      var cred=new firebase.auth.OAuthProvider('apple.com').credential({idToken:c.idToken,rawNonce:c.nonce});
+      return firebase.auth().signInWithCredential(cred);
+    }).then(function(r){authUser=r.user;return authUser;});
+  }
+  function signInApple(){
+    if(!fbInit())return Promise.reject(new Error('offline'));
+    if(isNativeApp())return nativeAppleSignIn();
+    var provider=new firebase.auth.OAuthProvider('apple.com');
+    provider.addScope('email');provider.addScope('name');
+    return firebase.auth().signInWithPopup(provider).then(function(r){
+      authUser=r.user;return authUser;
+    }).catch(function(e){
+      var code=e&&e.code||'';
+      if(/popup-blocked|popup-closed-by-user|operation-not-supported|cancelled-popup-request/.test(code)){
+        return firebase.auth().signInWithRedirect(provider);
+      }
+      throw e;
+    });
+  }
+  // Apple "Hide My Email" gives a @privaterelay.appleid.com address; email-keyed
+  // shares won't match it, so relay viewers see a note (paintRelayNote).
+  function isRelayEmail(e){return /@privaterelay\.appleid\.com$/i.test(String(e||''));}
 
   // Reflect whether anyone is signed in, so the button never asks for a
   // credential that does not exist — the old version prompted for a sync code
@@ -1707,9 +1769,17 @@
       t.textContent='Open Your Cards';
       s.textContent=(authUser.email||authUser.displayName||'Signed in')+' · tap to open';
     }else{
-      t.textContent='Sign in to view your cards';
-      s.textContent='Google sign-in — nothing to remember';
+      t.textContent='Sign in with Google';
+      s.textContent='Using Apple? Choose “Share My Email” so shared cards appear.';
     }
+  }
+  // A relay (Hide-My-Email) viewer's shares won't match their address, so show
+  // the address to have the owner invite. Called once we know who's signed in.
+  function paintRelayNote(){
+    var n=$('relayNote');if(!n)return;
+    var relay=!!(authUser&&isRelayEmail(authUser.email));
+    n.classList.toggle('hidden',!relay);
+    if(relay)$('relayAddr').textContent=authUser.email||'';
   }
 
   // Already signed in → straight into the cards, no intermediate "open" tap.
@@ -1740,7 +1810,13 @@
     loadCloud();
   }
 
-  $('cloudOpen').onclick=loadCloud;   // a real button now, so Enter/Space work natively
+  $('cloudOpen').onclick=function(){loadCloud(signIn);};     // real buttons: Enter/Space work natively
+  $('appleOpen').onclick=function(){loadCloud(signInApple);};
+  if($('relayCopy'))$('relayCopy').onclick=function(){
+    var a=(authUser&&authUser.email)||'';if(!a)return;
+    var done=function(){$('relayCopy').textContent='Copied';setTimeout(function(){$('relayCopy').textContent='Copy';},1500);};
+    if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(a).then(done,function(){});
+  };
 
   /* A cancelled sign-in is not a failure. The web SDK reports it as an error
      code; the native plugin surfaces the platform's own wording instead, so the
@@ -1750,11 +1826,12 @@
     var code=(e&&e.code)||'', msg=(e&&(e.message||(''+e)))||'';
     return /popup-closed-by-user|cancelled-popup-request/.test(code)||/cancel/i.test(msg);
   }
-  function loadCloud(){
+  function loadCloud(providerFn){
+    providerFn=providerFn||signIn;
     $('cloudSub').textContent='Opening…';
 
     currentUser().then(function(u){
-      return u || signIn();
+      return u || providerFn();
     }).then(function(u){
       if(!u){
         /* Web redirect sign-in navigates away and comes back, so leaving
@@ -1768,6 +1845,7 @@
       paintCloudButton();
       $('gearBtn').classList.remove('hidden');   // signed in → settings reachable
       paintScanTab();
+      paintRelayNote();
       // Pick up any email-invites for this account (grants viewOf on first sign-in).
       return fns().httpsCallable('syncSharedAccess')({}).then(function(r){return (r&&r.data&&r.data.granted)||[];},function(){return [];});
     }).then(function(granted){

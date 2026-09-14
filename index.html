@@ -187,6 +187,27 @@
   @keyframes nudge{0%,100%{transform:none}30%{transform:translateY(-4px)}60%{transform:translateY(1px)}}
   .gbtn.nudge{animation:nudge .42s ease}
   @media (prefers-reduced-motion:reduce){.gbtn.nudge{animation:none}}
+  /* Sign in with Apple: Apple's own black button, same size/shape as the Google
+     one so the two read as equal-weight choices. Apple's convention puts it on
+     top. */
+  .signinblock{display:flex;flex-direction:column;gap:10px}
+  .abtn{
+    display:inline-flex;align-items:center;justify-content:center;gap:10px;
+    width:100%;font:inherit;font-size:15.5px;font-weight:600;padding:14px 18px;
+    border:1px solid #000;border-radius:12px;background:#000;color:#fff;
+    cursor:pointer;transition:box-shadow .15s;
+  }
+  .abtn:hover,.abtn:focus-visible{box-shadow:0 1px 6px rgba(0,0,0,.25)}
+  .abtn[disabled]{opacity:.55;cursor:progress}
+  .abtn svg{fill:currentColor}
+  /* Prevention nudge (B): tell Apple users to share their email so shared cards
+     can reach them. Quiet, below the buttons. */
+  .signin-note{margin:12px auto 0;max-width:320px;font-size:12.5px;line-height:1.45;color:var(--muted);text-align:center}
+  /* Accommodation (A): a relay signer sees the exact address to have invited. */
+  .relaynote{margin:16px auto 0;max-width:340px;padding:12px 14px;border:1px solid var(--rule);border-radius:12px;background:#FBEDF2;color:var(--ink);font-size:13px;line-height:1.5;text-align:left}
+  .relaynote code{font-size:12.5px;word-break:break-all}
+  .relayrow{display:flex;align-items:center;gap:10px;margin-top:8px}
+  .relayrow code{flex:1}
 
   /* Pinned low and quiet, off the path to the primary button */
   .who{font-size:12px;color:#9A9AA2;text-align:center;margin-top:20px;padding-top:4px}
@@ -498,6 +519,12 @@
 
     <div id="signedOut" class="homefill">
       <div class="signinblock">
+        <button type="button" class="abtn" id="appleBtn">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+            <path d="M17.05 12.04c-.03-2.85 2.33-4.21 2.44-4.28-1.33-1.94-3.4-2.21-4.13-2.24-1.76-.18-3.43 1.03-4.32 1.03-.89 0-2.26-1.01-3.72-.98-1.91.03-3.68 1.11-4.66 2.82-1.99 3.45-.51 8.56 1.42 11.36.94 1.37 2.07 2.91 3.53 2.86 1.42-.06 1.96-.92 3.67-.92 1.71 0 2.19.92 3.69.89 1.53-.03 2.49-1.4 3.42-2.78.65-.95.92-1.44 1.44-2.51-3.78-1.44-3.19-6.63-.02-8.13zM14.13 4.02c.79-.95 1.32-2.28 1.18-3.6-1.13.05-2.5.76-3.31 1.71-.73.84-1.36 2.19-1.19 3.48 1.26.1 2.54-.64 3.32-1.59z"/>
+          </svg>
+          <span>Sign in with Apple</span>
+        </button>
         <button type="button" class="gbtn" id="googleBtn">
           <svg viewBox="0 0 18 18" width="18" height="18" aria-hidden="true">
             <path fill="#4285F4" d="M17.6 9.2c0-.6-.1-1.3-.2-1.9H9v3.5h4.8a4.1 4.1 0 01-1.8 2.7v2.2h2.9c1.7-1.6 2.7-3.9 2.7-6.5z"/>
@@ -508,6 +535,7 @@
           <span>Sign in with Google</span>
         </button>
       </div>
+      <p class="signin-note">Using Sign in with Apple? Choose <b>Share My Email</b> so cards shared with you can appear.</p>
       <!-- The only way into the viewer for someone who never signs in. The viewer
            needs no account, so a signed-out tap must go straight there: this is
            an .altlink, which the signed-out tab-tap guard deliberately does not
@@ -520,6 +548,10 @@
     <div id="signedIn" class="homefill hidden">
       <p class="who"><span id="whoText">Signed in</span>
         <button type="button" class="linkbtn" id="signOutBtn">Sign out</button></p>
+      <div id="relayNote" class="relaynote hidden">
+        Your Apple email is hidden, so cards shared with your real address won’t appear here. To receive shared cards, ask the sender to invite this exact address:
+        <div class="relayrow"><code id="relayAddr"></code><button type="button" class="linkbtn" id="relayCopy">Copy</button></div>
+      </div>
     </div>
   </section>
 
@@ -611,6 +643,38 @@
         throw e;
       });
   }
+  // Sign in with Apple (App Store 4.8: an equal alternative to Google). Native
+  // uses the plugin's Apple flow with skipNativeAuth, so we get the raw idToken
+  // and nonce and hand them to the JS SDK exactly as we do for Google; the web
+  // path is the same popup/redirect shape. Apple's provider id is 'apple.com'.
+  function nativeAppleSignIn(){
+    var FA=window.Capacitor.Plugins.FirebaseAuthentication;
+    return FA.signInWithApple().then(function(res){
+      var c=(res&&res.credential)||{};
+      if(!c.idToken)throw new Error('No Apple credential returned');
+      var cred=new firebase.auth.OAuthProvider('apple.com').credential({idToken:c.idToken,rawNonce:c.nonce});
+      return firebase.auth().signInWithCredential(cred);
+    }).then(function(r){authUser=r.user;return authUser;});
+  }
+  function signInApple(){
+    if(!fbInit())return Promise.reject(new Error('firebase unavailable'));
+    if(isNativeApp())return nativeAppleSignIn();
+    var p=new firebase.auth.OAuthProvider('apple.com');
+    p.addScope('email');p.addScope('name');
+    return firebase.auth().signInWithPopup(p).then(function(r){authUser=r.user;return authUser})
+      .catch(function(e){
+        var c=e&&e.code||'';
+        if(/popup-blocked|popup-closed-by-user|operation-not-supported|cancelled-popup-request/.test(c)){
+          return firebase.auth().signInWithRedirect(p);
+        }
+        throw e;
+      });
+  }
+  // Apple's "Hide My Email" hands us a @privaterelay.appleid.com address instead
+  // of the person's real one. Sharing grants are keyed by email, so a viewer
+  // invited at their real address won't match a relay sign-in — hence the note
+  // that tells them which address to have the owner invite.
+  function isRelayEmail(e){return /@privaterelay\.appleid\.com$/i.test(String(e||''));}
   function signOutUser(){
     if(!fbInit())return Promise.resolve();
     var jsOut=function(){return firebase.auth().signOut().then(function(){authUser=null});};
@@ -654,6 +718,9 @@
       : 'Scan and keep your greeting cards.';
     if(signedIn){
       $('whoText').textContent='Signed in as '+(authUser.email||authUser.displayName||'your account');
+      var relay=isRelayEmail(authUser.email);
+      if($('relayNote'))$('relayNote').classList.toggle('hidden',!relay);
+      if(relay&&$('relayAddr'))$('relayAddr').textContent=authUser.email||'';
       paintCount();
     }
   }
@@ -697,6 +764,29 @@
     }).then(function(){
       btn.disabled=false;btn.querySelector('span').textContent='Sign in with Google';
     });
+  };
+  $('appleBtn').onclick=function(){
+    var btn=$('appleBtn');
+    btn.disabled=true;btn.querySelector('span').textContent='Signing in…';
+    signInApple().then(function(u){
+      if(!u)return;            // redirect flow: we come back later
+      paintHome();
+    }).catch(function(e){
+      var c=e&&e.code||'';
+      if(/unauthorized-domain/.test(c)){
+        openAlert('This site isn’t authorised for sign-in yet. Add kept.cards in the Firebase console under Authentication → Settings → Authorized domains.','Sign-in not set up');
+      }else if(!isSignInCancel(e)){
+        openAlert('Could not sign in with Apple. Check your connection and try again.','Sign-in failed');
+      }
+      if(window.console)console.warn(e);
+    }).then(function(){
+      btn.disabled=false;btn.querySelector('span').textContent='Sign in with Apple';
+    });
+  };
+  if($('relayCopy'))$('relayCopy').onclick=function(){
+    var a=(authUser&&authUser.email)||'';if(!a)return;
+    var done=function(){$('relayCopy').textContent='Copied';setTimeout(function(){$('relayCopy').textContent='Copy';},1500);};
+    if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(a).then(done,function(){});
   };
   $('signOutBtn').onclick=function(){signOutUser().then(paintHome)};
   $('homeGear').onclick=function(){location.href='cards.html?settings=1';};

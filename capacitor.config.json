@@ -5,7 +5,7 @@
   "plugins": {
     "FirebaseAuthentication": {
       "skipNativeAuth": true,
-      "providers": ["google.com"]
+      "providers": ["apple.com", "google.com"]
     }
   }
 }
