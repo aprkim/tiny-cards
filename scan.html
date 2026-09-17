@@ -107,6 +107,15 @@
   .drop.cam strong{color:var(--accent)}
   /* Primary deepens rather than changing character */
   .drop.cam:hover,.drop.cam:focus-visible{border-color:#8E1340;background:#F7DCE6}
+  /* Computer (no touch, real mouse): there is no rear camera for Take Photos to
+     open, so hide it and make Choose Photos the one primary action, with
+     drag-and-drop. Phones are untouched. */
+  html.desktop .camgroup{display:none}
+  html.desktop #dropzone{border-style:solid;border-color:var(--accent);background:var(--accent-soft)}
+  html.desktop #dropzone strong{color:var(--accent)}
+  html.desktop #dropzone:hover,html.desktop #dropzone:focus-visible{border-color:#8E1340;background:#F7DCE6}
+  /* Files being dragged over the box */
+  .drop.dragover{border-style:solid;border-color:#8E1340;background:#F7DCE6}
 
   /* Landing (Add a Card) screen: fill the space between header and tab bar so the
      entry buttons sit vertically centred. Scoped to :not(.scanning) so the
@@ -971,7 +980,7 @@
         <span>Delete Account</span>
       </button>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.1</span> · <span class="setver">v2026.09.17.1437</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.1</span> · <span class="setver">v2026.09.17.1445</span></p>
   </div>
 </div>
 
@@ -1038,6 +1047,16 @@
 
   var $=function(id){return document.getElementById(id)};
   var picker=$('picker');
+  // Computer vs phone: no touch points and a real pointer means no rear camera
+  // for Take Photos to open. Applied here, before the landing is revealed by
+  // the sign-in gate, so nothing flashes. Touch devices (iPhone, iPad, Android)
+  // report touch points and keep the camera button.
+  var isDesktop=navigator.maxTouchPoints===0&&window.matchMedia('(hover:hover) and (pointer:fine)').matches;
+  if(isDesktop){
+    document.documentElement.classList.add('desktop');
+    var dzSpan=document.querySelector('#dropzone span');
+    if(dzSpan)dzSpan.textContent='Pick the photos you took of the card, or drag them here';
+  }
 
   /* Year/Month/Day dropdowns in place of the OS date input, so picking a day
      never needs a second tap. Stored value stays 'YYYY-MM-DD' (or '' if not
@@ -2020,6 +2039,27 @@
     if(!picker.files.length)return;
     ingestBatch(Array.prototype.slice.call(picker.files));
   };
+  // Drag-and-drop onto Choose Photos, a computer's natural gesture. Same path
+  // as a picked batch. dragleave also fires when the pointer crosses the box's
+  // own children, so only clear the highlight when it truly leaves. The window
+  // handlers stop a drop that misses the box from navigating the tab to the image.
+  (function(){
+    var dz=$('dropzone');
+    function stop(e){e.preventDefault();e.stopPropagation();}
+    dz.addEventListener('dragenter',function(e){stop(e);dz.classList.add('dragover');});
+    dz.addEventListener('dragover',function(e){stop(e);dz.classList.add('dragover');});
+    dz.addEventListener('dragleave',function(e){stop(e);if(!dz.contains(e.relatedTarget))dz.classList.remove('dragover');});
+    dz.addEventListener('drop',function(e){
+      stop(e);dz.classList.remove('dragover');
+      var all=Array.prototype.slice.call((e.dataTransfer&&e.dataTransfer.files)||[]);
+      var imgs=all.filter(function(x){return /^image\//.test(x.type);});
+      if(!imgs.length)return;
+      mode='batch';
+      ingestBatch(imgs);
+    });
+    window.addEventListener('dragover',function(e){e.preventDefault();});
+    window.addEventListener('drop',function(e){e.preventDefault();});
+  })();
   // Native multi-select straight from the library (pickImages). Cancel → empty
   // result or throw, both ignored.
   function nativePick(){
