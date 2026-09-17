@@ -57,7 +57,7 @@
 
   /* Fixed bottom nav — the same Scan/View bar every other page has. The viewer
      was the one screen without it, so opening a folder of exported files left
-     no way back at all: the "Back to your cards" link lives in #start, which is
+     no way back at all: the Back link lives in #start, which is
      hidden once #view appears, and a native webview has no browser chrome to
      fall back on. */
   .tabbar{
@@ -619,8 +619,8 @@
   function upgrade(){
     var a=document.getElementById('backLink');
     if(!a)return;
-    a.textContent='\u2190 Back to your cards';
-    a.setAttribute('href','cards.html');
+    a.textContent='\u2190 Back to settings';
+    a.setAttribute('href','cards.html?settings=1');
   }
   try{
     for(var i=0;i<localStorage.length;i++){
