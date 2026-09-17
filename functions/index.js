@@ -355,13 +355,16 @@ exports.exportAll = onRequest({
     }
   }, 15000);
 
-  /* The build, as one attempt. Opening the upload session to Storage has
-     failed at zero bytes twice in a row on fresh instances ("socket hang up",
-     2026-09-13), with nothing of ours involved yet; a second attempt a few
-     seconds later is cheap, and the alternative is the person retrying by hand. */
+  /* The build, as one attempt. Opening a *resumable* upload session to Storage
+     (the uploadType=resumable handshake) failed with "socket hang up" at zero
+     bytes on fresh instances on 2026-09-13 and again on 2026-09-17 - both
+     attempts of the retry, ~8s apart, each on a cold instance. The handshake
+     itself is the fragile part, so the stream is a single non-resumable upload
+     (as makeThumbnail already does), which skips that handshake entirely. The
+     retry below stays as the safety net. */
   const attempt = async () => {
       out = dest.createWriteStream({
-        resumable: true,
+        resumable: false,
         metadata: {
           contentType: 'application/zip',
           // Makes a browser save it as a file instead of trying to display it.
