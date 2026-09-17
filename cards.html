@@ -486,8 +486,10 @@
      once left the address ~115px and wrapped it to three. */
   .share-row{display:flex;flex-direction:column;gap:8px;font-size:14px}
   /* Email + status pill on one line; actions on their own line below. */
-  .share-line{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-  .share-line .who{overflow-wrap:anywhere;min-width:0}
+  /* Email + status + actions all on one line; a long email truncates with an
+     ellipsis so the status pill and buttons never wrap below or get squeezed. */
+  .share-line{display:flex;align-items:center;gap:8px}
+  .share-line .who{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .share-row button{font:inherit;font-size:12.5px;padding:5px 12px;border-radius:100px;border:1px solid var(--rule);background:var(--field);color:var(--muted);cursor:pointer;flex-shrink:0}
   /* Hover only with a real pointer, so a tap on touch doesn't leave the red
      state stuck on the button; :active gives the press feedback on touch. */
@@ -886,7 +888,7 @@
       </button>
       <p class="set-delnote hidden" id="delNote">Deletes your account, not the cards shared with you.</p>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.1</span> · <span class="setver">v2026.09.16.2253</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.1</span> · <span class="setver">v2026.09.16.2256</span></p>
   </div>
 </div>
 
@@ -1577,22 +1579,17 @@
         fns().httpsCallable('revokeViewer')({email:v.email}).then(refreshInvites)
           .catch(function(e){rm.disabled=false;rm.textContent='Remove';openAlert('Could not remove that person. Please try again.','Shared with');if(window.console)console.warn(e);});
       };
+      // Everything on one line: the email flexes and truncates so the status
+      // pill and the action(s) stay on the right instead of wrapping below.
       line.appendChild(who);line.appendChild(tag);
-      row.appendChild(line);
-      if(v.status==='active'){
-        // One action: keep Remove on the email line, right-aligned, so it reads
-        // as "remove this person" rather than a control floating on its own row.
-        rm.className='share-rm';
-        line.appendChild(rm);
-      }else{
-        // Two actions (Share invite + Remove): stack them below, where a long
-        // address can't crowd them.
+      if(v.status!=='active'){
         var sh=document.createElement('button');sh.type='button';sh.className='share-again';
         sh.textContent='Share invite';
         sh.onclick=function(){shareInvite(v.email);};
-        acts.appendChild(sh);acts.appendChild(rm);
-        row.appendChild(acts);
+        line.appendChild(sh);
       }
+      line.appendChild(rm);
+      row.appendChild(line);
       ul.appendChild(row);
     });
   }
