@@ -968,7 +968,7 @@
         <span>Delete Account</span>
       </button>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.1</span> · <span class="setver">v2026.09.16.2336</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.1</span> · <span class="setver">v2026.09.16.2343</span></p>
   </div>
 </div>
 
@@ -1533,17 +1533,26 @@
      placeholder id ships a dead link. Post-approval, add
      url:'https://apps.apple.com/app/kept/id<REAL_ID>' back onto the share()
      calls (and onto `full`) so Messages and Mail render the App Store card. */
-  // The owner sends the invite themselves; copy the message to the clipboard
-  // rather than opening the OS share sheet.
   function shareInvite(email){
-    var text=inviteMessage(email);
-    if(navigator.clipboard&&navigator.clipboard.writeText){
-      navigator.clipboard.writeText(text).then(function(){
-        openAlert('Invite message copied — paste it into a text or email to them.','Share invite');
-      },function(){openAlert(text,'Share invite');});
-    }else{
-      openAlert(text,'Share invite');
-    }
+    var text=inviteMessage(email), full=text;
+    var S=(window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.Share)||null;
+    var go;
+    if(S&&S.share)go=S.share({title:'Kept',text:text,dialogTitle:'Tell them'});
+    else if(navigator.share)go=navigator.share({title:'Kept',text:text});
+    else go=Promise.reject(new Error('no share target'));
+    return go.catch(function(e){
+      if(isShareCancel(e))return;
+      /* Web share needs a live user gesture and the invite round trip has
+         already spent it, so a rejection here is ordinary on desktop rather
+         than exceptional. Hand the message over instead of losing it. */
+      if(window.console)console.warn('share invite',e);
+      if(navigator.clipboard&&navigator.clipboard.writeText){
+        return navigator.clipboard.writeText(full).then(function(){
+          openAlert('Invite message copied — paste it into a message to them.','Share invite');
+        },function(){openAlert(full,'Share invite');});
+      }
+      openAlert(full,'Share invite');
+    });
   }
   // Invite by email → granted now if the account exists, else on their first sign-in.
   $('inviteBtn').onclick=function(){
