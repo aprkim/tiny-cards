@@ -968,7 +968,7 @@
         <span>Delete Account</span>
       </button>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.1</span> · <span class="setver">v2026.09.16.2343</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.1</span> · <span class="setver">v2026.09.16.2351</span></p>
   </div>
 </div>
 
@@ -1518,10 +1518,11 @@
      Duplicated verbatim in cards.html and scan.html. These pages are standalone
      documents with no module system, so "shared" means identical, and a change
      to one belongs in the other. */
+  // App Store link kept in one place so it's easy to change later.
+  var APP_STORE_URL='https://apps.apple.com/app/id6809942529';
   function inviteMessage(email){
-    return 'I saved our cards in Kept and shared them with you! Download Kept from '+
-           'the App Store, then sign in with Google using this email: '+email+
-           ' \u2014 your cards will be waiting.';
+    return 'I saved our cards in Kept and shared them with you! Download Kept here: '+APP_STORE_URL+'\n'+
+           'Sign in with '+email+' (this exact email) and your cards will be waiting for you.';
   }
   // Dismissing the sheet is an ordinary outcome, not a failure — the invite
   // already stands. Anything else is worth a line in the console.
