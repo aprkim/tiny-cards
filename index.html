@@ -161,7 +161,7 @@
   .heroart span{position:absolute;border-radius:12px;background:#fff;border:2.5px solid var(--accent)}
   .heroart .c1{inset:12px 22px 12px 0;transform:rotate(-9deg);background:var(--accent-soft)}
   .heroart .c2{inset:0 0 0 24px;display:flex;align-items:center;justify-content:center}
-  .heroart svg{width:44px;height:44px;fill:var(--accent)}
+  .heroart svg{width:100%;height:100%;display:block}
 
   /* The running total. Big enough to feel like progress during a long session. */
   .cardcount{font-size:15px;color:var(--muted);min-height:22px}
@@ -509,10 +509,7 @@
            screen, so it does the obvious job: tapping it starts a scan. A real
            link, so it works before the script runs and reads as a control. -->
       <a class="heroart" href="scan.html" aria-label="Scan a card">
-        <span class="c1" aria-hidden="true"></span>
-        <span class="c2" aria-hidden="true">
-          <svg viewBox="0 0 24 24"><path d="M12 20.5l-6.9-6.6C2.6 11.5 3.4 7.6 6.6 6.4c1.9-.7 4 .1 5.4 1.8 1.4-1.7 3.5-2.5 5.4-1.8 3.2 1.2 4 5.1 1.5 7.5L12 20.5z"/></svg>
-        </span>
+        <svg viewBox="500 52 104 122" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect x="520" y="62" width="72" height="100" rx="8" fill="#F2B8CB" transform="rotate(8 556 112)"/><g transform="rotate(-6 546 110)"><rect x="510" y="60" width="72" height="100" rx="8" fill="#B0184F"/><path d="M546 117 C536 109 530 103 530 96.5 C530 90.5 534 87 538.5 87 C542 87 545 89.5 546 92.5 C547 89.5 550 87 553.5 87 C558 87 562 90.5 562 96.5 C562 103 556 109 546 117 Z" fill="#FFFFFF"/><path d="M526 138 h40" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round"/></g></svg>
       </a>
       <!-- Carries state: the number climbing is the point during a 200-card session -->
       <p class="cardcount" id="cardCount" aria-live="polite"></p>
