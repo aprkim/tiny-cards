@@ -502,6 +502,10 @@
   .share-row button.share-again:active{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
   /* Working state (after tapping Remove): dimmed and neutral, never a red stub. */
   .share-row button:disabled{opacity:.6;cursor:default;border-color:var(--rule);color:var(--muted);background:var(--field)}
+  /* Resend a pending invite: an icon, not a word, so a long invited email keeps
+     its space on the one line. */
+  .share-again{padding:0;width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center}
+  .share-again svg{width:18px;height:18px;display:block}
   /* Invite by email */
   .share-invite{display:flex;gap:8px;margin-top:4px;align-items:center}
   /* 16px is a floor, not a taste: WKWebView zooms the whole page when an
@@ -888,7 +892,7 @@
       </button>
       <p class="set-delnote hidden" id="delNote">Deletes your account, not the cards shared with you.</p>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.1</span> · <span class="setver">v2026.09.16.2256</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.1</span> · <span class="setver">v2026.09.16.2304</span></p>
   </div>
 </div>
 
@@ -1584,7 +1588,8 @@
       line.appendChild(who);line.appendChild(tag);
       if(v.status!=='active'){
         var sh=document.createElement('button');sh.type='button';sh.className='share-again';
-        sh.textContent='Share invite';
+        sh.setAttribute('aria-label','Share invite');sh.title='Share invite';
+        sh.innerHTML='<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M2.01 21 23 12 2.01 3 2 10l15 2-15 2z"/></svg>';
         sh.onclick=function(){shareInvite(v.email);};
         line.appendChild(sh);
       }
