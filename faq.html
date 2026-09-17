@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FAQ — Kept</title>
+<meta name="description" content="Answers to common questions about Kept: scanning, keeping the inside of a card, sharing with family, privacy, backups, and what you need to sign in.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{ --bg:#f2f2f0; --card:#fff; --ink:#111; --muted:#5c5c5c; --line:#e0e0dd; --footer:#161616; --accent:#B0184F; --accent-ink:#8E1340; }
+  *{ margin:0; padding:0; box-sizing:border-box; }
+  html{ scroll-behavior:smooth; }
+  @media (prefers-reduced-motion:reduce){ html{scroll-behavior:auto;} }
+  body{ background:var(--bg); color:var(--ink); font-family:'Inter',-apple-system,sans-serif; font-size:16px; line-height:1.65; -webkit-font-smoothing:antialiased; }
+  a{ color:var(--ink); }
+  a:focus-visible{ outline:2px solid var(--accent); outline-offset:3px; }
+  .eyebrow{ font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); }
+  header.site{ display:flex; align-items:center; justify-content:space-between; padding:24px 6vw; }
+  .logo{ display:inline-flex; align-items:center; gap:10px; white-space:nowrap; font-weight:800; font-size:18px; letter-spacing:-0.01em; text-decoration:none; }
+  .logo svg{ width:24px; height:26px; display:block; }
+  header.site nav a{ text-decoration:none; font-size:14px; color:var(--muted); margin-left:26px; }
+  header.site nav a:hover{ color:var(--ink); }
+  header.site nav a.cta{ color:var(--accent); font-weight:600; }
+  @media (max-width:640px){
+    header.site{ padding:18px 6vw; }
+    header.site nav a{ margin-left:16px; font-size:13px; }
+    header.site nav a.nav-hide{ display:none; }
+  }
+  .wrap{ max-width:760px; margin:0 auto; padding:32px 6vw 96px; }
+  .titleblock{ margin-bottom:40px; }
+  .titleblock h1{ font-size:clamp(34px,5vw,48px); font-weight:800; letter-spacing:-0.02em; line-height:1.1; margin:14px 0 14px; }
+  .titleblock p{ color:var(--muted); font-size:16.5px; }
+  .group{ margin-bottom:44px; }
+  .group h2{ font-size:14px; font-family:'IBM Plex Mono',monospace; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); margin-bottom:14px; }
+  details{ background:var(--card); border:1px solid var(--line); border-radius:12px; padding:0 22px; margin-bottom:10px; }
+  summary{ list-style:none; cursor:pointer; padding:16px 0; font-weight:600; font-size:16.5px; display:flex; justify-content:space-between; align-items:center; gap:16px; }
+  summary::-webkit-details-marker{ display:none; }
+  summary::after{ content:'+'; color:var(--accent); font-weight:500; font-size:22px; line-height:1; flex-shrink:0; transition:transform .15s ease; }
+  details[open] summary::after{ transform:rotate(45deg); }
+  details .a{ padding:0 0 18px; color:#2a2a2a; font-size:15.5px; }
+  details .a p{ margin-bottom:10px; }
+  details .a p:last-child{ margin-bottom:0; }
+  details .a a{ color:var(--accent); }
+  .contact{ background:var(--card); border:1px solid var(--line); border-radius:12px; padding:22px 26px; margin-top:8px; }
+  .contact .eyebrow{ display:block; margin-bottom:8px; }
+  .contact a{ color:var(--accent); font-weight:600; text-decoration:none; }
+  .contact a:hover{ text-decoration:underline; }
+  footer.site{ background:var(--footer); color:#b8b8b8; padding:36px 6vw; font-size:13.5px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:16px; }
+  footer.site a{ color:#e6e6e6; text-decoration:none; margin-left:24px; }
+  footer.site a:hover{ text-decoration:underline; }
+  @media (max-width:640px){ footer.site{flex-direction:column;} footer.site a{margin-left:0; margin-right:24px;} }
+</style>
+</head>
+<body>
+
+<header class="site">
+  <a class="logo" href="/" aria-label="Kept">
+    <svg viewBox="500 52 104 122" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect x="520" y="62" width="72" height="100" rx="8" fill="#F2B8CB" transform="rotate(8 556 112)"/><g transform="rotate(-6 546 110)"><rect x="510" y="60" width="72" height="100" rx="8" fill="#B0184F"/><path d="M546 117 C536 109 530 103 530 96.5 C530 90.5 534 87 538.5 87 C542 87 545 89.5 546 92.5 C547 89.5 550 87 553.5 87 C558 87 562 90.5 562 96.5 C562 103 556 109 546 117 Z" fill="#FFFFFF"/><path d="M526 138 h40" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round"/></g></svg>
+    Kept
+  </a>
+  <nav>
+    <a class="nav-hide" href="faq" aria-current="page">FAQ</a>
+    <a class="nav-hide" href="support">Support</a>
+    <a class="nav-hide" href="privacy">Privacy</a>
+    <a class="cta" href="https://apps.apple.com/app/id6809942529">Download</a>
+  </nav>
+</header>
+
+<main class="wrap">
+  <div class="titleblock">
+    <span class="eyebrow">Help</span>
+    <h1>Frequently asked questions</h1>
+    <p>Short answers to the things people ask most. Can't find yours? <a href="mailto:hello@lihallc.com">Email us</a>.</p>
+  </div>
+
+  <div class="group">
+    <h2>The basics</h2>
+    <details open>
+      <summary>What is Kept?</summary>
+      <div class="a"><p>Kept is an app for the greeting cards you can't bring yourself to throw away. Photograph a card with your phone and Kept straightens it, keeps the message written inside, and files it by date and by who sent it — so a shoebox of cards becomes a collection you'll actually open.</p></div>
+    </details>
+    <details>
+      <summary>Is Kept free?</summary>
+      <div class="a"><p>Yes. Kept is free to download and use on the App Store.</p></div>
+    </details>
+    <details>
+      <summary>How do I scan a card?</summary>
+      <div class="a"><p>Open the <b>Scan</b> tab and tap <b>Take Photos</b>. Lay the card on a flat surface — a plain, darker background helps the edges stand out — and photograph the front and the inside. Kept finds the edges and crops each one clean. You can also choose photos you've already taken.</p></div>
+    </details>
+    <details>
+      <summary>Does Kept keep the inside of the card?</summary>
+      <div class="a"><p>That's the whole point. The front is nice, but the handwritten message is what matters. Kept stores the front and the inside together, so the note is never separated from the card.</p></div>
+    </details>
+  </div>
+
+  <div class="group">
+    <h2>Signing in</h2>
+    <details>
+      <summary>What do I need to sign in?</summary>
+      <div class="a"><p>A Google account or an Apple ID. Kept has no passwords of its own — you sign in with one of those, and your cards are tied to that account.</p></div>
+    </details>
+    <details>
+      <summary>I don't use Gmail. Can I still sign in?</summary>
+      <div class="a"><p>Yes. A Google account isn't the same as a Gmail address — you can create a Google account using any email you already have (a work address, Outlook, Yahoo, and so on). Likewise, an Apple ID can use any email. Sign in with whichever one is tied to your email.</p></div>
+    </details>
+    <details>
+      <summary>Should I use "Hide My Email" with Sign in with Apple?</summary>
+      <div class="a"><p>If someone plans to share cards with you, choose <b>Share My Email</b> instead. Sharing is matched by email address, so a hidden (relay) address won't match the invitation sent to your real one. If you've already signed in with a hidden email, Kept shows you the address to give the person sharing.</p></div>
+    </details>
+  </div>
+
+  <div class="group">
+    <h2>Sharing with family</h2>
+    <details>
+      <summary>How does sharing work?</summary>
+      <div class="a"><p>In Settings, open <b>Shared with</b> and enter the email address of the person you want to share with. That grants them permission. Then tap the share icon to send them an invitation message with a link to the app. Once they sign in with that exact email, your cards appear for them.</p></div>
+    </details>
+    <details>
+      <summary>Does Kept email the person for me?</summary>
+      <div class="a"><p>No — Kept never sends email on your behalf. Entering their address only grants access. You send the invitation yourself (by text, email, or however you like) using the share icon, which opens your phone's share options with the message ready to go.</p></div>
+    </details>
+    <details>
+      <summary>What if the person I share with doesn't have a Google or Apple account?</summary>
+      <div class="a"><p>To see your cards inside Kept, they need to sign in with a Google account or Apple ID that uses the email you invited. If they have neither, they can create a Google account with their existing email address in a couple of minutes. Alternatively, invite an email they already use with Google or Apple. Anyone can also open a backup file you send them in the web viewer, no account needed.</p></div>
+    </details>
+    <details>
+      <summary>Someone shared cards with me. How do I see them?</summary>
+      <div class="a"><p>Download Kept and sign in with the <b>same email address</b> they invited. Their cards will be waiting. If you'd rather not install the app, you can view a backup file they send you at <a href="/viewer.html">kept.cards/viewer.html</a>.</p></div>
+    </details>
+    <details>
+      <summary>Can I stop sharing with someone?</summary>
+      <div class="a"><p>Yes. In <b>Shared with</b>, tap <b>Remove</b> next to their email. They lose access immediately.</p></div>
+    </details>
+  </div>
+
+  <div class="group">
+    <h2>Privacy and your data</h2>
+    <details>
+      <summary>Who can see my cards?</summary>
+      <div class="a"><p>Only you, and anyone you've explicitly shared with. There's no feed, no followers, no public profiles, and no strangers. Kept doesn't sell your data or show ads.</p></div>
+    </details>
+    <details>
+      <summary>Where are my cards stored?</summary>
+      <div class="a"><p>Your scans are stored securely in the cloud so they're safe if you lose your phone and available on any device you sign in to. Only your account (and people you share with) can access them. See the <a href="/privacy">Privacy Policy</a> for details.</p></div>
+    </details>
+    <details>
+      <summary>How do I back up or export my cards?</summary>
+      <div class="a"><p>In Settings, tap <b>Export all cards</b>. Kept packages your whole archive into a file you can save to Files, AirDrop, or keep anywhere you like. You can import it later, and anyone can open it in the web viewer. Your cards are never locked in.</p></div>
+    </details>
+    <details>
+      <summary>What happens if I delete my account?</summary>
+      <div class="a"><p>Deleting your account permanently removes your cards and your account. Kept asks you to export a backup first so nothing is lost by accident. If people had access to your cards, they lose it. Deleting your account does <b>not</b> remove cards that others shared with you — those belong to their owners.</p></div>
+    </details>
+  </div>
+
+  <div class="group">
+    <h2>Devices</h2>
+    <details>
+      <summary>Is there an Android or desktop version?</summary>
+      <div class="a"><p>The iPhone app is on the App Store. You can also use Kept in a web browser on Android or a computer at <a href="/app.html">kept.cards</a> — sign in with the same account and your cards are there.</p></div>
+    </details>
+    <details>
+      <summary>Do my cards sync between devices?</summary>
+      <div class="a"><p>Yes. Sign in with the same account on any device and your collection is the same everywhere.</p></div>
+    </details>
+  </div>
+
+  <div class="contact">
+    <span class="eyebrow">Still stuck?</span>
+    <p>Email <a href="mailto:hello@lihallc.com">hello@lihallc.com</a> and we'll help.</p>
+  </div>
+</main>
+
+<footer class="site">
+  <span>© 2026 Liha LLC · Kept</span>
+  <nav>
+    <a href="faq">FAQ</a>
+    <a href="support">Support</a>
+    <a href="privacy">Privacy</a>
+    <a href="terms">Terms</a>
+  </nav>
+</footer>
+
+</body>
+</html>
