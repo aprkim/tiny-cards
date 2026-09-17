@@ -489,9 +489,17 @@
   .share-line{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .share-line .who{overflow-wrap:anywhere;min-width:0}
   .share-row button{font:inherit;font-size:12.5px;padding:5px 12px;border-radius:100px;border:1px solid var(--rule);background:var(--field);color:var(--muted);cursor:pointer;flex-shrink:0}
-  .share-row button:hover{border-color:#BF3143;color:#BF3143;background:#FEF2F2}
-  /* Not destructive, so it must not borrow Remove's red hover. */
-  .share-row button.share-again:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+  /* Hover only with a real pointer, so a tap on touch doesn't leave the red
+     state stuck on the button; :active gives the press feedback on touch. */
+  @media (hover:hover){
+    .share-row button:hover{border-color:#BF3143;color:#BF3143;background:#FEF2F2}
+    /* Not destructive, so it must not borrow Remove's red hover. */
+    .share-row button.share-again:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+  }
+  .share-row button:active{border-color:#BF3143;color:#BF3143;background:#FEF2F2}
+  .share-row button.share-again:active{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+  /* Working state (after tapping Remove): dimmed and neutral, never a red stub. */
+  .share-row button:disabled{opacity:.6;cursor:default;border-color:var(--rule);color:var(--muted);background:var(--field)}
   /* Invite by email */
   .share-invite{display:flex;gap:8px;margin-top:4px;align-items:center}
   /* 16px is a floor, not a taste: WKWebView zooms the whole page when an
@@ -878,7 +886,7 @@
       </button>
       <p class="set-delnote hidden" id="delNote">Deletes your account, not the cards shared with you.</p>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.1</span> · <span class="setver">v2026.09.16.2249</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.1</span> · <span class="setver">v2026.09.16.2253</span></p>
   </div>
 </div>
 
@@ -1565,7 +1573,7 @@
       tag.textContent=v.status==='active'?'Active':'Invited';
       var rm=document.createElement('button');rm.type='button';rm.textContent='Remove';
       rm.onclick=function(){
-        rm.disabled=true;rm.textContent='…';
+        rm.disabled=true;rm.textContent='Removing…';
         fns().httpsCallable('revokeViewer')({email:v.email}).then(refreshInvites)
           .catch(function(e){rm.disabled=false;rm.textContent='Remove';openAlert('Could not remove that person. Please try again.','Shared with');if(window.console)console.warn(e);});
       };
