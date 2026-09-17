@@ -892,7 +892,7 @@
       </button>
       <p class="set-delnote hidden" id="delNote">Deletes your account, not the cards shared with you.</p>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.1</span> · <span class="setver">v2026.09.16.2351</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.1</span> · <span class="setver">v2026.09.16.2359</span></p>
   </div>
 </div>
 
@@ -1600,9 +1600,10 @@
   }
   function refreshInvites(){return fetchInvites().catch(function(){return [];}).then(renderInvites);}
   /* Sharing the invite is a separate step from making it. inviteViewer only
-     records permission — nothing is emailed, by us or by Firebase — so without
-     this the person just invited never finds out. Fires on success only: never
-     on a failed invite, never on revoke.
+     records permission — nothing is emailed, by us or by Firebase. The invited
+     person appears in the list with a share icon the owner taps to send them
+     the message (shareInvite); inviting no longer opens the share sheet on its
+     own.
 
      Duplicated verbatim in cards.html and scan.html. These pages are standalone
      documents with no module system, so "shared" means identical, and a change
@@ -1651,7 +1652,6 @@
     var b=$('inviteBtn'),old=b.textContent;b.disabled=true;b.textContent='Inviting…';
     fns().httpsCallable('inviteViewer')({email:email}).then(function(){
       b.disabled=false;b.textContent=old;$('inviteEmail').value='';refreshInvites();
-      shareInvite(email);          // success only — never on failure, never on revoke
     }).catch(function(e){
       b.disabled=false;b.textContent=old;
       var msg=(e&&e.message)||'';
