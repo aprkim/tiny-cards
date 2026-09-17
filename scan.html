@@ -968,7 +968,7 @@
         <span>Delete Account</span>
       </button>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.1</span> · <span class="setver">v2026.09.17.0008</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.1</span> · <span class="setver">v2026.09.17.0012</span></p>
   </div>
 </div>
 
@@ -1337,6 +1337,14 @@
   // Same Settings as the View page: Account, Export all (owner + desktop),
   // Sign out. Export streams a ZIP backup via the exportAll function.
   function isOwner(){return !!authUser;}   // every user owns their own space
+  // ?settings=1: the File Viewer's back link lands here with Settings open.
+  var openSettingsOnLoad=(new URLSearchParams(location.search)).get('settings')==='1';
+  function openSettingsFromURL(){
+    if(!openSettingsOnLoad)return;
+    openSettingsOnLoad=false;
+    try{history.replaceState({},'',location.pathname);}catch(e){}
+    openSettings();
+  }
   function openSettings(){
     $('setEmail').textContent=(authUser&&authUser.email)||'Signed in';
     var owner=isOwner();
@@ -1438,7 +1446,7 @@
   function closeSettings(){$('settings').classList.add('hidden')}
   $('setClose').onclick=closeSettings;
   // viewer.html is self-contained (no Firebase), so this is plain navigation.
-  $('setViewer').onclick=function(){location.href='viewer.html';};
+  $('setViewer').onclick=function(){location.href='viewer.html?from=scan';};
   $('gearBtn').onclick=openSettings;
 
   // ---- invites (owner sharing) — same as the View page ----
@@ -1598,6 +1606,7 @@
     document.body.classList.remove('scanning');   // tab bar visible on the landing
     $('gearBtn').classList.remove('hidden');   // signed in → settings reachable
     paintCloud();
+    openSettingsFromURL();
     window.scrollTo(0,0);
   }
   function goHomeToSignIn(){

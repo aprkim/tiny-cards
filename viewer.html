@@ -619,8 +619,9 @@
   function upgrade(){
     var a=document.getElementById('backLink');
     if(!a)return;
+    var from=(new URLSearchParams(location.search)).get('from');
     a.textContent='\u2190 Back to settings';
-    a.setAttribute('href','cards.html?settings=1');
+    a.setAttribute('href',(from==='scan'?'scan.html':'cards.html')+'?settings=1');
   }
   try{
     for(var i=0;i<localStorage.length;i++){
