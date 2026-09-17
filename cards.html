@@ -319,8 +319,12 @@
   .scrim{
     position:fixed;inset:0;z-index:60;background:rgba(22,22,29,.45);
     display:flex;justify-content:center;align-items:center;
-    padding:20px;
+    padding:20px;overscroll-behavior:contain;
   }
+  /* While any sheet is open, lock the page behind it so scrolling the sheet (or
+     its dim backdrop) doesn't drag the background up and down. */
+  html:has(.scrim:not(.hidden), .tsheet-scrim:not(.hidden)),
+  body:has(.scrim:not(.hidden), .tsheet-scrim:not(.hidden)){overflow:hidden}
   /* The dialog is the one overlay that must win: it is raised from inside the
      Settings and Share sheets (import and export results, invite errors) and
      from the transcription sheet, all of which share this layer or sit above
@@ -332,6 +336,7 @@
     background:var(--paper);border-radius:18px;
     width:100%;max-width:400px;padding:26px 22px 20px;
     box-shadow:0 16px 48px rgba(22,22,29,.28);
+    max-height:88vh;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;
   }
   /* Close (X) in the top-right of a sheet (Settings) */
   .sheetx{
@@ -873,7 +878,7 @@
       </button>
       <p class="set-delnote hidden" id="delNote">Deletes your account, not the cards shared with you.</p>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.16.2200</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setver">v2026.09.16.2208</span></p>
   </div>
 </div>
 
