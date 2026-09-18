@@ -980,7 +980,7 @@
         <span>Delete Account</span>
       </button>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.1</span> · <span class="setver">v2026.09.17.1445</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.1</span> · <span class="setver">v2026.09.17.1912</span></p>
   </div>
 </div>
 
@@ -1751,6 +1751,30 @@
     });
   }
 
+  /* Background handwriting read, fired once a card with an inside page is
+     saved. Never awaited: the save and the screen carry on, and the server
+     writes the text onto the card when it returns (the View tab polls for it).
+     Only a failure needs a write from here, so the card can show "Couldn't
+     read this one" with the one remaining manual trigger. */
+  var transcribing={};
+  function autoTranscribe(cardId,path){
+    if(transcribing[cardId])return;transcribing[cardId]=true;
+    fns().httpsCallable('transcribeCard')({cardId:cardId,path:path}).then(function(){
+      delete transcribing[cardId];
+    }).catch(function(e){
+      delete transcribing[cardId];
+      if(window.console)console.warn('auto transcription failed',e);
+      var ref=fbDb.collection('tinyCards').doc(SPACE);
+      ref.get().then(function(doc){
+        var rows=(doc.exists&&doc.data().cards)||[];
+        rows=rows.map(function(x){
+          if(x&&x.id===cardId&&!x.transcription){x=Object.assign({},x);delete x.transcriptionPendingAt;x.transcriptionFailed=true;}
+          return x;
+        });
+        return ref.set({cards:rows,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+      }).catch(function(){});
+    });
+  }
   function runSync(){
     if(!useCloud||!pages.length)return Promise.resolve(null);
     if(!curCardId)curCardId=genId();
@@ -1779,12 +1803,39 @@
                  labels:pageLabels.slice(),paths:upPaths.slice(),savedAt:Date.now(),
                  bytes:upBytes.slice(),totalBytes:upBytes.reduce(function(a,b){return a+(b||0)},0)};
         var ref=fbDb.collection('tinyCards').doc(SPACE);
+        var toTranscribe='';   // inside path to read after this save, if any
         return ref.get().then(function(doc){
-          var rows=(doc.exists&&doc.data().cards)||[],found=false;
+          var rows=(doc.exists&&doc.data().cards)||[],prev=null,found=false;
+          rows.forEach(function(x){if(x&&x.id===curCardId)prev=x;});
+          /* Transcript bookkeeping. A re-save used to replace the whole row and
+             silently drop the transcript; carry it over. transcriptionOf is the
+             inside image the text was requested for: same image, nothing to do
+             (this also covers the draft auto-saves while a read is in flight);
+             a new or replaced inside image is read once, in the background.
+             No inside page, no transcript and no call. */
+          var ii=pageLabels.indexOf('inside'), inside=ii>=0?(upPaths[ii]||''):'';
+          if(prev)['transcription','transcriptionOf','transcriptionPendingAt','transcriptionFailed','translations']
+            .forEach(function(k){if(prev[k]!==undefined)rec[k]=prev[k];});
+          if(inside){
+            // Older card read by hand, before transcriptionOf existed: adopt its text
+            // only if the inside image is still the one it was saved with.
+            if(rec.transcription&&!rec.transcriptionOf&&prev&&prev.paths&&prev.labels&&
+               prev.paths[prev.labels.indexOf('inside')]===inside)rec.transcriptionOf=inside;
+            if(rec.transcriptionOf!==inside){
+              delete rec.transcription;delete rec.translations;delete rec.transcriptionFailed;
+              rec.transcriptionOf=inside;rec.transcriptionPendingAt=Date.now();
+              toTranscribe=inside;
+            }
+          }else{
+            ['transcription','transcriptionOf','transcriptionPendingAt','transcriptionFailed','translations']
+              .forEach(function(k){delete rec[k];});
+          }
           rows=rows.map(function(x){if(x&&x.id===curCardId){found=true;return rec}return x});
           if(!found)rows.push(rec);
           recordCreated=true;
           return ref.set({cards:rows,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+        }).then(function(){
+          if(toTranscribe)autoTranscribe(curCardId,toTranscribe);   // background; never awaited
         });
       }).then(function(){pendingSync=false;upProgress('Saved to your cards',100);setTimeout(upHide,900);return true});
     }).catch(function(e){

@@ -253,14 +253,17 @@
   }
   .box button.boxx:hover{background:rgba(255,255,255,.16)}
   .box button.boxx svg{width:20px;height:20px;display:block}
-  /* "Read handwriting" / "View transcription" entry link — a plain muted text
-     link on the dark overlay, not a pill. Overrides the .box button pill styles. */
-  .box button.boxread{
-    border:none;background:none;padding:2px 4px;border-radius:0;text-transform:none;
-    font-size:13.5px;color:rgba(255,255,255,.55);
-    text-decoration:underline;text-underline-offset:3px;text-decoration-color:rgba(255,255,255,.28);
-  }
-  .box button.boxread:hover{background:none;color:#fff;text-decoration-color:rgba(255,255,255,.6)}
+  /* Transcript block under the caption on the Inside page: quiet light text on
+     the dark overlay, with small underlined links (Edit / Translate / Retry).
+     The links override the .box button pill styles. */
+  .box .boxtrans{max-width:520px;margin:2px auto 0;padding:0 14px;text-align:center;color:rgba(255,255,255,.85);font-size:13.5px;line-height:1.5}
+  .box .boxtrans .tx{white-space:pre-wrap;overflow-wrap:anywhere;max-height:26vh;overflow-y:auto;overscroll-behavior:contain}
+  .box .boxtrans .tx.tr{margin-top:4px}
+  .box .boxtrans .tq{color:rgba(255,255,255,.5);font-style:italic}
+  .box .boxtrans .tl{color:rgba(255,255,255,.5);font-size:12px;margin-top:8px}
+  .box .boxtrans .acts{margin-top:6px}
+  .box .boxtrans button{border:none;background:none;padding:2px 4px;border-radius:0;text-transform:none;font:inherit;font-size:13px;color:rgba(255,255,255,.55);text-decoration:underline;text-underline-offset:3px;text-decoration-color:rgba(255,255,255,.28);cursor:pointer}
+  .box .boxtrans button:hover{background:none;color:#fff;text-decoration-color:rgba(255,255,255,.6)}
 
   /* ---- transcription bottom sheet (dark, draggable) ----------------------------
      A new sheet component — deliberately NOT the light static Settings/Share sheet.
@@ -727,7 +730,7 @@
     <strong id="boxName"></strong>
     <small id="boxSub"></small>
   </div>
-  <button id="boxRead" class="boxread hidden" type="button">Read handwriting</button>
+  <div id="boxTrans" class="boxtrans hidden"></div>
   <div class="nav" id="boxNav"></div>
   <div class="rowbtns hidden" id="boxTools">
     <button class="minibtn" id="boxEdit">Edit</button>
@@ -895,7 +898,7 @@
       </button>
       <p class="set-delnote hidden" id="delNote">Deletes your account, not the cards shared with you.</p>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.1</span> · <span class="setver">v2026.09.17.1445</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.1</span> · <span class="setver">v2026.09.17.1912</span></p>
   </div>
 </div>
 
@@ -2180,18 +2183,8 @@
     // read-only, so those controls must not even render for them. Download
     // stays available to anyone who can see the card.
     var owner=fromCloud&&isOwner();
-    // "Read handwriting" / "View transcription": only on the Inside page of a real
-    // cloud card. Re-evaluated here because show() re-runs on every page switch.
-    // Owners can always transcribe; viewers of a shared space are read-only — the
-    // link shows only if a transcription already exists, and opens without Edit.
-    var hasT=!!(card.raw&&card.raw.transcription);
-    var canRead=fromCloud&&p&&p.label==='inside'&&(owner||hasT);
-    var rd=$('boxRead');
-    rd.classList.toggle('hidden',!canRead);
-    if(canRead){
-      rd.textContent=hasT?'View transcription':'Read handwriting';
-      rd.onclick=function(e){e.stopPropagation();openTranscription(card,!owner);};
-    }
+    // Transcript block, Inside page only; re-evaluated on every page switch.
+    renderTrans(card,p,owner);
     $('boxTools').classList.toggle('hidden',!fromCloud);
     $('boxEdit').classList.toggle('hidden',!owner);
     $('boxCrop').classList.toggle('hidden',!owner);
@@ -2201,7 +2194,7 @@
   }
 
   function close(){
-    $('box').classList.add('hidden');$('boxImg').src='';openCard=null;
+    stopTransPoll();$('box').classList.add('hidden');$('boxImg').src='';openCard=null;
     $('boxForm').classList.add('hidden');$('box').classList.remove('editing');
   }
 
@@ -2815,9 +2808,9 @@
   });
 
   /* ---- transcription bottom sheet ----
-     Bound to the card whose "Read handwriting"/"View transcription" link was tapped.
-     The transcript lives on card.raw.transcription: the transcribeCard function
-     auto-saves it server-side on first read; edits are persisted here via cloudMutate. */
+     Now edit-only: the transcript itself shows inline on the card (renderTrans
+     below); its Edit link opens this sheet in edit mode. Edits persist via
+     cloudMutate; the transcribeCard function writes the text server-side. */
   var tDetent='half',tsCard=null,tsPath='',tsReadonly=false;
   function tText(){return (tsCard&&tsCard.raw&&tsCard.raw.transcription)||'';}
 
@@ -2825,36 +2818,136 @@
   function openSheet(state){$('tScrim').classList.remove('hidden');tSetDetent(state==='edit'?'full':'half');tRender(state);}
   function dismissSheet(){$('tScrim').classList.add('hidden');}
 
-  // Entry point from the overlay link. Existing transcription → View; otherwise fetch.
-  function openTranscription(card,readOnly){
-    tsCard=card;tsReadonly=!!readOnly;tsPath=(card.pages[openPage]||{}).path||'';
-    if(tText())openSheet('view');            // read-only viewers only ever reach here
-    else if(!readOnly)runTranscribe();
+  /* ---- transcript on the card (Inside page) ----
+     Transcription runs on its own when a card with an inside page is saved
+     (scan.html). This block shows the result and its states; the only manual
+     trigger left is the link on a failed or never-read card. The read may have
+     been started on another page load, so "pending" is the card's own
+     transcriptionPendingAt (stale after 3 minutes = failed), and while pending
+     the card is re-read every few seconds until the text lands. */
+  var transPoll=null, transBusy={}, transShown={};
+  function stopTransPoll(){if(transPoll){clearTimeout(transPoll);transPoll=null;}}
+  function transState(raw){
+    if(!raw)return 'none';
+    if(raw.transcription)return 'text';
+    if(transBusy[raw.id])return 'pending';
+    if(raw.transcriptionPendingAt&&Date.now()-raw.transcriptionPendingAt<180000)return 'pending';
+    if(raw.transcriptionFailed||raw.transcriptionPendingAt)return 'failed';
+    return 'unread';
   }
-  function runTranscribe(){
-    openSheet('loading');
-    fns().httpsCallable('transcribeCard')({cardId:tsCard.id,path:tsPath}).then(function(r){
-      if(tsCard&&tsCard.raw)tsCard.raw.transcription=(r.data&&r.data.text)||'';
-      updateReadLink();openSheet('view');
+  function deviceLang(){return ((navigator.language||'en').split('-')[0]||'en').toLowerCase();}
+  // Dominant script of the text; enough to tell "different language from the
+  // device" for Hangul/Han/Kana/Cyrillic/etc. vs Latin. Same-script pairs
+  // (English vs Spanish) are not told apart, so no Translate is offered there.
+  function scriptOf(s){
+    var c={hangul:0,han:0,kana:0,cyr:0,arab:0,heb:0,thai:0,latin:0};
+    for(var i=0;i<s.length;i++){var k=s.charCodeAt(i);
+      if((k>=0xAC00&&k<=0xD7A3)||(k>=0x1100&&k<=0x11FF)||(k>=0x3130&&k<=0x318F))c.hangul++;
+      else if(k>=0x3040&&k<=0x30FF)c.kana++;
+      else if(k>=0x4E00&&k<=0x9FFF)c.han++;
+      else if(k>=0x0400&&k<=0x04FF)c.cyr++;
+      else if(k>=0x0600&&k<=0x06FF)c.arab++;
+      else if(k>=0x0590&&k<=0x05FF)c.heb++;
+      else if(k>=0x0E00&&k<=0x0E7F)c.thai++;
+      else if((k>=0x41&&k<=0x5A)||(k>=0x61&&k<=0x7A)||(k>=0xC0&&k<=0x24F))c.latin++;}
+    var best='',n=0;Object.keys(c).forEach(function(k){if(c[k]>n){n=c[k];best=k;}});return best;
+  }
+  var LANG_SCRIPT={ko:'hangul',ja:'kana',zh:'han',ru:'cyr',uk:'cyr',bg:'cyr',sr:'cyr',ar:'arab',fa:'arab',ur:'arab',he:'heb',th:'thai'};
+  function needsTranslate(text){
+    var sc=scriptOf(text||'');if(!sc)return false;
+    var d=LANG_SCRIPT[deviceLang()]||'latin';
+    if(sc==='han'&&d==='kana')return false;   // Japanese text is often mostly kanji
+    return sc!==d;
+  }
+  function renderTrans(card,p,owner){
+    var box=$('boxTrans');stopTransPoll();
+    var raw=card&&card.raw, on=!!(fromCloud&&p&&p.label==='inside'&&raw);
+    var st=on?transState(raw):'none';
+    if(on&&!owner&&st!=='text')on=false;                 // viewers: only a finished transcript
+    box.classList.toggle('hidden',!on);box.innerHTML='';
+    if(!on)return;
+    var el=function(tag,cls,txt){var e=document.createElement(tag);if(cls)e.className=cls;if(txt!=null)e.textContent=txt;return e;};
+    var link=function(label,fn){var b=el('button',null,label);b.type='button';b.onclick=function(e){e.stopPropagation();fn();};return b;};
+    if(st==='pending'){
+      box.appendChild(el('div','tq','Reading the handwriting…'));
+      transPoll=setTimeout(function(){pollTrans(card,p,owner);},4000);
+      return;
+    }
+    if(st==='failed'||st==='unread'){
+      var a=el('div','acts');
+      a.appendChild(el('span','tq',st==='failed'?'Couldn’t read this one · ':'Not read yet · '));
+      a.appendChild(link(st==='failed'?'Retry':'Read now',function(){readNow(card,p,owner);}));
+      box.appendChild(a);
+      return;
+    }
+    box.appendChild(el('div','tx',raw.transcription));
+    var acts=el('div','acts'), lang=deviceLang(), cached=raw.translations&&raw.translations[lang];
+    if(owner)acts.appendChild(link('Edit',function(){tsCard=card;tsReadonly=false;tsPath=p.path||'';openSheet('edit');}));
+    if(needsTranslate(raw.transcription)){
+      if(owner)acts.appendChild(el('span','tq',' · '));
+      acts.appendChild(link(cached?'Show translation':'Translate',function(){translate(card,lang);}));
+    }
+    box.appendChild(acts);
+    if(cached&&transShown[card.id]===lang){
+      box.appendChild(el('div','tl','Translated from '+(cached.from||'the original')));
+      box.appendChild(el('div','tx tr',cached.text));
+    }
+  }
+  function refreshTrans(){if(openCard)renderTrans(openCard,openCard.pages[openPage],fromCloud&&isOwner());}
+  function pollTrans(card,p,owner){
+    if(openCard!==card)return;
+    fbDb.collection('tinyCards').doc(cloudCode).get().then(function(doc){
+      var rows=(doc.exists&&doc.data().cards)||[],row=null;
+      rows.forEach(function(x){if(x&&x.id===card.id)row=x;});
+      if(row&&card.raw)['transcription','transcriptionOf','transcriptionPendingAt','transcriptionFailed','translations']
+        .forEach(function(k){if(row[k]===undefined)delete card.raw[k];else card.raw[k]=row[k];});
+      if(openCard===card&&card.pages[openPage]===p)renderTrans(card,p,owner);
+    }).catch(function(){if(openCard===card)transPoll=setTimeout(function(){pollTrans(card,p,owner);},4000);});
+  }
+  // The one manual trigger: a failed or never-read card. Same call, rendered inline.
+  function readNow(card,p,owner){
+    var raw=card.raw;if(!raw||transBusy[raw.id])return;
+    transBusy[raw.id]=true;renderTrans(card,p,owner);
+    fns().httpsCallable('transcribeCard')({cardId:card.id,path:p.path}).then(function(r){
+      delete transBusy[raw.id];
+      raw.transcription=(r.data&&r.data.text)||'';raw.transcriptionOf=p.path;
+      delete raw.transcriptionPendingAt;delete raw.transcriptionFailed;delete raw.translations;
+      refreshTrans();
     }).catch(function(e){
-      openSheet((e&&e.code==='resource-exhausted')?'limit':'error');   // cap vs transient
+      delete transBusy[raw.id];
+      var limit=!!(e&&e.code==='resource-exhausted');
+      raw.transcriptionFailed=true;delete raw.transcriptionPendingAt;
+      cloudMutate(function(rows){return rows.map(function(x){if(x&&x.id===card.id&&!x.transcription){x=Object.assign({},x);delete x.transcriptionPendingAt;x.transcriptionFailed=true;}return x;});}).catch(function(){});
+      refreshTrans();
+      if(limit)openAlert('Transcription limit reached — contact support','Read handwriting');
+    });
+  }
+  function translate(card,lang){
+    var raw=card.raw;if(!raw)return;
+    var cached=raw.translations&&raw.translations[lang];
+    if(cached){transShown[card.id]=lang;refreshTrans();return;}      // from the card: no call
+    var key='tr:'+raw.id;if(transBusy[key])return;transBusy[key]=true;
+    var note=document.createElement('div');note.className='tq';note.textContent='Translating…';$('boxTrans').appendChild(note);
+    fns().httpsCallable('translateCard')({space:cloudCode,cardId:card.id,target:lang}).then(function(r){
+      delete transBusy[key];
+      var d=(r&&r.data)||{};raw.translations=raw.translations||{};raw.translations[lang]={text:d.text||'',from:d.from||''};
+      transShown[card.id]=lang;refreshTrans();
+    }).catch(function(e){
+      delete transBusy[key];refreshTrans();
+      openAlert((e&&e.code==='resource-exhausted')?'Translation limit reached — contact support':'Couldn’t translate this one. Check your connection and try again.','Translate');
     });
   }
   function saveTranscription(text){
     if(tsCard&&tsCard.raw)tsCard.raw.transcription=text;     // local cache
-    tSetDetent('half');tRender('view');updateReadLink();
+    tSetDetent('half');tRender('view');refreshTrans();
     var id=tsCard&&tsCard.id;
     cloudMutate(function(rows){return rows.map(function(r){if(r&&r.id===id)r.transcription=text;return r;});})
       .catch(function(e){if(window.console)console.warn('save transcription failed',e);});
   }
-  // Keep the overlay link label in sync once a transcription exists.
-  function updateReadLink(){if(openCard&&openCard.raw&&openCard.raw.transcription&&!$('boxRead').classList.contains('hidden'))$('boxRead').textContent='View transcription';}
 
   function tRender(state){
     var c=$('tContent');
-    if(state==='loading'){
-      c.innerHTML='<div class="ts-center"><div class="ts-spinner"></div><p class="ts-loadtext">Reading handwriting…</p></div>';
-    }else if(state==='view'){
+    if(state==='view'){
       c.innerHTML='<div class="ts-head"><span class="ts-title">Transcription</span>'
         +(tsReadonly?'':'<button type="button" class="ts-editlink" id="tEdit">Edit</button>')+'</div>'
         +'<div class="ts-scroll"><div class="ts-text"></div></div>'
@@ -2869,12 +2962,6 @@
       $('tCancel').onclick=function(){tSetDetent('half');tRender('view');};              // discard edits
       $('tSave').onclick=function(){saveTranscription($('tArea').value);};
       setTimeout(function(){try{$('tArea').focus();}catch(e){}},50);
-    }else{  // 'error' | 'limit'
-      var limit=state==='limit';
-      var msg=limit?'Transcription limit reached — contact support':'Couldn’t read this card. Check your connection and try again.';
-      c.innerHTML='<div class="ts-center"><p class="ts-errmsg"></p>'+(limit?'':'<button type="button" class="ts-retry" id="tRetry">Retry</button>')+'</div>';
-      c.querySelector('.ts-errmsg').textContent=msg;
-      if(!limit)$('tRetry').onclick=function(){runTranscribe();};
     }
   }
 

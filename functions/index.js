@@ -849,12 +849,117 @@ exports.transcribeCard = onCall(
       const cur = (s.exists && s.data().cards) || [];
       const i = cur.findIndex((c) => c && c.id === cardId);
       if (i < 0) throw new HttpsError('not-found', 'Card not found.');
-      cur[i] = Object.assign({}, cur[i], {transcription: text});
+      // transcriptionOf = the image this text was read from (the client's
+      // idempotency key); the auto-run's pending/failed markers are cleared.
+      const upd = Object.assign({}, cur[i], {transcription: text, transcriptionOf: path});
+      delete upd.transcriptionPendingAt; delete upd.transcriptionFailed;
+      cur[i] = upd;
       tx.set(cardsRef, {cards: cur, updatedAt: admin.firestore.FieldValue.serverTimestamp()}, {merge: true});
       tx.set(usageRef, {count: admin.firestore.FieldValue.increment(1),
                         updatedAt: admin.firestore.FieldValue.serverTimestamp()}, {merge: true});
     });
 
     return {text};
+  }
+);
+
+/**
+ * Translation of a card's transcript. Sends only the transcript text (never an
+ * image) to Claude and stores the result on the card keyed by target language,
+ * so a second request for the same card+language is served from the card with
+ * no API call. The owner or a viewer of the space (the `viewOf` claim) may call
+ * it; the cached translation lives on the owner's card, so everyone shares it.
+ * A separate silent lifetime cap (per caller) guards API cost, independent of
+ * the transcription cap.
+ */
+const TRANSLATE_CAP = 300;           // lifetime translations per caller
+const LANG_NAMES = {en: 'English', ko: 'Korean', ja: 'Japanese', zh: 'Chinese', es: 'Spanish',
+  fr: 'French', de: 'German', it: 'Italian', pt: 'Portuguese', ru: 'Russian', ar: 'Arabic',
+  he: 'Hebrew', th: 'Thai', vi: 'Vietnamese', hi: 'Hindi', nl: 'Dutch', sv: 'Swedish',
+  pl: 'Polish', tr: 'Turkish', id: 'Indonesian', tl: 'Filipino'};
+
+exports.translateCard = onCall(
+  {secrets: [ANTHROPIC_API_KEY], memory: '512MiB', timeoutSeconds: 60},
+  async (req) => {
+    const auth = req.auth;
+    requireVerified(auth);
+    const uid = auth.uid;
+    const space = String((req.data && req.data.space) || uid).trim();
+    const cardId = String((req.data && req.data.cardId) || '').trim();
+    const target = String((req.data && req.data.target) || '').trim().toLowerCase().slice(0, 12);
+    if (!cardId || !/^[a-z]{2,3}(-[a-z0-9]{2,8})?$/.test(target)) {
+      throw new HttpsError('invalid-argument', 'Missing cardId or target language.');
+    }
+    // Owner, or a viewer the owner has shared with.
+    const viewOf = (auth.token && auth.token.viewOf) || [];
+    if (space !== uid && viewOf.indexOf(space) === -1) {
+      throw new HttpsError('permission-denied', 'Not shared with you.');
+    }
+    const lang = target.split('-')[0];
+    const targetName = LANG_NAMES[lang] || target;
+    const db = admin.firestore();
+    const cardsRef = db.collection('tinyCards').doc(space);
+    const usageRef = db.collection('transcriptions').doc(uid);
+
+    // 1) Cached on the card? Served as is: no API call, no usage.
+    const snap = await cardsRef.get();
+    const rows = (snap.exists && snap.data().cards) || [];
+    const card = rows.find((c) => c && c.id === cardId);
+    if (!card) throw new HttpsError('not-found', 'Card not found.');
+    const source = String(card.transcription || '').trim();
+    if (!source) throw new HttpsError('failed-precondition', 'No transcript to translate.');
+    const cached = card.translations && card.translations[lang];
+    if (cached && cached.text) return {text: cached.text, from: cached.from || '', lang, cached: true};
+
+    // 2) Cap, separate from transcription's, enforced before any API call.
+    const usage = await usageRef.get();
+    const count = (usage.exists && Number(usage.data().translateCount)) || 0;
+    if (count >= TRANSLATE_CAP) throw new HttpsError('resource-exhausted', 'limit-reached');
+
+    // 3) Claude, text only. First line names the source language; then the translation.
+    let text, from;
+    try {
+      const resp = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {'content-type': 'application/json', 'anthropic-version': '2023-06-01',
+                  'x-api-key': ANTHROPIC_API_KEY.value()},
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6', max_tokens: 1024,
+          messages: [{role: 'user', content: [{type: 'text', text:
+            'Translate the following handwritten card message into ' + targetName + '. ' +
+            'Preserve line breaks. Reply with the name of the source language in English on ' +
+            'the first line (for example "Korean"), then a blank line, then only the ' +
+            'translation, no commentary.\n\n' + source}]}],
+        }),
+      });
+      if (!resp.ok) {
+        logger.error('translate: API ' + resp.status + ' ' + (await resp.text().catch(() => '')));
+        throw new Error('api ' + resp.status);
+      }
+      const data = await resp.json();
+      const out = (data.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('').trim();
+      const nl = out.indexOf('\n');
+      from = (nl > 0 ? out.slice(0, nl) : '').trim().replace(/[.:]+$/, '');
+      text = (nl > 0 ? out.slice(nl + 1) : out).trim();
+      if (!text) throw new Error('empty translation');
+    } catch (e) {
+      logger.error('translate: API failed', e);
+      throw new HttpsError('unavailable', 'translation-failed');
+    }
+
+    // 4) Save onto the owner's card, keyed by language, and bump the caller's counter.
+    await db.runTransaction(async (tx) => {
+      const s2 = await tx.get(cardsRef);
+      const cur = (s2.exists && s2.data().cards) || [];
+      const i = cur.findIndex((c) => c && c.id === cardId);
+      if (i < 0) throw new HttpsError('not-found', 'Card not found.');
+      const tr = Object.assign({}, cur[i].translations || {});
+      tr[lang] = {text, from, at: Date.now()};
+      cur[i] = Object.assign({}, cur[i], {translations: tr});
+      tx.set(cardsRef, {cards: cur, updatedAt: admin.firestore.FieldValue.serverTimestamp()}, {merge: true});
+      tx.set(usageRef, {translateCount: admin.firestore.FieldValue.increment(1),
+                        updatedAt: admin.firestore.FieldValue.serverTimestamp()}, {merge: true});
+    });
+    return {text, from, lang, cached: false};
   }
 );
