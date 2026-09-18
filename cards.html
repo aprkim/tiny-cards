@@ -1930,10 +1930,15 @@
       $('view').classList.remove('hidden');
       cards=[];fromCloud=true;
       var pending=rows.length, paintTimer=null;
+      // Years newest first, so the latest year is at the top; inside a year,
+      // the calendar order the cards arrived in (Valentine's, Mother's Day,
+      // Father's Day, Christmas), not reversed. Undated cards sort last.
       function sortCards(){
         cards.sort(function(a,b){
-          if(a.date===b.date)return a.person.localeCompare(b.person);
-          return b.date.localeCompare(a.date);
+          var ya=a.date.slice(0,4),yb=b.date.slice(0,4);
+          if(ya!==yb)return yb.localeCompare(ya);
+          if(a.date!==b.date)return a.date.localeCompare(b.date);
+          return a.person.localeCompare(b.person);
         });
       }
       // Coalesce paints: a burst of six arriving together should redraw once.
