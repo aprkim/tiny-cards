@@ -960,6 +960,18 @@
         <span>Shared with</span>
         <span class="set-end"><span class="set-count" id="setShareCount"></span><span class="set-chev" aria-hidden="true">&rsaquo;</span></span>
       </button>
+      <!-- Kept Plus (iOS only; hidden on the web). Paywall when the plan is
+           free, "Subscribed · Manage subscription" when it is Plus. Restore
+           purchases is always visible on the phone: App Review requires it. -->
+      <button type="button" class="set-row set-stack hidden" id="setPlus">
+        <span class="set-stackv">
+          <span id="setPlusLabel">Kept Plus</span>
+          <span class="set-hint" id="setPlusHint">Unlimited handwriting reading and translation</span>
+        </span>
+        <span class="set-chev" aria-hidden="true">&rsaquo;</span>
+      </button>
+      <button type="button" class="set-row hidden" id="setRestore"><span>Restore purchases</span></button>
+      <div class="set-sep hidden" id="setPlusSep"></div>
       <!-- File viewer: the export's reader. Same row on both tabs' Settings, and
            shown whether or not there are cards — it reads files, not the archive. -->
       <button type="button" class="set-row" id="setViewer">
@@ -980,7 +992,7 @@
         <span>Delete Account</span>
       </button>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.1</span> · <span class="setver">v2026.09.17.1912</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.1</span> · <span class="setver">v2026.09.21.1518</span></p>
   </div>
 </div>
 
@@ -1017,6 +1029,7 @@
 <script src="vendor/firebase/firebase-firestore.js"></script>
 <script src="vendor/firebase/firebase-storage.js"></script>
 <script src="vendor/firebase/firebase-functions.js"></script>
+<script src="purchases.js"></script>
 <script>
 (function(){
   // A card holds up to 4 photos: front, inside, back, extra.
@@ -1375,6 +1388,7 @@
     // View tab, fetched fresh each time Settings opens.
     $('setLibStats').textContent='';
     if(owner){loadLibrary();loadViewerCount();}
+    paintPlus();
     $('settings').classList.remove('hidden');
   }
   function loadLibrary(){
@@ -1469,6 +1483,34 @@
   $('setClose').onclick=closeSettings;
   // viewer.html is self-contained (no Firebase), so this is plain navigation.
   $('setViewer').onclick=function(){location.href='viewer.html?from=scan';};
+  /* ---- Kept Plus (Settings) ----
+     The plan itself lives in purchases.js (isPlus = Firestore users/{uid}.isPlus,
+     or a purchase made this session). These rows only show on the phone. */
+  function paintPlus(){
+    var native=KeptPurchases.native;
+    ['setPlus','setRestore','setPlusSep'].forEach(function(id){$(id).classList.toggle('hidden',!native);});
+    if(!native)return;
+    var plus=KeptPurchases.isPlus();
+    $('setPlusLabel').textContent=plus?'Kept Plus · Subscribed':'Kept Plus';
+    $('setPlusHint').textContent=plus?'Manage subscription':'Unlimited handwriting reading and translation';
+  }
+  KeptPurchases.onChange(paintPlus);
+  $('setPlus').onclick=function(){
+    if(KeptPurchases.isPlus()){KeptPurchases.manage();return;}
+    KeptPurchases.showPaywall().then(function(bought){        // closed without buying: nothing to say
+      paintPlus();
+      if(bought)openAlert('You’re in. Handwriting reading and translation are now unlimited.','Kept Plus');
+    });
+  };
+  $('setRestore').onclick=function(){
+    var b=$('setRestore');b.disabled=true;
+    KeptPurchases.restore().then(function(plus){
+      paintPlus();
+      openAlert(plus?'Your subscription is active on this device.':'No purchases to restore for this Apple ID.','Restore purchases');
+    }).catch(function(){
+      openAlert('Couldn’t restore right now. Check your connection and try again.','Restore purchases');
+    }).then(function(){b.disabled=false;});
+  };
   $('gearBtn').onclick=openSettings;
 
   // ---- invites (owner sharing) — same as the View page ----
@@ -1641,6 +1683,7 @@
   function afterAuth(u){
     authUser=u;
     SPACE=u.uid;
+    KeptPurchases.init();   // RevenueCat app_user_id = this uid; plan watch
     enterScanner();
     loadSuggestions();
   }
@@ -1764,11 +1807,13 @@
     }).catch(function(e){
       delete transcribing[cardId];
       if(window.console)console.warn('auto transcription failed',e);
+      // 'limit' = the free allowance is spent; the View tab offers Kept Plus there.
+      var mark=(e&&e.code==='resource-exhausted')?'limit':true;
       var ref=fbDb.collection('tinyCards').doc(SPACE);
       ref.get().then(function(doc){
         var rows=(doc.exists&&doc.data().cards)||[];
         rows=rows.map(function(x){
-          if(x&&x.id===cardId&&!x.transcription){x=Object.assign({},x);delete x.transcriptionPendingAt;x.transcriptionFailed=true;}
+          if(x&&x.id===cardId&&!x.transcription){x=Object.assign({},x);delete x.transcriptionPendingAt;x.transcriptionFailed=mark;}
           return x;
         });
         return ref.set({cards:rows,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});

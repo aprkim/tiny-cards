@@ -584,8 +584,15 @@ exports.syncSharedAccess = onCall(async (req) => {
   requireVerified(auth);
   const uid = auth.uid;
   const key = normEmail(auth.token.email || '');
-  if (!key) return {granted: []};
   const db = admin.firestore();
+  // users/{uid}: the account's plan record, created on first sign-in with the
+  // free defaults. Only functions (and, next, the store webhook) write it; the
+  // client reads it. create() is a no-op race-free "if absent" — ALREADY_EXISTS
+  // (gRPC 6) is the normal case for every sign-in after the first.
+  await db.collection('users').doc(uid).create({
+    isPlus: false, plusSource: null, createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  }).catch((e) => { if (e.code !== 6) throw e; });
+  if (!key) return {granted: []};
   const owners = await db.collection('emailGrants').doc(key).collection('owners').get();
   if (owners.empty) return {granted: []};
 
@@ -726,6 +733,7 @@ exports.deleteAccount = onCall(async (req) => {
     await db.recursiveDelete(db.collection('cardViewers').doc(uid));   // legacy, read-only in the client
     await db.doc(`exportJobs/${uid}`).delete().catch(() => {});        // holds the export's download link
     await db.collection('transcriptions').doc(uid).delete().catch(() => {});
+    await db.collection('users').doc(uid).delete().catch(() => {});
     await db.collection('tinyCards').doc(uid).delete().catch(() => {});
   });
 
@@ -758,6 +766,15 @@ exports.deleteAccount = onCall(async (req) => {
  * any edit. A silent lifetime cap guards against runaway API cost.
  */
 const TRANSCRIBE_CAP = 300;          // lifetime transcriptions per user
+
+// The plan, for the cost caps: users/{uid}.isPlus, written by syncSharedAccess
+// (defaults) and next by the store webhook. Plus is uncapped; a missing doc is
+// free. Read here, server-side, so the client's own view of the plan can never
+// lift a cap.
+async function isPlusUser(db, uid) {
+  const s = await db.collection('users').doc(uid).get().catch(() => null);
+  return !!(s && s.exists && s.data().isPlus === true);
+}
 const TRANSCRIBE_MAX_PX = 1.5e6;     // downscale bigger images to control token cost
 const TRANSCRIBE_PROMPT =
   'Transcribe this handwritten card message exactly as written. Preserve line ' +
@@ -780,7 +797,7 @@ exports.transcribeCard = onCall(
     // 1) Usage cap — read the counter (missing doc = 0). Enforced before any API call.
     const usageSnap = await usageRef.get();
     const count = (usageSnap.exists && Number(usageSnap.data().count)) || 0;
-    if (count >= TRANSCRIBE_CAP) throw new HttpsError('resource-exhausted', 'limit-reached');
+    if (count >= TRANSCRIBE_CAP && !(await isPlusUser(db, uid))) throw new HttpsError('resource-exhausted', 'limit-reached');
 
     // 2) Load the card from the caller's own space and verify the supplied path
     //    actually belongs to it — never trust a client Storage path on its own.
@@ -914,7 +931,7 @@ exports.translateCard = onCall(
     // 2) Cap, separate from transcription's, enforced before any API call.
     const usage = await usageRef.get();
     const count = (usage.exists && Number(usage.data().translateCount)) || 0;
-    if (count >= TRANSLATE_CAP) throw new HttpsError('resource-exhausted', 'limit-reached');
+    if (count >= TRANSLATE_CAP && !(await isPlusUser(db, uid))) throw new HttpsError('resource-exhausted', 'limit-reached');
 
     // 3) Claude, text only. First line names the source language; then the translation.
     let text, from;

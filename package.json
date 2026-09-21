@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "node scripts/stamp.js && rm -rf www && mkdir -p www && cp app.html www/index.html && cp app.html www/app.html && cp cards.html scan.html viewer.html favicon.svg favicon.ico favicon-32x32.png favicon-16x16.png og-image.png www/ && cp -r vendor www/"
+    "build": "node scripts/stamp.js && rm -rf www && mkdir -p www && cp app.html www/index.html && cp app.html www/app.html && cp cards.html scan.html viewer.html purchases.js favicon.svg favicon.ico favicon-32x32.png favicon-16x16.png og-image.png www/ && cp -r vendor www/ && node scripts/rc-config.js"
   },
   "repository": {
     "type": "git",
@@ -29,6 +29,8 @@
     "@capacitor/ios": "^8.5.0",
     "@capacitor/network": "^8.0.1",
     "@capacitor/share": "^8.0.1",
-    "@capawesome/capacitor-file-picker": "^8.1.0"
+    "@capawesome/capacitor-file-picker": "^8.1.0",
+    "@revenuecat/purchases-capacitor": "^13.6.0",
+    "@revenuecat/purchases-capacitor-ui": "^13.6.0"
   }
 }

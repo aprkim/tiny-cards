@@ -879,6 +879,18 @@
         <div class="exp-bar"><div class="exp-fill" id="importFill"></div></div>
         <div class="exp-row"><span class="exp-pct" id="importPct">Reading…</span><button type="button" class="exp-cancel" id="importCancel">Cancel</button></div>
       </div>
+      <!-- Kept Plus (iOS only; hidden on the web). Paywall when the plan is
+           free, "Subscribed · Manage subscription" when it is Plus. Restore
+           purchases is always visible on the phone: App Review requires it. -->
+      <button type="button" class="set-row set-stack hidden" id="setPlus">
+        <span class="set-stackv">
+          <span id="setPlusLabel">Kept Plus</span>
+          <span class="set-hint" id="setPlusHint">Unlimited handwriting reading and translation</span>
+        </span>
+        <span class="set-chev" aria-hidden="true">&rsaquo;</span>
+      </button>
+      <button type="button" class="set-row hidden" id="setRestore"><span>Restore purchases</span></button>
+      <div class="set-sep hidden" id="setPlusSep"></div>
       <!-- File viewer: the export's reader. Same row on both tabs' Settings, and
            shown whether or not there are cards — it reads files, not the archive. -->
       <button type="button" class="set-row" id="setViewer">
@@ -898,7 +910,7 @@
       </button>
       <p class="set-delnote hidden" id="delNote">Deletes your account, not the cards shared with you.</p>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.1</span> · <span class="setver">v2026.09.17.1912</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.1</span> · <span class="setver">v2026.09.21.1518</span></p>
   </div>
 </div>
 
@@ -945,6 +957,7 @@
 <script src="vendor/firebase/firebase-firestore.js"></script>
 <script src="vendor/firebase/firebase-storage.js"></script>
 <script src="vendor/firebase/firebase-functions.js"></script>
+<script src="purchases.js"></script>
 <script>
 (function(){
   var cards=[],urls=[],filter=null,openCard=null,openPage=0,fromCloud=false;
@@ -1057,6 +1070,7 @@
     var photos=0,ppl={};cards.forEach(function(x){photos+=x.pages.length;ppl[x.person]=1;});
     $('meta').textContent=cards.length?(plur(cards.length,'card')+' · '+plur(photos,'photo')+' · '+plur(Object.keys(ppl).length,'person','people')):'';
     if(owner)loadViewerCount();          // "N" viewers, or "Invite" when none
+    paintPlus();
     $('settings').classList.remove('hidden');
   }
   // Family viewers count for the Settings row (owner only).
@@ -1267,6 +1281,34 @@
   $('setClose').onclick=closeSettings;
   // viewer.html is self-contained (no Firebase), so this is plain navigation.
   $('setViewer').onclick=function(){location.href='viewer.html?from=view';};
+  /* ---- Kept Plus (Settings) ----
+     The plan itself lives in purchases.js (isPlus = Firestore users/{uid}.isPlus,
+     or a purchase made this session). These rows only show on the phone. */
+  function paintPlus(){
+    var native=KeptPurchases.native;
+    ['setPlus','setRestore','setPlusSep'].forEach(function(id){$(id).classList.toggle('hidden',!native);});
+    if(!native)return;
+    var plus=KeptPurchases.isPlus();
+    $('setPlusLabel').textContent=plus?'Kept Plus · Subscribed':'Kept Plus';
+    $('setPlusHint').textContent=plus?'Manage subscription':'Unlimited handwriting reading and translation';
+  }
+  KeptPurchases.onChange(paintPlus);
+  $('setPlus').onclick=function(){
+    if(KeptPurchases.isPlus()){KeptPurchases.manage();return;}
+    KeptPurchases.showPaywall().then(function(bought){        // closed without buying: nothing to say
+      paintPlus();
+      if(bought)openAlert('You’re in. Handwriting reading and translation are now unlimited.','Kept Plus');
+    });
+  };
+  $('setRestore').onclick=function(){
+    var b=$('setRestore');b.disabled=true;
+    KeptPurchases.restore().then(function(plus){
+      paintPlus();
+      openAlert(plus?'Your subscription is active on this device.':'No purchases to restore for this Apple ID.','Restore purchases');
+    }).catch(function(){
+      openAlert('Couldn’t restore right now. Check your connection and try again.','Restore purchases');
+    }).then(function(){b.disabled=false;});
+  };
   $('gearBtn').onclick=openSettings;
   $('settings').onclick=function(e){if(e.target===$('settings'))closeSettings()};
 
@@ -1869,6 +1911,7 @@
         return null;
       }
       authUser=u;myUid=u.uid;if(!SPACE)SPACE=u.uid;cloudCode=SPACE;
+      KeptPurchases.init();                      // RevenueCat app_user_id = this uid; plan watch
       paintCloudButton();
       $('gearBtn').classList.remove('hidden');   // signed in → settings reachable
       paintScanTab();
@@ -2880,8 +2923,14 @@
     }
     if(st==='failed'||st==='unread'){
       var a=el('div','acts');
-      a.appendChild(el('span','tq',st==='failed'?'Couldn’t read this one · ':'Not read yet · '));
-      a.appendChild(link(st==='failed'?'Retry':'Read now',function(){readNow(card,p,owner);}));
+      if(raw.transcriptionFailed==='limit'&&!KeptPurchases.isPlus()){
+        // Free allowance spent. On the phone, Plus lifts it; elsewhere just say so.
+        a.appendChild(el('span','tq','Free reads used up'+(KeptPurchases.native?' · ':'')));
+        if(KeptPurchases.native)a.appendChild(link('Get Kept Plus',function(){onLimit(function(){readNow(card,p,owner);});}));
+      }else{
+        a.appendChild(el('span','tq',st==='failed'?'Couldn’t read this one · ':'Not read yet · '));
+        a.appendChild(link(st==='failed'?'Retry':'Read now',function(){readNow(card,p,owner);}));
+      }
       box.appendChild(a);
       return;
     }
@@ -2920,12 +2969,25 @@
       refreshTrans();
     }).catch(function(e){
       delete transBusy[raw.id];
-      var limit=!!(e&&e.code==='resource-exhausted');
-      raw.transcriptionFailed=true;delete raw.transcriptionPendingAt;
-      cloudMutate(function(rows){return rows.map(function(x){if(x&&x.id===card.id&&!x.transcription){x=Object.assign({},x);delete x.transcriptionPendingAt;x.transcriptionFailed=true;}return x;});}).catch(function(){});
+      var limit=!!(e&&e.code==='resource-exhausted'), mark=limit?'limit':true;
+      raw.transcriptionFailed=mark;delete raw.transcriptionPendingAt;
+      cloudMutate(function(rows){return rows.map(function(x){if(x&&x.id===card.id&&!x.transcription){x=Object.assign({},x);delete x.transcriptionPendingAt;x.transcriptionFailed=mark;}return x;});}).catch(function(){});
       refreshTrans();
-      if(limit)openAlert('Transcription limit reached — contact support','Read handwriting');
+      if(limit)onLimit(function(){readNow(card,p,owner);});
     });
+  }
+  // The server said the free allowance is spent. Plus lifts the cap: on the
+  // phone, offer the paywall and run the action again once it's bought (a
+  // closed sheet is silent); anywhere else, or if the plan is already Plus but
+  // the server hasn't seen it yet, say so.
+  function onLimit(retry){
+    if(KeptPurchases.native&&!KeptPurchases.isPlus()){
+      KeptPurchases.showPaywall().then(function(bought){if(bought)retry();});
+      return;
+    }
+    openAlert(KeptPurchases.isPlus()
+      ?'Your subscription hasn’t reached the server yet. Try again in a moment.'
+      :'Free handwriting reads used up. Kept Plus in the iPhone app makes reading and translation unlimited.','Kept Plus');
   }
   function translate(card,lang){
     var raw=card.raw;if(!raw)return;
@@ -2939,7 +3001,8 @@
       transShown[card.id]=lang;refreshTrans();
     }).catch(function(e){
       delete transBusy[key];refreshTrans();
-      openAlert((e&&e.code==='resource-exhausted')?'Translation limit reached — contact support':'Couldn’t translate this one. Check your connection and try again.','Translate');
+      if(e&&e.code==='resource-exhausted')onLimit(function(){translate(card,lang);});
+      else openAlert('Couldn’t translate this one. Check your connection and try again.','Translate');
     });
   }
   function saveTranscription(text){
