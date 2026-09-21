@@ -27,6 +27,7 @@
   var storePlus=false;    // users/{uid}.isPlus — the source of truth
   var sessionPlus=false;  // just bought/restored in this session (optimistic)
   var started=false, unsubPlan=null, watchers=[];
+  var planError='';      // why the plan could not be read (offline, rules, no doc yet)
 
   function isPlus(){return storePlus||sessionPlus;}
   function notify(){watchers.forEach(function(f){try{f(isPlus());}catch(e){}});}
@@ -37,10 +38,16 @@
   function watchPlan(uid){
     if(unsubPlan){unsubPlan();unsubPlan=null;}
     storePlus=false;sessionPlus=false;
+    planError=uid?'reading\u2026':'';
     if(uid){
       unsubPlan=firebase.firestore().collection('users').doc(uid).onSnapshot(function(d){
-        storePlus=!!(d.exists&&d.data().isPlus===true);notify();
-      },function(e){storePlus=false;warn('plan watch',e&&e.code);notify();});
+        storePlus=!!(d.exists&&d.data().isPlus===true);
+        planError=d.exists?'':'no plan record yet';
+        notify();
+      },function(e){
+        storePlus=false;planError=(e&&(e.code||e.message))||'unavailable';
+        warn('plan watch',planError);notify();
+      });
     }
     notify();
   }
@@ -167,7 +174,8 @@
     }).then(function(url){window.open(url,'_blank');});
   }
 
-  window.KeptPurchases={init:init,isPlus:isPlus,onChange:onChange,getEntitlement:getEntitlement,
+  function planStatus(){return planError;}
+  window.KeptPurchases={init:init,isPlus:isPlus,planStatus:planStatus,onChange:onChange,getEntitlement:getEntitlement,
                         showPaywall:showPaywall,bought:bought,explain:explain,
                         restore:restore,manage:manage,native:native};
 })();

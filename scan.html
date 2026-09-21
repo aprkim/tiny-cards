@@ -992,7 +992,7 @@
         <span>Delete Account</span>
       </button>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.1</span> · <span class="setver">v2026.09.21.1609</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.1</span> · <span class="setver">v2026.09.21.1644</span></p>
   </div>
 </div>
 
@@ -1490,9 +1490,12 @@
     var native=KeptPurchases.native;
     ['setPlus','setRestore','setPlusSep'].forEach(function(id){$(id).classList.toggle('hidden',!native);});
     if(!native)return;
-    var plus=KeptPurchases.isPlus();
+    var plus=KeptPurchases.isPlus(), why=KeptPurchases.planStatus();
     $('setPlusLabel').textContent=plus?'Kept Plus · Subscribed':'Kept Plus';
-    $('setPlusHint').textContent=plus?'Manage subscription':'Unlimited handwriting reading and translation';
+    // A plan we cannot read is not the same as a plan that is free: say so
+    // rather than quietly showing the upsell to someone who already paid.
+    $('setPlusHint').textContent=plus?'Manage subscription'
+      :(why?'Couldn’t check your subscription ('+why+')':'Unlimited handwriting reading and translation');
   }
   KeptPurchases.onChange(paintPlus);
   $('setPlus').onclick=function(){

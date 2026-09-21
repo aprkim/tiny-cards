@@ -30,6 +30,7 @@ setGlobalOptions({region: 'us-east1', maxInstances: 10});
 // Anthropic API key for handwriting transcription (see transcribeCard).
 // Set with: firebase functions:secrets:set ANTHROPIC_API_KEY
 const ANTHROPIC_API_KEY = defineSecret('ANTHROPIC_API_KEY');
+const RC_WEBHOOK_TOKEN = defineSecret('RC_WEBHOOK_TOKEN');
 
 // Access model: each user owns tinyCards/{uid}. Read access to another user's
 // space is granted by a `viewOf` custom claim (see redeemInvite). Mirrors rules.
@@ -978,5 +979,106 @@ exports.translateCard = onCall(
                         updatedAt: admin.firestore.FieldValue.serverTimestamp()}, {merge: true});
     });
     return {text, from, lang, cached: false};
+  }
+);
+
+
+/* ---------------------------------------------------------------------------
+ * Kept Plus: the store's word on who is subscribed.
+ *
+ * RevenueCat POSTs here on every subscription event and this is the ONLY thing
+ * that writes users/{uid}.isPlus. The client is never trusted for it: the app
+ * shows a purchase optimistically for the session, but the caps in
+ * transcribeCard/translateCard read this document, so a tampered client cannot
+ * lift its own limit.
+ *
+ * app_user_id is the Firebase uid, because the app calls logIn with it. A
+ * purchase made before sign-in arrives under an anonymous id instead; the real
+ * uid is then among the aliases, so we look there before giving up.
+ *
+ * Grant vs revoke is deliberately not a straight switch on the event type:
+ * CANCELLATION only means auto-renew was turned off, and that subscriber keeps
+ * access until the period they paid for actually ends. So the rule is the
+ * entitlement's own expiry — access lasts until expiration_at_ms passes —
+ * except for events that end it immediately (refund, pause, transfer away).
+ * ------------------------------------------------------------------------- */
+const RC_ENTITLEMENT = 'unlimited';
+const RC_SOURCES = {APP_STORE: 'appstore', MAC_APP_STORE: 'appstore', PLAY_STORE: 'playstore',
+  STRIPE: 'stripe', AMAZON: 'amazon', RC_BILLING: 'stripe', PROMOTIONAL: 'promotional'};
+// Ends access the moment it arrives, whatever the expiry says.
+const RC_REVOKE_NOW = ['EXPIRATION', 'SUBSCRIPTION_PAUSED', 'REFUND'];
+// Carry no entitlement decision: billing retries and grace periods keep access.
+const RC_IGNORE = ['TEST', 'BILLING_ISSUE', 'SUBSCRIBER_ALIAS', 'INVOICE_ISSUANCE',
+  'VIRTUAL_CURRENCY_TRANSACTION', 'TEMPORARY_ENTITLEMENT_GRANT'];
+
+const isFirebaseUid = (s) => /^[A-Za-z0-9]{20,40}$/.test(s) && !s.startsWith('$RCAnonymousID');
+
+exports.revenuecatWebhook = onRequest(
+  {secrets: [RC_WEBHOOK_TOKEN], memory: '256MiB', timeoutSeconds: 30},
+  async (req, res) => {
+    if (req.method !== 'POST') return res.status(405).send('POST only');
+
+    // Shared secret from RevenueCat's Authorization header, compared in constant
+    // time. Without this anyone who guessed the URL could hand themselves Plus.
+    const want = Buffer.from(RC_WEBHOOK_TOKEN.value() || '');
+    const got = Buffer.from(req.get('authorization') || '');
+    if (!want.length || want.length !== got.length || !crypto.timingSafeEqual(want, got)) {
+      logger.warn('rc webhook: bad authorization');
+      return res.status(401).send('unauthorized');
+    }
+
+    const ev = (req.body && req.body.event) || {};
+    const type = String(ev.type || '');
+    if (RC_IGNORE.indexOf(type) >= 0) return res.status(200).send('ignored');
+
+    // The entitlement we sell. Events for anything else are not ours.
+    const ents = ev.entitlement_ids || (ev.entitlement_id ? [ev.entitlement_id] : []);
+    if (ents.length && ents.indexOf(RC_ENTITLEMENT) < 0) return res.status(200).send('other entitlement');
+
+    // Whose account? app_user_id, or the real uid hiding among the aliases.
+    let uid = String(ev.app_user_id || '');
+    if (!isFirebaseUid(uid)) uid = (ev.aliases || []).find(isFirebaseUid) || '';
+    if (!uid) {
+      logger.warn('rc webhook: no Firebase uid on event', {type, appUserId: ev.app_user_id});
+      return res.status(200).send('no uid');      // 200: retrying will not help
+    }
+
+    const now = Date.now();
+    const expiry = Number(ev.expiration_at_ms || 0);
+    const revokeNow = RC_REVOKE_NOW.indexOf(type) >= 0 ||
+                      (type === 'CANCELLATION' && ev.cancel_reason === 'CUSTOMER_SUPPORT') ||
+                      (type === 'TRANSFER' && String(ev.transferred_from || '').indexOf(uid) >= 0);
+    const isPlus = !revokeNow && (expiry ? expiry > now : true);
+    const source = RC_SOURCES[String(ev.store || '')] || 'appstore';
+
+    // Out-of-order and duplicate deliveries are normal: RevenueCat retries, and
+    // a renewal can land before the expiration it supersedes. The event's own
+    // timestamp decides, so a late arrival can never undo a newer state.
+    const stamp = Number(ev.event_timestamp_ms || now);
+    const ref = admin.firestore().collection('users').doc(uid);
+    try {
+      await admin.firestore().runTransaction(async (tx) => {
+        const snap = await tx.get(ref);
+        const prev = (snap.exists && Number(snap.data().plusEventAt)) || 0;
+        if (stamp < prev) throw new Error('stale');
+        tx.set(ref, {
+          isPlus,
+          plusSource: isPlus ? source : null,
+          plusExpiresAt: isPlus && expiry ? expiry : null,
+          plusEventAt: stamp,
+          plusEventType: type,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, {merge: true});
+      });
+    } catch (e) {
+      if (e && e.message === 'stale') {
+        logger.info('rc webhook: ignored stale event', {uid, type});
+        return res.status(200).send('stale');
+      }
+      logger.error('rc webhook: write failed', e);
+      return res.status(500).send('write failed');   // RevenueCat will retry
+    }
+    logger.info('rc webhook', {uid, type, isPlus, source});
+    return res.status(200).send('ok');
   }
 );
