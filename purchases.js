@@ -23,7 +23,7 @@
   function plugin(n){return (native&&window.Capacitor.Plugins&&window.Capacitor.Plugins[n])||null;}
   function warn(){if(window.console)console.warn.apply(console,['purchases:'].concat([].slice.call(arguments)));}
 
-  var configured=null;    // Promise<boolean>: SDK configured with the signed-in uid
+  var configured=null;    // Promise<string>: '' once the SDK is configured, else why not
   var storePlus=false;    // users/{uid}.isPlus — the source of truth
   var sessionPlus=false;  // just bought/restored in this session (optimistic)
   var started=false, unsubPlan=null, watchers=[];
@@ -54,16 +54,29 @@
       document.head.appendChild(s);
     });
   }
+  /* Resolves '' when the SDK is ready, otherwise a short reason. Returning the
+     reason rather than a boolean is the difference between "the button does
+     nothing" and knowing which piece is missing — on a device there is no
+     console to check. */
   function configure(uid){
     var P=plugin('Purchases');
     return loadKey().then(function(key){
-      if(!key){warn('no SDK key (rc-config.js missing) — purchases disabled');return false;}
+      if(!key)return 'key file missing';
       return P.isConfigured().then(function(r){
-        if(r&&r.isConfigured)return uid?P.logIn({appUserID:uid}).then(function(){return true;}):true;
+        if(r&&r.isConfigured)return uid?P.logIn({appUserID:uid}).then(function(){return '';}):'';
+        /* configure() is declared CAPPluginReturnNone on the native side: it
+           returns undefined, not a promise, so it cannot be chained. It applies
+           synchronously, and isConfigured() is how we confirm it took. */
         var o={apiKey:key};if(uid)o.appUserID=uid;
-        return P.configure(o).then(function(){return true;});
+        P.configure(o);
+        return P.isConfigured().then(function(r2){
+          return (r2&&r2.isConfigured)?'':'configure had no effect';
+        });
       });
-    }).catch(function(e){warn('configure failed',e);return false;});
+    }).catch(function(e){
+      warn('configure failed',e);
+      return 'sdk: '+((e&&(e.message||e.code))||'unknown');
+    });
   }
 
   function init(){
@@ -73,8 +86,8 @@
       watchPlan(uid);
       if(!plugin('Purchases'))return;                                  // web: nothing to configure
       if(!configured){configured=configure(uid);return;}
-      configured.then(function(ok){
-        if(!ok)return;
+      configured.then(function(why){
+        if(why)return;
         var P=plugin('Purchases');
         if(uid)P.logIn({appUserID:uid}).catch(function(e){warn('logIn',e);});
         else P.logOut().catch(function(){});                            // already anonymous = fine
@@ -86,39 +99,55 @@
     var a=info&&info.entitlements&&info.entitlements.active;
     return !!(a&&a[ENTITLEMENT]);
   }
-  function ready(){return configured?configured:Promise.resolve(false);}
+  // '' when usable; a reason when not (including before init() has run).
+  function ready(){return configured?configured:Promise.resolve('init not run');}
 
   // RevenueCat's own answer: the active entitlements map (empty when unknown).
   function getEntitlement(){
-    return ready().then(function(ok){
-      if(!ok)return {};
+    return ready().then(function(why){
+      if(why)return {};
       return plugin('Purchases').getCustomerInfo().then(function(r){
         return (r&&r.customerInfo&&r.customerInfo.entitlements&&r.customerInfo.entitlements.active)||{};
       });
     }).catch(function(e){warn('customerInfo',e);return {};});
   }
 
-  // Hosted paywall for the default offering. Resolves true only on PURCHASED or
-  // RESTORED. CANCELLED (the user closed the sheet) is a normal outcome and
-  // resolves false with no message; the sheet itself reports store errors.
+  /* Hosted paywall for the default offering. Resolves the outcome as a string
+     rather than a boolean, because every way this can fail is invisible to the
+     user otherwise: a tap that opens nothing is indistinguishable from a broken
+     button. bought() and explain() turn the string into a decision and a
+     sentence; CANCELLED is the one non-success that stays silent. */
   function showPaywall(){
     var UI=plugin('RevenueCatUI');
-    return ready().then(function(ok){
-      if(!ok||!UI)return false;
+    return ready().then(function(why){
+      if(why)return 'NOT_CONFIGURED: '+why;
+      if(!UI)return 'NO_UI_PLUGIN';
       return UI.presentPaywall({displayCloseButton:true}).then(function(r){
-        var res=(r&&r.result)||'';
-        if(res==='PURCHASED'||res==='RESTORED'){sessionPlus=true;notify();return true;}
+        var res=(r&&r.result)||'UNKNOWN';
+        if(bought(res)){sessionPlus=true;notify();}
         if(res!=='CANCELLED')warn('paywall result',res);
-        return false;
+        return res;
       });
-    }).catch(function(e){warn('paywall',e);return false;});
+    }).catch(function(e){
+      warn('paywall',e);
+      return 'ERROR: '+((e&&(e.message||e.code))||'unknown');
+    });
+  }
+  function bought(res){return res==='PURCHASED'||res==='RESTORED';}
+  // null when there is nothing to say (bought, or closed on purpose).
+  function explain(res){
+    if(bought(res)||res==='CANCELLED')return null;
+    if(res.indexOf('NOT_CONFIGURED')===0)return 'Purchases aren\u2019t set up in this build yet \u2014 '+res.slice(17)+'.';
+    if(res==='NO_UI_PLUGIN')return 'This build is missing the paywall component.';
+    if(res==='NOT_PRESENTED')return 'There\u2019s no paywall configured for Kept yet, so there is nothing to show.';
+    return 'The subscription screen couldn\u2019t open ('+res+').';
   }
 
   // Restore Purchases (App Review requires it). Resolves true if the
   // entitlement is active for this Apple ID; rejects on a store/network error.
   function restore(){
-    return ready().then(function(ok){
-      if(!ok)throw new Error('purchases unavailable');
+    return ready().then(function(why){
+      if(why)throw new Error('purchases unavailable: '+why);
       return plugin('Purchases').restorePurchases().then(function(r){
         var plus=hasEntitlement(r&&r.customerInfo);
         if(plus){sessionPlus=true;notify();}
@@ -130,8 +159,8 @@
   // Apple's subscription management page for this account.
   function manage(){
     var apple='https://apps.apple.com/account/subscriptions';
-    return ready().then(function(ok){
-      if(!ok)return apple;
+    return ready().then(function(why){
+      if(why)return apple;
       return plugin('Purchases').getCustomerInfo().then(function(r){
         return (r&&r.customerInfo&&r.customerInfo.managementURL)||apple;
       }).catch(function(){return apple;});
@@ -139,5 +168,6 @@
   }
 
   window.KeptPurchases={init:init,isPlus:isPlus,onChange:onChange,getEntitlement:getEntitlement,
-                        showPaywall:showPaywall,restore:restore,manage:manage,native:native};
+                        showPaywall:showPaywall,bought:bought,explain:explain,
+                        restore:restore,manage:manage,native:native};
 })();

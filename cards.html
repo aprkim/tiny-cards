@@ -910,7 +910,7 @@
       </button>
       <p class="set-delnote hidden" id="delNote">Deletes your account, not the cards shared with you.</p>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.1</span> · <span class="setver">v2026.09.21.1518</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.1</span> · <span class="setver">v2026.09.21.1609</span></p>
   </div>
 </div>
 
@@ -1295,9 +1295,10 @@
   KeptPurchases.onChange(paintPlus);
   $('setPlus').onclick=function(){
     if(KeptPurchases.isPlus()){KeptPurchases.manage();return;}
-    KeptPurchases.showPaywall().then(function(bought){        // closed without buying: nothing to say
+    KeptPurchases.showPaywall().then(function(res){
       paintPlus();
-      if(bought)openAlert('You’re in. Handwriting reading and translation are now unlimited.','Kept Plus');
+      if(KeptPurchases.bought(res))openAlert('You’re in. Handwriting reading and translation are now unlimited.','Kept Plus');
+      else{var m=KeptPurchases.explain(res);if(m)openAlert(m,'Kept Plus');}   // closed on purpose: silent
     });
   };
   $('setRestore').onclick=function(){
@@ -2982,7 +2983,10 @@
   // the server hasn't seen it yet, say so.
   function onLimit(retry){
     if(KeptPurchases.native&&!KeptPurchases.isPlus()){
-      KeptPurchases.showPaywall().then(function(bought){if(bought)retry();});
+      KeptPurchases.showPaywall().then(function(res){
+        if(KeptPurchases.bought(res))retry();
+        else{var m=KeptPurchases.explain(res);if(m)openAlert(m,'Kept Plus');}
+      });
       return;
     }
     openAlert(KeptPurchases.isPlus()
