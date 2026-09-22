@@ -851,6 +851,17 @@
         </span>
       </div>
       <div class="set-sep"></div>
+      <!-- The plan, directly under the account because that is what it is: who
+           you are, then what you are on. iOS only — there is no purchase on the
+           web. Reads as an offer when free and as a status when subscribed. -->
+      <button type="button" class="set-row set-stack hidden" id="setUnlimited">
+        <span class="set-stackv">
+          <span id="setUnlimitedLabel">Get Kept Unlimited</span>
+          <span class="set-hint" id="setUnlimitedHint">Your free archive holds 20 cards</span>
+        </span>
+        <span class="set-chev" aria-hidden="true">&rsaquo;</span>
+      </button>
+      <div class="set-sep hidden" id="setUnlimitedSep"></div>
       <button type="button" class="set-row hidden" id="setShare">
         <span>Shared with</span>
         <span class="set-end"><span class="set-count" id="setShareCount"></span><span class="set-chev" aria-hidden="true">&rsaquo;</span></span>
@@ -879,18 +890,6 @@
         <div class="exp-bar"><div class="exp-fill" id="importFill"></div></div>
         <div class="exp-row"><span class="exp-pct" id="importPct">Reading…</span><button type="button" class="exp-cancel" id="importCancel">Cancel</button></div>
       </div>
-      <!-- Kept Unlimited (iOS only; hidden on the web). Paywall when the plan is
-           free, "Subscribed · Manage subscription" when it is not. Restore
-           purchases is always visible on the phone: App Review requires it. -->
-      <button type="button" class="set-row set-stack hidden" id="setUnlimited">
-        <span class="set-stackv">
-          <span id="setUnlimitedLabel">Kept Unlimited</span>
-          <span class="set-hint" id="setUnlimitedHint">Keep as many cards as you like</span>
-        </span>
-        <span class="set-chev" aria-hidden="true">&rsaquo;</span>
-      </button>
-      <button type="button" class="set-row hidden" id="setRestore"><span>Restore purchases</span></button>
-      <div class="set-sep hidden" id="setUnlimitedSep"></div>
       <!-- File viewer: the export's reader. Same row on both tabs' Settings, and
            shown whether or not there are cards — it reads files, not the archive. -->
       <button type="button" class="set-row" id="setViewer">
@@ -901,6 +900,9 @@
         <span class="set-chev" aria-hidden="true">&rsaquo;</span>
       </button>
       <div class="set-sep"></div>
+      <!-- Restore purchases: required by App Review, and a recovery action, so it
+           sits with the other account rows rather than beside the offer. -->
+      <button type="button" class="set-row hidden" id="setRestore"><span>Restore purchases</span></button>
       <button type="button" class="set-row" id="setSignOut"><span>Sign out</span></button>
       <div class="set-sep"></div>
       <!-- Account deletion. Unlike Delete All Cards this is not owner-gated: a
@@ -910,7 +912,7 @@
       </button>
       <p class="set-delnote hidden" id="delNote">Deletes your account, not the cards shared with you.</p>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.2</span> · <span class="setver">v2026.09.21.2228</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.2</span> · <span class="setver">v2026.09.21.2306</span></p>
   </div>
 </div>
 
@@ -1301,12 +1303,14 @@
     var native=KeptPurchases.native;
     ['setUnlimited','setRestore','setUnlimitedSep'].forEach(function(id){$(id).classList.toggle('hidden',!native);});
     if(!native)return;
-    var plus=KeptPurchases.isUnlimited(), why=KeptPurchases.planStatus();
-    $('setUnlimitedLabel').textContent=plus?'Kept Unlimited · Subscribed':'Kept Unlimited';
-    // A plan we cannot read is not the same as a plan that is free: say so
-    // rather than quietly showing the upsell to someone who already paid.
-    $('setUnlimitedHint').textContent=plus?'Manage subscription'
-      :(why?'Couldn’t check your subscription ('+why+')':'Keep as many cards as you like');
+    var on=KeptPurchases.isUnlimited(), why=KeptPurchases.planStatus();
+    // "Kept Unlimited" alone reads as a status, so a free account thinks it
+    // already has it. The label says what tapping does; the hint says what you
+    // have. A plan we cannot read is not the same as a plan that is free, so
+    // that case says so rather than showing the upsell to someone who paid.
+    $('setUnlimitedLabel').textContent=on?'Kept Unlimited · Subscribed':'Get Kept Unlimited';
+    $('setUnlimitedHint').textContent=on?'Manage subscription'
+      :(why?'Couldn’t check your subscription ('+why+')':'Your free archive holds 20 cards');
   }
   KeptPurchases.onChange(paintUnlimited);
   $('setUnlimited').onclick=function(){
