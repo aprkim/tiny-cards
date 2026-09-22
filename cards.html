@@ -910,7 +910,7 @@
       </button>
       <p class="set-delnote hidden" id="delNote">Deletes your account, not the cards shared with you.</p>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.1</span> · <span class="setver">v2026.09.21.1644</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.1</span> · <span class="setver">v2026.09.21.2206</span></p>
   </div>
 </div>
 
@@ -1233,6 +1233,13 @@
               rows=rows.map(function(x){if(x&&x.id===k.id){found=true;return rec}return x});
               if(!found)rows.push(rec);
               return ref.set({cards:rows,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+            }).catch(function(e){
+              /* The 20-card ceiling is enforced in Firestore rules, which cannot
+                 tell an import from a scan — so a restore stops there like
+                 anything else. Say so plainly: a bare permission error at card
+                 21 of someone's own backup would be baffling. */
+              if(e&&e.code==='permission-denied')throw new Error('archive-full');
+              throw e;
             });
           }).then(function(){imported++;i++;return next();});
         }
@@ -1249,6 +1256,12 @@
     }).catch(function(e){
       importUI(false);importing=false;src.done();
       if(window.console)console.warn('import failed',e);
+      if((e&&e.message)==='archive-full'){
+        openAlert(imported+' card'+(imported===1?'':'s')+' restored, then your free archive filled up — it holds 20. '
+          +'Kept Unlimited removes the limit, and the rest restore when you tap Import again.','Archive full');
+        if(imported){closeSettings();loadCloud();}
+        return;
+      }
       var notKept=/not a Kept backup|not a zip/.test((e&&e.message)||'');
       openAlert(notKept?'That file isn\u2019t a Kept backup. Choose the .zip that Export all cards made.'
         :(imported?imported+' cards were imported before it stopped. Tap Import again to continue \u2014 finished cards are skipped.':'Could not import that backup. Please try again.'),'Import backup');

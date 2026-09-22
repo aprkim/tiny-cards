@@ -992,7 +992,7 @@
         <span>Delete Account</span>
       </button>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.1</span> · <span class="setver">v2026.09.21.1644</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.1</span> · <span class="setver">v2026.09.21.2206</span></p>
   </div>
 </div>
 
@@ -1726,7 +1726,7 @@
      overlapping syncs can't clobber each other's read-modify-write. */
   var curCardId=null,upPaths=[],upBytes=[],upDone=[],recordCreated=false,pendingSync=false;
   function genId(){return String(Date.now())+'-'+Math.round(Math.random()*1e6)}
-  function resetDraft(){curCardId=genId();upPaths=[];upBytes=[];upDone=[];recordCreated=false;pendingSync=false}
+  function resetDraft(){curCardId=genId();upPaths=[];upBytes=[];upDone=[];recordCreated=false;pendingSync=false;roomOk=false}
   function currentMeta(){
     return {date:getDateVal('dateY','dateM','dateD'),occasion:occasion(),
             recipient:clean($('recipient').value),sender:clean($('sender').value)};
@@ -1824,9 +1824,50 @@
       }).catch(function(){});
     });
   }
+  /* Free archives hold FREE_CARDS cards; Kept Unlimited lifts it. Firestore
+     rules are the real limit — this check exists so the person is told BEFORE
+     photos upload, and so a card that cannot be saved leaves no orphaned images
+     in Storage. Editing a card already in the archive is never growth, and the
+     answer is cached for the draft so the repeated auto-saves cost one read.
+     If the count cannot be read, the save proceeds and the rules decide: a
+     network hiccup should not look like a paywall. */
+  var FREE_CARDS=20, roomOk=false;
+  function roomForCard(){
+    if(roomOk||!useCloud||!SPACE||!fbDb)return Promise.resolve(true);
+    if(KeptPurchases.isUnlimited()){roomOk=true;return Promise.resolve(true)}
+    return fbDb.collection('tinyCards').doc(SPACE).get().then(function(doc){
+      var rows=(doc.exists&&doc.data().cards)||[];
+      if(rows.length<FREE_CARDS||rows.some(function(x){return x&&x.id===curCardId})){roomOk=true;return true}
+      return false;
+    }).catch(function(){return true});
+  }
+  /* The archive is full: the only moment Kept asks for money. On the phone that
+     is the paywall; on the web there is no purchase, so it points at the app.
+     Closing the paywall is not an error, but the card still did not save, so
+     the progress line says so rather than leaving Save looking broken. */
+  function archiveFull(){
+    var msg='Your free archive holds '+FREE_CARDS+' cards. Kept Unlimited removes the limit.';
+    if(!KeptPurchases.native){
+      upHide();
+      openAlert(msg+' Open Kept on your iPhone to subscribe.','Archive full');
+      return;
+    }
+    KeptPurchases.showPaywall().then(function(res){
+      if(KeptPurchases.bought(res)){roomOk=true;saveCard();return}      // bought: save what they were keeping
+      var why=KeptPurchases.explain(res);
+      if(why){upHide();openAlert(why,'Kept Unlimited');return}
+      upProgress('Not saved \u2014 your free archive is full',100,true);
+    });
+  }
   function runSync(){
     if(!useCloud||!pages.length)return Promise.resolve(null);
     if(!curCardId)curCardId=genId();
+    return roomForCard().then(function(ok){
+      if(!ok){archiveFull();return false}
+      return syncCloud();
+    });
+  }
+  function syncCloud(){
     return currentUser().then(function(user){
       if(!user)return null;                    // signed out: nothing to upload to
       var todo=[];
