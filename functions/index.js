@@ -771,12 +771,20 @@ const TRANSCRIBE_CAP = 300;          // lifetime transcriptions per free user
 // capped in any way they could notice; this is only an abuse ceiling.
 const TRANSCRIBE_CAP_UNLIMITED = 5000;
 
-// The plan: users/{uid}.isUnlimited, created free by syncSharedAccess and
-// flipped only by revenuecatWebhook. A missing doc is free. Read server-side so
-// the client's own view of the plan can never lift a cap.
+/* The plan. Two separate facts, because they answer to different things:
+   - isUnlimited is the current subscription, owned entirely by
+     revenuecatWebhook, and it comes and goes with the store.
+   - unlimitedGrant is a permanent grant the store never touches: the people
+     who used Kept before there was a limit, and comped accounts. Subscribing
+     and later lapsing must not take it away, which is exactly what would
+     happen if the webhook wrote the same field.
+   Either one is enough. A missing doc is free. Read server-side, so the
+   client's own view of the plan can never lift a cap. */
 async function isUnlimitedUser(db, uid) {
   const s = await db.collection('users').doc(uid).get().catch(() => null);
-  return !!(s && s.exists && s.data().isUnlimited === true);
+  if (!s || !s.exists) return false;
+  const d = s.data();
+  return d.isUnlimited === true || d.unlimitedGrant === true;
 }
 const TRANSCRIBE_MAX_PX = 1.5e6;     // downscale bigger images to control token cost
 const TRANSCRIBE_PROMPT =

@@ -41,7 +41,10 @@
     planError=uid?'reading\u2026':'';
     if(uid){
       unsubPlan=firebase.firestore().collection('users').doc(uid).onSnapshot(function(d){
-        storeUnlimited=!!(d.exists&&d.data().isUnlimited===true);
+        // isUnlimited is the live subscription; unlimitedGrant is permanent
+        // (early users, comped accounts) and survives a lapse. Either counts.
+        var p=d.exists?d.data():null;
+        storeUnlimited=!!(p&&(p.isUnlimited===true||p.unlimitedGrant===true));
         planError=d.exists?'':'no plan record yet';
         notify();
       },function(e){
