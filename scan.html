@@ -960,18 +960,18 @@
         <span>Shared with</span>
         <span class="set-end"><span class="set-count" id="setShareCount"></span><span class="set-chev" aria-hidden="true">&rsaquo;</span></span>
       </button>
-      <!-- Kept Plus (iOS only; hidden on the web). Paywall when the plan is
-           free, "Subscribed · Manage subscription" when it is Plus. Restore
+      <!-- Kept Unlimited (iOS only; hidden on the web). Paywall when the plan is
+           free, "Subscribed · Manage subscription" when it is not. Restore
            purchases is always visible on the phone: App Review requires it. -->
-      <button type="button" class="set-row set-stack hidden" id="setPlus">
+      <button type="button" class="set-row set-stack hidden" id="setUnlimited">
         <span class="set-stackv">
-          <span id="setPlusLabel">Kept Plus</span>
-          <span class="set-hint" id="setPlusHint">Unlimited handwriting reading and translation</span>
+          <span id="setUnlimitedLabel">Kept Unlimited</span>
+          <span class="set-hint" id="setUnlimitedHint">Keep as many cards as you like</span>
         </span>
         <span class="set-chev" aria-hidden="true">&rsaquo;</span>
       </button>
       <button type="button" class="set-row hidden" id="setRestore"><span>Restore purchases</span></button>
-      <div class="set-sep hidden" id="setPlusSep"></div>
+      <div class="set-sep hidden" id="setUnlimitedSep"></div>
       <!-- File viewer: the export's reader. Same row on both tabs' Settings, and
            shown whether or not there are cards — it reads files, not the archive. -->
       <button type="button" class="set-row" id="setViewer">
@@ -1388,7 +1388,7 @@
     // View tab, fetched fresh each time Settings opens.
     $('setLibStats').textContent='';
     if(owner){loadLibrary();loadViewerCount();}
-    paintPlus();
+    paintUnlimited();
     $('settings').classList.remove('hidden');
   }
   function loadLibrary(){
@@ -1483,33 +1483,33 @@
   $('setClose').onclick=closeSettings;
   // viewer.html is self-contained (no Firebase), so this is plain navigation.
   $('setViewer').onclick=function(){location.href='viewer.html?from=scan';};
-  /* ---- Kept Plus (Settings) ----
-     The plan itself lives in purchases.js (isPlus = Firestore users/{uid}.isPlus,
+  /* ---- Kept Unlimited (Settings) ----
+     The plan itself lives in purchases.js (isUnlimited = Firestore users/{uid}.isUnlimited,
      or a purchase made this session). These rows only show on the phone. */
-  function paintPlus(){
+  function paintUnlimited(){
     var native=KeptPurchases.native;
-    ['setPlus','setRestore','setPlusSep'].forEach(function(id){$(id).classList.toggle('hidden',!native);});
+    ['setUnlimited','setRestore','setUnlimitedSep'].forEach(function(id){$(id).classList.toggle('hidden',!native);});
     if(!native)return;
-    var plus=KeptPurchases.isPlus(), why=KeptPurchases.planStatus();
-    $('setPlusLabel').textContent=plus?'Kept Plus · Subscribed':'Kept Plus';
+    var plus=KeptPurchases.isUnlimited(), why=KeptPurchases.planStatus();
+    $('setUnlimitedLabel').textContent=plus?'Kept Unlimited · Subscribed':'Kept Unlimited';
     // A plan we cannot read is not the same as a plan that is free: say so
     // rather than quietly showing the upsell to someone who already paid.
-    $('setPlusHint').textContent=plus?'Manage subscription'
-      :(why?'Couldn’t check your subscription ('+why+')':'Unlimited handwriting reading and translation');
+    $('setUnlimitedHint').textContent=plus?'Manage subscription'
+      :(why?'Couldn’t check your subscription ('+why+')':'Keep as many cards as you like');
   }
-  KeptPurchases.onChange(paintPlus);
-  $('setPlus').onclick=function(){
-    if(KeptPurchases.isPlus()){KeptPurchases.manage();return;}
+  KeptPurchases.onChange(paintUnlimited);
+  $('setUnlimited').onclick=function(){
+    if(KeptPurchases.isUnlimited()){KeptPurchases.manage();return;}
     KeptPurchases.showPaywall().then(function(res){
-      paintPlus();
-      if(KeptPurchases.bought(res))openAlert('You’re in. Handwriting reading and translation are now unlimited.','Kept Plus');
-      else{var m=KeptPurchases.explain(res);if(m)openAlert(m,'Kept Plus');}   // closed on purpose: silent
+      paintUnlimited();
+      if(KeptPurchases.bought(res))openAlert('You’re in. Your archive is unlimited now.','Kept Unlimited');
+      else{var m=KeptPurchases.explain(res);if(m)openAlert(m,'Kept Unlimited');}   // closed on purpose: silent
     });
   };
   $('setRestore').onclick=function(){
     var b=$('setRestore');b.disabled=true;
     KeptPurchases.restore().then(function(plus){
-      paintPlus();
+      paintUnlimited();
       openAlert(plus?'Your subscription is active on this device.':'No purchases to restore for this Apple ID.','Restore purchases');
     }).catch(function(){
       openAlert('Couldn’t restore right now. Check your connection and try again.','Restore purchases');
@@ -1811,7 +1811,7 @@
     }).catch(function(e){
       delete transcribing[cardId];
       if(window.console)console.warn('auto transcription failed',e);
-      // 'limit' = the free allowance is spent; the View tab offers Kept Plus there.
+      // 'limit' = the free allowance is spent; the View tab offers Kept Unlimited there.
       var mark=(e&&e.code==='resource-exhausted')?'limit':true;
       var ref=fbDb.collection('tinyCards').doc(SPACE);
       ref.get().then(function(doc){

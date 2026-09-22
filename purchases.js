@@ -1,11 +1,11 @@
-/* Kept Plus — RevenueCat on iOS, in one place.
+/* Kept Unlimited — RevenueCat on iOS, in one place.
 
    Both tab pages (cards.html, scan.html) load this before their own script and
    call KeptPurchases.init() once Firebase is up. On the web there is no
    Capacitor, so every store call is a no-op and only the plan watch runs.
 
    Two facts, kept apart on purpose:
-   - isPlus() is what the app gates on. It comes from users/{uid}.isPlus in
+   - isUnlimited() is what the app gates on. It comes from users/{uid}.isUnlimited in
      Firestore (written by functions and, next, the store webhook; the client
      never writes it), OR'd with a session-only flag set the moment a purchase
      or restore succeeds so the UI doesn't lag the receipt.
@@ -24,28 +24,28 @@
   function warn(){if(window.console)console.warn.apply(console,['purchases:'].concat([].slice.call(arguments)));}
 
   var configured=null;    // Promise<string>: '' once the SDK is configured, else why not
-  var storePlus=false;    // users/{uid}.isPlus — the source of truth
-  var sessionPlus=false;  // just bought/restored in this session (optimistic)
+  var storeUnlimited=false;    // users/{uid}.isUnlimited — the source of truth
+  var sessionUnlimited=false;  // just bought/restored in this session (optimistic)
   var started=false, unsubPlan=null, watchers=[];
   var planError='';      // why the plan could not be read (offline, rules, no doc yet)
 
-  function isPlus(){return storePlus||sessionPlus;}
-  function notify(){watchers.forEach(function(f){try{f(isPlus());}catch(e){}});}
+  function isUnlimited(){return storeUnlimited||sessionUnlimited;}
+  function notify(){watchers.forEach(function(f){try{f(isUnlimited());}catch(e){}});}
   function onChange(f){watchers.push(f);}
 
   // Plan watch: live, so a webhook write (later) or a restore on another device
   // shows up without a relaunch. A missing doc, or no read permission, is free.
   function watchPlan(uid){
     if(unsubPlan){unsubPlan();unsubPlan=null;}
-    storePlus=false;sessionPlus=false;
+    storeUnlimited=false;sessionUnlimited=false;
     planError=uid?'reading\u2026':'';
     if(uid){
       unsubPlan=firebase.firestore().collection('users').doc(uid).onSnapshot(function(d){
-        storePlus=!!(d.exists&&d.data().isPlus===true);
+        storeUnlimited=!!(d.exists&&d.data().isUnlimited===true);
         planError=d.exists?'':'no plan record yet';
         notify();
       },function(e){
-        storePlus=false;planError=(e&&(e.code||e.message))||'unavailable';
+        storeUnlimited=false;planError=(e&&(e.code||e.message))||'unavailable';
         warn('plan watch',planError);notify();
       });
     }
@@ -131,7 +131,7 @@
       if(!UI)return 'NO_UI_PLUGIN';
       return UI.presentPaywall({displayCloseButton:true}).then(function(r){
         var res=(r&&r.result)||'UNKNOWN';
-        if(bought(res)){sessionPlus=true;notify();}
+        if(bought(res)){sessionUnlimited=true;notify();}
         if(res!=='CANCELLED')warn('paywall result',res);
         return res;
       });
@@ -157,7 +157,7 @@
       if(why)throw new Error('purchases unavailable: '+why);
       return plugin('Purchases').restorePurchases().then(function(r){
         var plus=hasEntitlement(r&&r.customerInfo);
-        if(plus){sessionPlus=true;notify();}
+        if(plus){sessionUnlimited=true;notify();}
         return plus;
       });
     });
@@ -175,7 +175,7 @@
   }
 
   function planStatus(){return planError;}
-  window.KeptPurchases={init:init,isPlus:isPlus,planStatus:planStatus,onChange:onChange,getEntitlement:getEntitlement,
+  window.KeptPurchases={init:init,isUnlimited:isUnlimited,planStatus:planStatus,onChange:onChange,getEntitlement:getEntitlement,
                         showPaywall:showPaywall,bought:bought,explain:explain,
                         restore:restore,manage:manage,native:native};
 })();

@@ -591,8 +591,8 @@ exports.syncSharedAccess = onCall(async (req) => {
   // client reads it. create() is a no-op race-free "if absent" — ALREADY_EXISTS
   // (gRPC 6) is the normal case for every sign-in after the first.
   await db.collection('users').doc(uid).create({
-    isPlus: false, plusSource: null, createdAt: admin.firestore.FieldValue.serverTimestamp(),
-  }).catch((e) => { if (e.code !== 6) throw e; });
+    isUnlimited: false, unlimitedSource: null, createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  }).catch((e) => { if (e.code !== 6) throw e; });   // 6 = ALREADY_EXISTS: every sign-in after the first
   if (!key) return {granted: []};
   const owners = await db.collection('emailGrants').doc(key).collection('owners').get();
   if (owners.empty) return {granted: []};
@@ -766,15 +766,17 @@ exports.deleteAccount = onCall(async (req) => {
  * from Storage, sends it to Claude, and auto-saves the text onto the card before
  * any edit. A silent lifetime cap guards against runaway API cost.
  */
-const TRANSCRIBE_CAP = 300;          // lifetime transcriptions per user
+const TRANSCRIBE_CAP = 300;          // lifetime transcriptions per free user
+// Kept Unlimited is sold on cards, never on reads, so a subscriber is not
+// capped in any way they could notice; this is only an abuse ceiling.
+const TRANSCRIBE_CAP_UNLIMITED = 5000;
 
-// The plan, for the cost caps: users/{uid}.isPlus, written by syncSharedAccess
-// (defaults) and next by the store webhook. Plus is uncapped; a missing doc is
-// free. Read here, server-side, so the client's own view of the plan can never
-// lift a cap.
-async function isPlusUser(db, uid) {
+// The plan: users/{uid}.isUnlimited, created free by syncSharedAccess and
+// flipped only by revenuecatWebhook. A missing doc is free. Read server-side so
+// the client's own view of the plan can never lift a cap.
+async function isUnlimitedUser(db, uid) {
   const s = await db.collection('users').doc(uid).get().catch(() => null);
-  return !!(s && s.exists && s.data().isPlus === true);
+  return !!(s && s.exists && s.data().isUnlimited === true);
 }
 const TRANSCRIBE_MAX_PX = 1.5e6;     // downscale bigger images to control token cost
 const TRANSCRIBE_PROMPT =
@@ -798,7 +800,8 @@ exports.transcribeCard = onCall(
     // 1) Usage cap — read the counter (missing doc = 0). Enforced before any API call.
     const usageSnap = await usageRef.get();
     const count = (usageSnap.exists && Number(usageSnap.data().count)) || 0;
-    if (count >= TRANSCRIBE_CAP && !(await isPlusUser(db, uid))) throw new HttpsError('resource-exhausted', 'limit-reached');
+    const cap = (await isUnlimitedUser(db, uid)) ? TRANSCRIBE_CAP_UNLIMITED : TRANSCRIBE_CAP;
+    if (count >= cap) throw new HttpsError('resource-exhausted', 'limit-reached');
 
     // 2) Load the card from the caller's own space and verify the supplied path
     //    actually belongs to it — never trust a client Storage path on its own.
@@ -890,7 +893,8 @@ exports.transcribeCard = onCall(
  * A separate silent lifetime cap (per caller) guards API cost, independent of
  * the transcription cap.
  */
-const TRANSLATE_CAP = 300;           // lifetime translations per caller
+const TRANSLATE_CAP = 300;           // lifetime translations per free caller
+const TRANSLATE_CAP_UNLIMITED = 5000;
 const LANG_NAMES = {en: 'English', ko: 'Korean', ja: 'Japanese', zh: 'Chinese', es: 'Spanish',
   fr: 'French', de: 'German', it: 'Italian', pt: 'Portuguese', ru: 'Russian', ar: 'Arabic',
   he: 'Hebrew', th: 'Thai', vi: 'Vietnamese', hi: 'Hindi', nl: 'Dutch', sv: 'Swedish',
@@ -932,7 +936,8 @@ exports.translateCard = onCall(
     // 2) Cap, separate from transcription's, enforced before any API call.
     const usage = await usageRef.get();
     const count = (usage.exists && Number(usage.data().translateCount)) || 0;
-    if (count >= TRANSLATE_CAP && !(await isPlusUser(db, uid))) throw new HttpsError('resource-exhausted', 'limit-reached');
+    const cap = (await isUnlimitedUser(db, uid)) ? TRANSLATE_CAP_UNLIMITED : TRANSLATE_CAP;
+    if (count >= cap) throw new HttpsError('resource-exhausted', 'limit-reached');
 
     // 3) Claude, text only. First line names the source language; then the translation.
     let text, from;
@@ -984,10 +989,10 @@ exports.translateCard = onCall(
 
 
 /* ---------------------------------------------------------------------------
- * Kept Plus: the store's word on who is subscribed.
+ * Kept Unlimited: the store's word on who is subscribed.
  *
  * RevenueCat POSTs here on every subscription event and this is the ONLY thing
- * that writes users/{uid}.isPlus. The client is never trusted for it: the app
+ * that writes users/{uid}.isUnlimited. The client is never trusted for it: the app
  * shows a purchase optimistically for the session, but the caps in
  * transcribeCard/translateCard read this document, so a tampered client cannot
  * lift its own limit.
@@ -1048,7 +1053,7 @@ exports.revenuecatWebhook = onRequest(
     const revokeNow = RC_REVOKE_NOW.indexOf(type) >= 0 ||
                       (type === 'CANCELLATION' && ev.cancel_reason === 'CUSTOMER_SUPPORT') ||
                       (type === 'TRANSFER' && String(ev.transferred_from || '').indexOf(uid) >= 0);
-    const isPlus = !revokeNow && (expiry ? expiry > now : true);
+    const isUnlimited = !revokeNow && (expiry ? expiry > now : true);
     const source = RC_SOURCES[String(ev.store || '')] || 'appstore';
 
     // Out-of-order and duplicate deliveries are normal: RevenueCat retries, and
@@ -1059,14 +1064,17 @@ exports.revenuecatWebhook = onRequest(
     try {
       await admin.firestore().runTransaction(async (tx) => {
         const snap = await tx.get(ref);
-        const prev = (snap.exists && Number(snap.data().plusEventAt)) || 0;
+        const prev = (snap.exists && Number(snap.data().unlimitedEventAt || snap.data().plusEventAt)) || 0;
         if (stamp < prev) throw new Error('stale');
+        const del = admin.firestore.FieldValue.delete();
         tx.set(ref, {
-          isPlus,
-          plusSource: isPlus ? source : null,
-          plusExpiresAt: isPlus && expiry ? expiry : null,
-          plusEventAt: stamp,
-          plusEventType: type,
+          isUnlimited,
+          unlimitedSource: isUnlimited ? source : null,
+          unlimitedExpiresAt: isUnlimited && expiry ? expiry : null,
+          unlimitedEventAt: stamp,
+          unlimitedEventType: type,
+          // Fields from the earlier "Plus" naming; dropped as each account is touched.
+          isPlus: del, plusSource: del, plusExpiresAt: del, plusEventAt: del, plusEventType: del,
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         }, {merge: true});
       });
@@ -1078,7 +1086,7 @@ exports.revenuecatWebhook = onRequest(
       logger.error('rc webhook: write failed', e);
       return res.status(500).send('write failed');   // RevenueCat will retry
     }
-    logger.info('rc webhook', {uid, type, isPlus, source});
+    logger.info('rc webhook', {uid, type, isUnlimited, source});
     return res.status(200).send('ok');
   }
 );

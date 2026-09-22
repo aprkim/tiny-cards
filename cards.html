@@ -879,18 +879,18 @@
         <div class="exp-bar"><div class="exp-fill" id="importFill"></div></div>
         <div class="exp-row"><span class="exp-pct" id="importPct">Reading…</span><button type="button" class="exp-cancel" id="importCancel">Cancel</button></div>
       </div>
-      <!-- Kept Plus (iOS only; hidden on the web). Paywall when the plan is
-           free, "Subscribed · Manage subscription" when it is Plus. Restore
+      <!-- Kept Unlimited (iOS only; hidden on the web). Paywall when the plan is
+           free, "Subscribed · Manage subscription" when it is not. Restore
            purchases is always visible on the phone: App Review requires it. -->
-      <button type="button" class="set-row set-stack hidden" id="setPlus">
+      <button type="button" class="set-row set-stack hidden" id="setUnlimited">
         <span class="set-stackv">
-          <span id="setPlusLabel">Kept Plus</span>
-          <span class="set-hint" id="setPlusHint">Unlimited handwriting reading and translation</span>
+          <span id="setUnlimitedLabel">Kept Unlimited</span>
+          <span class="set-hint" id="setUnlimitedHint">Keep as many cards as you like</span>
         </span>
         <span class="set-chev" aria-hidden="true">&rsaquo;</span>
       </button>
       <button type="button" class="set-row hidden" id="setRestore"><span>Restore purchases</span></button>
-      <div class="set-sep hidden" id="setPlusSep"></div>
+      <div class="set-sep hidden" id="setUnlimitedSep"></div>
       <!-- File viewer: the export's reader. Same row on both tabs' Settings, and
            shown whether or not there are cards — it reads files, not the archive. -->
       <button type="button" class="set-row" id="setViewer">
@@ -1070,7 +1070,7 @@
     var photos=0,ppl={};cards.forEach(function(x){photos+=x.pages.length;ppl[x.person]=1;});
     $('meta').textContent=cards.length?(plur(cards.length,'card')+' · '+plur(photos,'photo')+' · '+plur(Object.keys(ppl).length,'person','people')):'';
     if(owner)loadViewerCount();          // "N" viewers, or "Invite" when none
-    paintPlus();
+    paintUnlimited();
     $('settings').classList.remove('hidden');
   }
   // Family viewers count for the Settings row (owner only).
@@ -1281,33 +1281,33 @@
   $('setClose').onclick=closeSettings;
   // viewer.html is self-contained (no Firebase), so this is plain navigation.
   $('setViewer').onclick=function(){location.href='viewer.html?from=view';};
-  /* ---- Kept Plus (Settings) ----
-     The plan itself lives in purchases.js (isPlus = Firestore users/{uid}.isPlus,
+  /* ---- Kept Unlimited (Settings) ----
+     The plan itself lives in purchases.js (isUnlimited = Firestore users/{uid}.isUnlimited,
      or a purchase made this session). These rows only show on the phone. */
-  function paintPlus(){
+  function paintUnlimited(){
     var native=KeptPurchases.native;
-    ['setPlus','setRestore','setPlusSep'].forEach(function(id){$(id).classList.toggle('hidden',!native);});
+    ['setUnlimited','setRestore','setUnlimitedSep'].forEach(function(id){$(id).classList.toggle('hidden',!native);});
     if(!native)return;
-    var plus=KeptPurchases.isPlus(), why=KeptPurchases.planStatus();
-    $('setPlusLabel').textContent=plus?'Kept Plus · Subscribed':'Kept Plus';
+    var plus=KeptPurchases.isUnlimited(), why=KeptPurchases.planStatus();
+    $('setUnlimitedLabel').textContent=plus?'Kept Unlimited · Subscribed':'Kept Unlimited';
     // A plan we cannot read is not the same as a plan that is free: say so
     // rather than quietly showing the upsell to someone who already paid.
-    $('setPlusHint').textContent=plus?'Manage subscription'
-      :(why?'Couldn’t check your subscription ('+why+')':'Unlimited handwriting reading and translation');
+    $('setUnlimitedHint').textContent=plus?'Manage subscription'
+      :(why?'Couldn’t check your subscription ('+why+')':'Keep as many cards as you like');
   }
-  KeptPurchases.onChange(paintPlus);
-  $('setPlus').onclick=function(){
-    if(KeptPurchases.isPlus()){KeptPurchases.manage();return;}
+  KeptPurchases.onChange(paintUnlimited);
+  $('setUnlimited').onclick=function(){
+    if(KeptPurchases.isUnlimited()){KeptPurchases.manage();return;}
     KeptPurchases.showPaywall().then(function(res){
-      paintPlus();
-      if(KeptPurchases.bought(res))openAlert('You’re in. Handwriting reading and translation are now unlimited.','Kept Plus');
-      else{var m=KeptPurchases.explain(res);if(m)openAlert(m,'Kept Plus');}   // closed on purpose: silent
+      paintUnlimited();
+      if(KeptPurchases.bought(res))openAlert('You’re in. Your archive is unlimited now.','Kept Unlimited');
+      else{var m=KeptPurchases.explain(res);if(m)openAlert(m,'Kept Unlimited');}   // closed on purpose: silent
     });
   };
   $('setRestore').onclick=function(){
     var b=$('setRestore');b.disabled=true;
     KeptPurchases.restore().then(function(plus){
-      paintPlus();
+      paintUnlimited();
       openAlert(plus?'Your subscription is active on this device.':'No purchases to restore for this Apple ID.','Restore purchases');
     }).catch(function(){
       openAlert('Couldn’t restore right now. Check your connection and try again.','Restore purchases');
@@ -2927,10 +2927,8 @@
     }
     if(st==='failed'||st==='unread'){
       var a=el('div','acts');
-      if(raw.transcriptionFailed==='limit'&&!KeptPurchases.isPlus()){
-        // Free allowance spent. On the phone, Plus lifts it; elsewhere just say so.
-        a.appendChild(el('span','tq','Free reads used up'+(KeptPurchases.native?' · ':'')));
-        if(KeptPurchases.native)a.appendChild(link('Get Kept Plus',function(){onLimit(function(){readNow(card,p,owner);});}));
+      if(raw.transcriptionFailed==='limit'){
+        a.appendChild(el('span','tq','Reading limit reached'));
       }else{
         a.appendChild(el('span','tq',st==='failed'?'Couldn’t read this one · ':'Not read yet · '));
         a.appendChild(link(st==='failed'?'Retry':'Read now',function(){readNow(card,p,owner);}));
@@ -2977,24 +2975,15 @@
       raw.transcriptionFailed=mark;delete raw.transcriptionPendingAt;
       cloudMutate(function(rows){return rows.map(function(x){if(x&&x.id===card.id&&!x.transcription){x=Object.assign({},x);delete x.transcriptionPendingAt;x.transcriptionFailed=mark;}return x;});}).catch(function(){});
       refreshTrans();
-      if(limit)onLimit(function(){readNow(card,p,owner);});
+      if(limit)onLimit();
     });
   }
-  // The server said the free allowance is spent. Plus lifts the cap: on the
-  // phone, offer the paywall and run the action again once it's bought (a
-  // closed sheet is silent); anywhere else, or if the plan is already Plus but
-  // the server hasn't seen it yet, say so.
-  function onLimit(retry){
-    if(KeptPurchases.native&&!KeptPurchases.isPlus()){
-      KeptPurchases.showPaywall().then(function(res){
-        if(KeptPurchases.bought(res))retry();
-        else{var m=KeptPurchases.explain(res);if(m)openAlert(m,'Kept Plus');}
-      });
-      return;
-    }
-    openAlert(KeptPurchases.isPlus()
-      ?'Your subscription hasn’t reached the server yet. Try again in a moment.'
-      :'Free handwriting reads used up. Kept Plus in the iPhone app makes reading and translation unlimited.','Kept Plus');
+  /* The handwriting-reading ceiling is an abuse guard, not a tier: Kept
+     Unlimited is sold on how many cards you keep, never on reads, so hitting
+     this must not turn into a sales pitch. Say what happened and offer a way to
+     ask for more. */
+  function onLimit(){
+    openAlert('This account has reached its handwriting-reading limit. Email hello@lihallc.com if you need more.','Reading limit');
   }
   function translate(card,lang){
     var raw=card.raw;if(!raw)return;
@@ -3008,7 +2997,7 @@
       transShown[card.id]=lang;refreshTrans();
     }).catch(function(e){
       delete transBusy[key];refreshTrans();
-      if(e&&e.code==='resource-exhausted')onLimit(function(){translate(card,lang);});
+      if(e&&e.code==='resource-exhausted')onLimit();
       else openAlert('Couldn’t translate this one. Check your connection and try again.','Translate');
     });
   }
