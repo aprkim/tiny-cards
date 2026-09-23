@@ -100,6 +100,28 @@
   if (window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform()) {
     location.replace('app.html');
   }
+  /* Roughly 40% of visitors cannot use the App Store, and the page was handing
+     them a large black button that goes nowhere as its primary action. Mark the
+     document before first paint so the CTAs are already the right way round
+     rather than swapping under them. iPadOS reports itself as a Mac, so the
+     touch check keeps iPads on the App Store path where they belong. */
+  (function () {
+    var ua = navigator.userAgent || '';
+    var iOS = /iPhone|iPod/.test(ua) ||
+              (/iPad/.test(ua)) ||
+              (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+    if (!iOS) document.documentElement.className += ' no-ios';
+  })();
+</script>
+<script>
+  /* The header link and the eyebrow say "iPhone" too; keep them honest. */
+  document.addEventListener('DOMContentLoaded', function () {
+    if (!/(^| )no-ios( |$)/.test(document.documentElement.className)) return;
+    var cta = document.getElementById('navCta');
+    if (cta) { cta.textContent = 'Open'; cta.setAttribute('href', 'app.html'); }
+    var eb = document.getElementById('eyebrow');
+    if (eb) eb.textContent = 'Works in your browser \u00b7 iPhone app too';
+  });
 </script>
 <style>
   :root{ --bg:#f2f2f0; --card:#fff; --ink:#111; --muted:#5c5c5c; --line:#e0e0dd; --footer:#161616;
@@ -141,6 +163,20 @@
   .appstore .ast b{ font-size:19px; font-weight:600; letter-spacing:-0.01em; }
   .weblink{ font-size:15px; font-weight:600; color:var(--accent); text-decoration:none; }
   .weblink:hover{ color:var(--accent-ink); }
+
+  /* Off iPhone, the App Store button is a dead end and the web app is the real
+     offer, so the two swap places: .no-ios is set on <html> before first paint.
+     Both links stay present either way — an Android visitor may well own an
+     iPad, and someone on a desktop may be reading it to decide on a phone. */
+  .webbtn{ display:none; align-items:center; gap:10px; background:var(--accent); color:#fff; text-decoration:none;
+           padding:14px 24px; border-radius:14px; font-size:17px; font-weight:600; letter-spacing:-0.01em;
+           transition:transform .12s ease, box-shadow .12s ease; }
+  .webbtn:hover{ transform:translateY(-1px); box-shadow:0 8px 24px rgba(176,24,79,.28); color:#fff; }
+  .storelink{ display:none; font-size:15px; font-weight:600; color:var(--accent); text-decoration:none; }
+  .storelink:hover{ color:var(--accent-ink); }
+  html.no-ios .appstore, html.no-ios .weblink{ display:none; }
+  html.no-ios .webbtn{ display:inline-flex; }
+  html.no-ios .storelink{ display:inline; }
 
   .heroart{ justify-self:center; width:min(320px,80vw); aspect-ratio:1/1; border-radius:32px; background:var(--cream);
             display:flex; align-items:center; justify-content:center; box-shadow:0 24px 60px rgba(22,22,29,.14); }
@@ -203,7 +239,7 @@
     <a class="nav-hide" href="faq">FAQ</a>
     <a class="nav-hide" href="support">Support</a>
     <a class="nav-hide" href="privacy">Privacy</a>
-    <a class="cta" href="https://apps.apple.com/app/id6809942529">Download</a>
+    <a class="cta" id="navCta" href="https://apps.apple.com/app/id6809942529">Download</a>
   </nav>
 </header>
 
@@ -211,7 +247,7 @@
   <div class="wrap">
     <section class="hero">
       <div class="herotext">
-        <span class="eyebrow">iPhone app · Also on web</span>
+        <span class="eyebrow" id="eyebrow">iPhone app · Also on web</span>
         <h1>Keep the handwriting. Lose the shoebox.</h1>
         <p class="sub">Kept scans both sides of a card, the printed front and the message written inside, and keeps every one searchable by who sent it and when.</p>
         <div class="cta-row">
@@ -220,6 +256,8 @@
             <span class="ast"><small>Download on the</small><b>App Store</b></span>
           </a>
           <a class="weblink" href="app.html">Open on the web &rarr;</a>
+          <a class="webbtn" href="app.html">Open Kept on the web</a>
+          <a class="storelink" href="https://apps.apple.com/app/id6809942529">Also on iPhone &rarr;</a>
         </div>
       </div>
       <div class="heroart" aria-hidden="true">
@@ -285,6 +323,8 @@
           <span class="ast"><small>Download on the</small><b>App Store</b></span>
         </a>
         <a class="weblink" href="app.html">Open on the web &rarr;</a>
+        <a class="webbtn" href="app.html">Open Kept on the web</a>
+        <a class="storelink" href="https://apps.apple.com/app/id6809942529">Also on iPhone &rarr;</a>
       </div>
     </section>
   </div>
