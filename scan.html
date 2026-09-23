@@ -994,7 +994,7 @@
         <span>Delete Account</span>
       </button>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.2</span> · <span class="setver">v2026.09.21.2306</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.2</span> · <span class="setver">v2026.09.23.1436</span></p>
   </div>
 </div>
 
@@ -1863,6 +1863,16 @@
       upProgress('Not saved \u2014 your free archive is full',100,true);
     });
   }
+  function saveFailure(e){
+    var code=(e&&(e.code||e.message))||'';
+    if(!navigator.onLine)return 'You’re offline — this card will save when you’re back.';
+    if(/unauthenticated/i.test(code))return 'You’ve been signed out. Sign in again and this card will save.';
+    // storage/unauthorized (the photo) and permission-denied (the card record)
+    // are different refusals from different rules, so never merge them.
+    if(/permission-denied|unauthorized/i.test(code))return 'Refused by the server — '+code+'.';
+    if(/quota|exceeded|maximum size/i.test(code))return 'This archive has hit a storage limit. Email hello@lihallc.com.';
+    return 'Could not reach your cards — it will retry when you save.'+(code?' ('+code+')':'');
+  }
   function runSync(){
     if(!useCloud||!pages.length)return Promise.resolve(null);
     if(!curCardId)curCardId=genId();
@@ -1933,8 +1943,11 @@
         });
       }).then(function(){pendingSync=false;upProgress('Saved to your cards',100);setTimeout(upHide,900);return true});
     }).catch(function(e){
-      upProgress('Could not reach your cards — it will retry when you save.',100,true);
-      if(window.console)console.warn('saveCard failed',e);
+      /* "Could not reach your cards" covered everything from dropped Wi-Fi to a
+         rejected write, which tells the person nothing and tells us less. Name
+         what happened; keep the reassurance that the card is not lost. */
+      upProgress(saveFailure(e),100,true);
+      if(window.console)console.warn('saveCard failed',(e&&e.code)||'',e);
       return false;
     });
   }
@@ -2062,6 +2075,7 @@
      waiting for the file to be fetched. Safe to call twice: nextLabel() is pure
      and the card counters are set from current state. */
   function enterCropStage(){
+    clearStage();
     $('start').classList.add('hidden');
     $('finish').classList.add('hidden');
     $('meta').classList.add('hidden');
@@ -2230,6 +2244,7 @@
 
   function loadPage(){
     if(pageIdx>=pageCount)return toMeta();
+    clearStage();
     $('meta').classList.add('hidden');
     $('crop').classList.remove('hidden');document.body.classList.add('scanning');document.body.classList.add('cropping');
     $('pageTag').textContent=nextLabel();
@@ -2248,8 +2263,24 @@
     });
   }
 
+  /* The crop stage is revealed before the next photo has decoded — on native it
+     is revealed before the camera even opens, so the canvas sits there for the
+     whole camera session — and until drawStage() runs it still holds the
+     PREVIOUS page's pixels. Blanking it on the way in is the difference between
+     a stage that reads as "loading" and one that flashes the card you just
+     took. The box is hidden rather than emptied: the polygon and the four
+     corner handles live inside it and carry listeners bound once at startup. */
+  function clearStage(){
+    img=null;
+    var cv=$('cv'),pv=$('pv'),box=$('cbox');
+    if(cv){cv.width=1;cv.height=1}
+    if(pv){pv.width=1;pv.height=1}
+    if(box)box.classList.add('hidden');
+  }
+
   function drawStage(){
     var cv=$('cv'),box=$('cbox'),stage=$('stage');
+    box.classList.remove('hidden');
     // Fit the photo inside the dark stage area on BOTH axes (never upscale), so
     // it's fully visible without scrolling and rotating just re-fits it.
     var availW=stage.clientWidth||360,availH=stage.clientHeight||availW;
@@ -2269,6 +2300,7 @@
   }
 
   function paintOverlay(){
+    if(!img||corners.length!==4)return;    // blank stage: nothing to outline yet
     $('poly').setAttribute('points',corners.map(function(p){return p.x+','+p.y}).join(' '));
     corners.forEach(function(p,i){
       var h=$('h'+i);
@@ -2509,6 +2541,7 @@
     if(!src)return;
     redoIndex=i;
     curSource=src;
+    clearStage();
     $('meta').classList.add('hidden');
     $('crop').classList.remove('hidden');document.body.classList.add('scanning');document.body.classList.add('cropping');
     $('pageTag').textContent=(pageLabels[i]||('p'+(i+1)))+' · redo';
