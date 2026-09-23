@@ -1,0 +1,49 @@
+# kept.cards — everything public is meant to be read, by search engines and by
+# AI assistants alike. The app pages (app, cards, scan) are sign-in gated and
+# carry no content worth indexing, so they are excluded to keep crawlers on the
+# pages that describe the product.
+
+User-agent: *
+Allow: /
+Disallow: /app.html
+Disallow: /cards.html
+Disallow: /scan.html
+Disallow: /viewer.html
+Disallow: /vendor/
+
+# AI assistants' crawlers, allowed explicitly so a default-deny list somewhere
+# never turns them away.
+User-agent: GPTBot
+Allow: /
+User-agent: OAI-SearchBot
+Allow: /
+User-agent: ChatGPT-User
+Allow: /
+User-agent: ClaudeBot
+Allow: /
+User-agent: Claude-SearchBot
+Allow: /
+User-agent: Claude-User
+Allow: /
+User-agent: anthropic-ai
+Allow: /
+User-agent: PerplexityBot
+Allow: /
+User-agent: Perplexity-User
+Allow: /
+User-agent: Google-Extended
+Allow: /
+User-agent: Applebot
+Allow: /
+User-agent: Applebot-Extended
+Allow: /
+User-agent: Bingbot
+Allow: /
+User-agent: Amazonbot
+Allow: /
+User-agent: meta-externalagent
+Allow: /
+User-agent: DuckAssistBot
+Allow: /
+
+Sitemap: https://kept.cards/sitemap.xml

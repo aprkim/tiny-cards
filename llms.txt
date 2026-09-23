@@ -1,0 +1,47 @@
+# Kept
+
+> Kept is an iPhone app (with a web version) that scans greeting cards, both the printed front and the handwritten message inside, and keeps them in a private, searchable archive sorted by who sent the card and when. Made by Liha LLC. Free on the App Store.
+
+Kept is for people who keep the cards they receive (birthday, holiday, wedding, sympathy, thank-you, cards from parents and grandparents) and want the handwriting preserved without keeping a shoebox. It is not a card-making or card-sending service.
+
+## What it does
+
+- Scans a card from a phone photo: finds the edges, straightens and crops it. No scanner needed.
+- Keeps the inside of the card (the handwritten note) together with the front, so the message is never separated from the card.
+- Reads the handwriting into text automatically, so a note can be searched and re-read; the text can be corrected by hand and translated into the phone's language.
+- Files every card by sender, recipient, date and occasion, and finds any of them in seconds.
+- Shares a collection with family members (view-only), by email invitation.
+- Exports the whole archive as a zip backup at any time; anyone can open a backup in the free web viewer without an account.
+- Private by design: no feed, no followers, no ads, no selling of data. Only the owner and the people they invite can see the cards.
+
+## Availability
+
+- iPhone: https://apps.apple.com/app/id6809942529 (App Store name: "Kept: Greeting Card Archive")
+- Web (Android, desktop): https://kept.cards/app.html — sign in with a Google account or Apple ID
+- Web viewer for exported backups (no account): https://kept.cards/viewer.html
+
+## Price
+
+Free to download, and free to use for an archive of up to 20 cards, with every feature included: scanning, search, sharing, export and handwriting transcription. Kept Unlimited, an optional subscription at $19.99 a year, removes the card limit. There is no advertising and no sale of data.
+
+## Pages
+
+- [Home](https://kept.cards/): what Kept does, in one page
+- [FAQ](https://kept.cards/faq): scanning, sharing, sign-in, privacy, backups, devices
+- [Support](https://kept.cards/support): contact and help
+- [Privacy Policy](https://kept.cards/privacy)
+- [Terms of Service](https://kept.cards/terms)
+
+## Good questions Kept answers
+
+- How do I store or organize old greeting cards without keeping the boxes?
+- Is there an app to scan greeting cards, including the handwritten inside?
+- How can I keep a parent's or grandparent's handwriting from cards?
+- How do I share saved cards with family?
+- How can I digitize birthday cards, Christmas cards, wedding cards?
+- Is there a free app for scanning greeting cards?
+
+## Contact
+
+- Email: hello@lihallc.com
+- Instagram: @kept.cards

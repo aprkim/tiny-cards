@@ -20,6 +20,77 @@
 <meta name="twitter:title" content="Kept — Scan and keep your greeting cards">
 <meta name="twitter:description" content="Keep the handwriting. Lose the shoebox. Scan greeting cards, both sides, and find any of them by who sent it and when.">
 <meta name="twitter:image" content="https://kept.cards/og-image.png">
+<link rel="canonical" href="https://kept.cards/">
+<!-- Structured data: what Kept is, in the vocabulary search engines and AI
+     assistants read. Keep it in step with the App Store listing and llms.txt. -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "MobileApplication",
+      "@id": "https://kept.cards/#app",
+      "name": "Kept",
+      "alternateName": "Kept: Greeting Card Archive",
+      "url": "https://kept.cards/",
+      "description": "Kept scans both sides of a greeting card, the printed front and the handwritten message inside, and keeps every card in a private, searchable archive sorted by who sent it and when. Reads the handwriting into text, shares with family, exports anytime.",
+      "applicationCategory": "LifestyleApplication",
+      "operatingSystem": "iOS",
+      "installUrl": "https://apps.apple.com/app/id6809942529",
+      "downloadUrl": "https://apps.apple.com/app/id6809942529",
+      "image": "https://kept.cards/og-image.png",
+      "screenshot": "https://kept.cards/og-image.png",
+      "offers": [
+        { "@type": "Offer", "price": "0", "priceCurrency": "USD",
+          "description": "Free to download and to keep an archive of up to 20 cards, with every feature included." },
+        { "@type": "Offer", "name": "Kept Unlimited", "price": "19.99", "priceCurrency": "USD",
+          "description": "Optional annual subscription that removes the 20-card limit." }
+      ],
+      "featureList": [
+        "Scan a greeting card from a phone photo: edges found, straightened, cropped",
+        "Keeps the handwritten inside together with the front",
+        "Reads the handwriting into searchable, editable text, with translation",
+        "Files cards by sender, recipient, date and occasion",
+        "Share a collection with family, view-only, by email invitation",
+        "Export the whole archive as a backup; open it in a free web viewer with no account",
+        "Private: no feed, no ads, no selling of data"
+      ],
+      "author": { "@id": "https://kept.cards/#org" },
+      "publisher": { "@id": "https://kept.cards/#org" }
+    },
+    {
+      "@type": "WebApplication",
+      "@id": "https://kept.cards/#webapp",
+      "name": "Kept on the web",
+      "url": "https://kept.cards/app.html",
+      "applicationCategory": "LifestyleApplication",
+      "operatingSystem": "Any",
+      "browserRequirements": "Requires a modern browser and a Google account or Apple ID",
+      "sameAs": "https://kept.cards/#app",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+    },
+    {
+      "@type": "Organization",
+      "@id": "https://kept.cards/#org",
+      "name": "Liha LLC",
+      "url": "https://kept.cards/",
+      "logo": "https://kept.cards/apple-touch-icon.png",
+      "email": "hello@lihallc.com",
+      "sameAs": [
+        "https://apps.apple.com/app/id6809942529",
+        "https://www.instagram.com/kept.cards/"
+      ]
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://kept.cards/#site",
+      "url": "https://kept.cards/",
+      "name": "Kept",
+      "publisher": { "@id": "https://kept.cards/#org" }
+    }
+  ]
+}
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
