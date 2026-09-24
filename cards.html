@@ -21,6 +21,20 @@
 <meta name="twitter:title" content="Kept — Your Cards">
 <meta name="twitter:description" content="Browse your scanned greeting cards by sender, occasion, and year.">
 <meta name="twitter:image" content="https://kept.cards/og-image.png">
+<script>
+  /* Sign in with Apple works on any platform and plenty of Android owners have
+     an Apple ID, so both providers stay — but the markup put Apple first
+     everywhere, which on a Google phone leads with the less likely option.
+     Mark the document before first paint and let CSS reorder them. The colours
+     are each provider's own brand guidance, not our emphasis, so only the order
+     changes. iPadOS reports itself as a Mac, hence the touch-point check. */
+  (function () {
+    var ua = navigator.userAgent || '';
+    var iOS = /iPhone|iPod|iPad/.test(ua) ||
+              (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+    if (!iOS) document.documentElement.className += ' no-ios';
+  })();
+</script>
 <style>
   :root{
     --ink:#16161D;--paper:#FAF9F6;--accent:#B0184F;--accent-soft:#FBEDF2;
@@ -188,6 +202,7 @@
   /* Sign-in buttons on the signed-out View: Apple + Google, equal weight, same
      shape (App Store 4.8). Matches the home screen's buttons. */
   .signin-btns{display:flex;flex-direction:column;gap:10px;max-width:320px;margin:0 auto}
+  html.no-ios .signin-btns .gbtn{order:-1}   /* Google leads off iOS */
   .abtn,.gbtn{display:inline-flex;align-items:center;justify-content:center;gap:10px;width:100%;font:inherit;font-size:15.5px;font-weight:600;padding:14px 18px;border-radius:12px;cursor:pointer;-webkit-tap-highlight-color:transparent}
   .abtn{border:1px solid #000;background:#000;color:#fff;transition:box-shadow .15s}
   .abtn:hover,.abtn:focus-visible{box-shadow:0 1px 6px rgba(0,0,0,.25)}

@@ -23,6 +23,20 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#FAF9F6">
 <title>Kept</title>
+<script>
+  /* Sign in with Apple works on any platform and plenty of Android owners have
+     an Apple ID, so both providers stay — but the markup put Apple first
+     everywhere, which on a Google phone leads with the less likely option.
+     Mark the document before first paint and let CSS reorder them. The colours
+     are each provider's own brand guidance, not our emphasis, so only the order
+     changes. iPadOS reports itself as a Mac, hence the touch-point check. */
+  (function () {
+    var ua = navigator.userAgent || '';
+    var iOS = /iPhone|iPod|iPad/.test(ua) ||
+              (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+    if (!iOS) document.documentElement.className += ' no-ios';
+  })();
+</script>
 <style>
   :root{
     --ink:#16161D;--paper:#FAF9F6;--accent:#B0184F;--accent-soft:#FBEDF2;
@@ -194,6 +208,7 @@
      one so the two read as equal-weight choices. Apple's convention puts it on
      top. */
   .signinblock{display:flex;flex-direction:column;gap:10px}
+  html.no-ios .signinblock .gbtn{order:-1}   /* Google leads off iOS */
   .abtn{
     display:inline-flex;align-items:center;justify-content:center;gap:10px;
     width:100%;font:inherit;font-size:15.5px;font-weight:600;padding:14px 18px;
