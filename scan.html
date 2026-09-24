@@ -1007,7 +1007,7 @@
         <span>Delete Account</span>
       </button>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.2</span> · <span class="setver">v2026.09.23.1436</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.2</span> · <span class="setver">v2026.09.24.0223</span></p>
   </div>
 </div>
 
@@ -1128,7 +1128,13 @@
     dpDays(yId,mId,dId);
     $(dId).value=p[2]||'';
   }
-  setDateVal('dateY','dateM','dateD',new Date().toISOString().slice(0,10));
+  /* Deliberately blank, not today. People scan cards that are decades old, so
+     today's date is almost always the wrong answer — and a wrong date looks
+     finished, so nobody ever corrects it. Left empty, the card lands in "Needs
+     a date" at the top of the archive, where it reads as something to finish.
+     Filling every card with the scan date would not preserve the year view, it
+     would quietly replace it with the year the shoebox was emptied. */
+  setDateVal('dateY','dateM','dateD','');
 
   /* ==================== ARCHIVE (Firebase) ====================
      Images go to Cloud Storage at cards/{uid}/{cardId}/pN.jpg — one space per

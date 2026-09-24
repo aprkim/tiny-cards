@@ -940,7 +940,7 @@
       </button>
       <p class="set-delnote hidden" id="delNote">Deletes your account, not the cards shared with you.</p>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.2</span> · <span class="setver">v2026.09.23.1436</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.2</span> · <span class="setver">v2026.09.24.0223</span></p>
   </div>
 </div>
 
@@ -2215,12 +2215,21 @@
     });
 
     // Library stats live in Settings (computed there from the full archive).
+    /* Cards with no date group first, not last. They are the ones that need
+       something doing, and they are where a card you just scanned appears — so
+       the top of the archive doubles as the queue to finish. "Needs a date"
+       rather than "Unsorted": it names the missing thing instead of filing it
+       under a shrug. (An occasion-less card that HAS a date is separately
+       labelled "Unsorted" within its year; different problem, different word.) */
+    var NO_DATE='Needs a date';
     var buckets={},order=[];
     list.forEach(function(x){
-      var k=x.ok?(x.year+' '+x.event):'Unsorted';
+      var k=x.ok?(x.year+' '+x.event):NO_DATE;
       if(!buckets[k]){buckets[k]=[];order.push(k)}
       buckets[k].push(x);
     });
+    var nd=order.indexOf(NO_DATE);
+    if(nd>0){order.splice(nd,1);order.unshift(NO_DATE);}
 
     var out=$('groups');out.innerHTML='';
     if(!list.length){out.innerHTML='<p class="empty">No cards match.</p>';return}
