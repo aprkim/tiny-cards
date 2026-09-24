@@ -425,6 +425,8 @@
   }
   .pvredo:hover,.pvredo:focus-visible{border-color:#fff;outline:none}
   .pvredo[disabled]{opacity:.4;cursor:not-allowed}
+  .pvdel{border-color:rgba(255,158,158,.45);color:#FF9E9E}
+  .pvdel:hover,.pvdel:focus-visible{border-color:#FF9E9E}
 
   .warn{
     margin-bottom:16px;padding:12px 14px;border-radius:12px;
@@ -476,7 +478,12 @@
     /* The screen is heading, photo, button. The photo takes the room the caption
        and tally used to occupy, with a little more beneath than above so it sits
        at the optical centre rather than the mathematical one. */
-    display:block;max-width:150px;max-height:190px;margin:30px auto 34px;
+    /* Sized against the screen, not a fixed number: this shot is how you check
+       the crop came out right and the card is the right way up, and at 150px
+       you could only tell that a card existed. The screen holds a heading, this
+       photo and one button, so the room was there. The vw/vh caps keep it whole
+       on a small phone rather than pushing the button under the fold. */
+    display:block;max-width:min(250px,64vw);max-height:min(315px,38vh);margin:28px auto 32px;
     border-radius:12px;border:1px solid var(--rule);background:var(--field);
     object-fit:contain;box-shadow:0 6px 20px rgba(22,22,29,.14);
     cursor:pointer;transition:transform .12s,box-shadow .12s;
@@ -934,6 +941,7 @@
   <div class="pvbar">
     <select id="pvLabel" class="pvlabel hidden" aria-label="Label for this photo"></select>
     <button class="pvredo" id="pvRedo" type="button">&#8635; Redo crop</button>
+    <button class="pvredo pvdel" id="pvRemove" type="button">Remove photo</button>
   </div>
 </div>
 
@@ -1007,7 +1015,7 @@
         <span>Delete Account</span>
       </button>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.2</span> · <span class="setver">v2026.09.24.0223</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.2</span> · <span class="setver">v2026.09.24.0409</span></p>
   </div>
 </div>
 
@@ -2180,6 +2188,40 @@
     $('pvRedo').disabled=!sources[i];       // can only redo a crop if the source was kept
     $('pageView').classList.remove('hidden');
   }
+  /* Remove one captured page. The photos are uploaded as they are captured, so
+     this is not just a splice: the stored file and its thumbnail have to go too,
+     and the card's record has to be rewritten, or View shows a page that no
+     longer exists and the orphan is billed forever.
+
+     Every per-page fact lives in a parallel array, so they all splice together —
+     miss one and the labels drift out of step with the photos. */
+  function removePage(i){
+    if(i<0||i>=pages.length)return;
+    if(pages.length<=1){
+      openAlert('A card needs at least one photo. Use \u201cDiscard this card\u201d to remove it entirely.','Remove photo');
+      return;
+    }
+    openConfirm({
+      title:'Remove photo',
+      body:'This page will be deleted from the card. The rest of the card is kept.',
+      confirmText:'Remove',
+      danger:true,
+      onConfirm:function(){
+        var path=upPaths[i];
+        [pages,pageLabels,sources,cornerSets,upPaths,upBytes,upDone].forEach(function(a){a.splice(i,1)});
+        pendingSync=true;
+        if(path&&fbStore){
+          fbStore.ref().child(path).delete().catch(function(){});
+          fbStore.ref().child(path.replace(/\.[^.]+$/,'')+'_thumb.jpg').delete().catch(function(){});
+        }
+        closePageView();
+        toMeta();                 // redraw the thumbnail row from the shortened arrays
+        saveCard();               // rewrite the record so it matches what is stored
+      },
+    });
+  }
+  $('pvRemove').onclick=function(){removePage(pvIndex)};
+
   function closePageView(){
     $('pageView').classList.add('hidden');
     if(pvURL){URL.revokeObjectURL(pvURL);pvURL=null}
