@@ -33,7 +33,10 @@
      land on the right account: RevenueCat takes the last path segment as the
      app_user_id, exactly as the native SDK is configured to. Leave either
      blank and the web simply falls back to pointing at the iPhone. */
-  var WEB_CHECKOUT='';   // the hosted checkout link from the RevenueCat dashboard
+  // SANDBOX link — the path carries /sandbox/ and charges no real card. It must
+  // be swapped for the production one when a real Stripe account is connected,
+  // or the web will happily hand out entitlements for free.
+  var WEB_CHECKOUT='https://pay.rev.cat/sandbox/ozxpbxbwsbfwdiny/';
   var WEB_PORTAL='';     // its customer portal link, for cancelling on the web
   // These hold the real links: kept.cards serves this file straight out of the
   // repo, with no build step to inject anything. The NATIVE build is what
@@ -42,14 +45,19 @@
   // survives anywhere in the file, which is why none is written out even in a
   // comment.
 
-  function uidNow(){
-    try{var u=firebase.auth().currentUser;return u?u.uid:'';}catch(e){return '';}
+  function userNow(){
+    try{return firebase.auth().currentUser||null;}catch(e){return null;}
   }
-  // '' when the web cannot sell right now — not configured, or not signed in.
+  /* '' when the web cannot sell right now — not configured, or not signed in.
+     The uid is a path segment, which is the format RevenueCat reads as the
+     app_user_id; email only prefills the payment page, and is left off when we
+     do not have one rather than sending an empty parameter. */
   function webCheckoutUrl(){
-    var uid=uidNow();
-    if(native||!WEB_CHECKOUT||!uid)return '';
-    return WEB_CHECKOUT.replace(/\/+$/,'')+'/'+encodeURIComponent(uid);
+    var u=userNow();
+    if(native||!WEB_CHECKOUT||!u||!u.uid)return '';
+    var url=WEB_CHECKOUT.replace(/\/+$/,'')+'/'+encodeURIComponent(u.uid);
+    if(u.email)url+='?email='+encodeURIComponent(u.email);
+    return url;
   }
   function canBuyWeb(){return !!webCheckoutUrl();}
   /* Same tab, not a new one: a popup here is blocked as often as not, and
