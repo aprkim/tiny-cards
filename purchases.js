@@ -19,6 +19,50 @@
    requested on the web. */
 (function(){
   var ENTITLEMENT='unlimited';
+
+  /* Web Billing (RevenueCat, Stripe underneath). Two facts make this small:
+     the checkout page is hosted by RevenueCat, and its events arrive at the
+     same revenuecatWebhook that already serves the App Store — store
+     RC_BILLING maps to unlimitedSource 'stripe'. So nothing new writes to
+     Firestore, and the plan watch below lights the app up the moment the
+     webhook lands, with no polling and no return-URL handshake.
+
+     The link is public by design (it is a payment page, not a credential), so
+     it lives here rather than in the build's key file, which kept.cards does
+     not serve anyway. Appending the Firebase uid is what makes the purchase
+     land on the right account: RevenueCat takes the last path segment as the
+     app_user_id, exactly as the native SDK is configured to. Leave either
+     blank and the web simply falls back to pointing at the iPhone. */
+  var WEB_CHECKOUT='';   // the hosted checkout link from the RevenueCat dashboard
+  var WEB_PORTAL='';     // its customer portal link, for cancelling on the web
+  // These hold the real links: kept.cards serves this file straight out of the
+  // repo, with no build step to inject anything. The NATIVE build is what
+  // removes them (scripts/strip-web-checkout.js), so the iOS bundle ships with
+  // no payment URL in it. That script also refuses to build if a payment host
+  // survives anywhere in the file, which is why none is written out even in a
+  // comment.
+
+  function uidNow(){
+    try{var u=firebase.auth().currentUser;return u?u.uid:'';}catch(e){return '';}
+  }
+  // '' when the web cannot sell right now — not configured, or not signed in.
+  function webCheckoutUrl(){
+    var uid=uidNow();
+    if(native||!WEB_CHECKOUT||!uid)return '';
+    return WEB_CHECKOUT.replace(/\/+$/,'')+'/'+encodeURIComponent(uid);
+  }
+  function canBuyWeb(){return !!webCheckoutUrl();}
+  /* Same tab, not a new one: a popup here is blocked as often as not, and
+     coming back to a tab that already holds the archive is the calmer return.
+     Nothing is lost by leaving — the card being saved is a draft in Firestore
+     already, and the entitlement arrives by webhook regardless of where the
+     browser ends up. */
+  function buyWeb(){
+    var url=webCheckoutUrl();
+    if(!url)return false;
+    window.location.href=url;
+    return true;
+  }
   var native=!!(window.Capacitor&&typeof window.Capacitor.isNativePlatform==='function'&&window.Capacitor.isNativePlatform());
   function plugin(n){return (native&&window.Capacitor.Plugins&&window.Capacitor.Plugins[n])||null;}
   function warn(){if(window.console)console.warn.apply(console,['purchases:'].concat([].slice.call(arguments)));}
@@ -169,6 +213,9 @@
   // Apple's subscription management page for this account.
   function manage(){
     var apple='https://apps.apple.com/account/subscriptions';
+    // A web subscriber has no Apple subscription to open, and sending them to
+    // one would be a dead end wearing a helpful face.
+    if(!native)return Promise.resolve(WEB_PORTAL?window.open(WEB_PORTAL,'_blank'):null);
     return ready().then(function(why){
       if(why)return apple;
       return plugin('Purchases').getCustomerInfo().then(function(r){
@@ -180,5 +227,6 @@
   function planStatus(){return planError;}
   window.KeptPurchases={init:init,isUnlimited:isUnlimited,planStatus:planStatus,onChange:onChange,getEntitlement:getEntitlement,
                         showPaywall:showPaywall,bought:bought,explain:explain,
-                        restore:restore,manage:manage,native:native};
+                        restore:restore,manage:manage,native:native,
+                        canBuyWeb:canBuyWeb,buyWeb:buyWeb,webPortal:function(){return WEB_PORTAL;}};
 })();

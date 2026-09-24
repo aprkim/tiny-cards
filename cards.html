@@ -1017,7 +1017,7 @@
       </button>
       <p class="set-delnote hidden" id="delNote">Deletes your account, not the cards shared with you.</p>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.2</span> · <span class="setver">v2026.09.24.0502</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.2</span> · <span class="setver">v2026.09.24.0851</span></p>
   </div>
 </div>
 
@@ -1403,12 +1403,18 @@
   $('setViewer').onclick=function(){location.href='viewer.html?from=view';};
   /* ---- Kept Unlimited (Settings) ----
      The plan itself lives in purchases.js (isUnlimited = Firestore users/{uid}.isUnlimited,
-     or a purchase made this session). These rows only show on the phone. */
+     or a purchase made this session). */
   function paintUnlimited(){
     var native=KeptPurchases.native;
-    ['setUnlimited','setRestore','setUnlimitedSep'].forEach(function(id){$(id).classList.toggle('hidden',!native);});
-    if(!native)return;
     var on=KeptPurchases.isUnlimited(), why=KeptPurchases.planStatus();
+    /* The web can sell too now, so the row appears wherever there is something
+       to do — buy it, or manage what you already have. Restore is an Apple ID
+       concept and stays on the phone: on the web the plan is read from
+       Firestore, so signing in is already the restore. */
+    var show=native||on||KeptPurchases.canBuyWeb();
+    ['setUnlimited','setUnlimitedSep'].forEach(function(id){$(id).classList.toggle('hidden',!show);});
+    $('setRestore').classList.toggle('hidden',!native);
+    if(!show)return;
     // "Kept Unlimited" alone reads as a status, so a free account thinks it
     // already has it. The label says what tapping does; the hint says what you
     // have. A plan we cannot read is not the same as a plan that is free, so
@@ -1419,7 +1425,19 @@
   }
   KeptPurchases.onChange(paintUnlimited);
   $('setUnlimited').onclick=function(){
-    if(KeptPurchases.isUnlimited()){KeptPurchases.manage();return;}
+    if(KeptPurchases.isUnlimited()){
+      // A web subscriber with no portal configured still deserves an answer
+      // about how to cancel, rather than a row that does nothing.
+      if(!KeptPurchases.native&&!KeptPurchases.webPortal()){
+        openAlert('Your archive is unlimited. To change or cancel your subscription, email hello@lihallc.com.','Kept Unlimited');
+        return;
+      }
+      KeptPurchases.manage();return;
+    }
+    if(!KeptPurchases.native){
+      if(!KeptPurchases.buyWeb())openAlert('Subscribing isn\u2019t available here yet \u2014 open Kept on your iPhone.','Kept Unlimited');
+      return;
+    }
     KeptPurchases.showPaywall().then(function(res){
       paintUnlimited();
       if(KeptPurchases.bought(res))openAlert('You’re in. Your archive is unlimited now.','Kept Unlimited');
