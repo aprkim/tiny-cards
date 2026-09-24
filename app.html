@@ -501,6 +501,19 @@
   }
   .hidden{display:none!important}
   @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+  /* Tap feedback, ours rather than the browser's. Chrome on Android paints a
+     translucent blue overlay on every tappable element, iOS a grey one, and
+     neither belongs to Kept — on Android it reads as the button glitching.
+     Suppress both and darken the element instead, so a press still looks like
+     a press. Buttons that already define their own :active keep it; this only
+     adds the dimming. */
+  button,a,select,summary,label,[role="button"]{-webkit-tap-highlight-color:transparent}
+  button:not(:disabled):active,a.go:active,.abtn:active,.gbtn:active{filter:brightness(.93)}
+  /* A press held a moment too long was selecting the button's own label and
+     offering to search the web for it. Labels are chrome, not content. Card
+     text, names and transcripts stay selectable. */
+  button,summary,.tabbar a,[role="button"]{-webkit-user-select:none;user-select:none}
 </style>
 </head>
 <body class="view-home">
