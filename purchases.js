@@ -33,10 +33,13 @@
      land on the right account: RevenueCat takes the last path segment as the
      app_user_id, exactly as the native SDK is configured to. Leave either
      blank and the web simply falls back to pointing at the iPhone. */
-  // SANDBOX link — the path carries /sandbox/ and charges no real card. It must
-  // be swapped for the production one when a real Stripe account is connected,
-  // or the web will happily hand out entitlements for free.
-  var WEB_CHECKOUT='https://pay.rev.cat/sandbox/ozxpbxbwsbfwdiny/';
+  /* Empty on purpose: the dashboard side is built and proven, but the only
+     link that exists is a SANDBOX one, which grants Kept Unlimited without
+     charging anything. Empty means canBuyWeb() is false and the web falls
+     back to naming the iPhone — today's behaviour, with the whole path ready
+     behind it. Paste the production link here once a real payment account is
+     connected, and web selling turns on with no other change. */
+  var WEB_CHECKOUT='';
   var WEB_PORTAL='';     // its customer portal link, for cancelling on the web
   // These hold the real links: kept.cards serves this file straight out of the
   // repo, with no build step to inject anything. The NATIVE build is what
