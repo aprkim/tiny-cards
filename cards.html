@@ -201,6 +201,17 @@
     border:1px solid var(--rule);border-radius:10px;display:block;
   }
   .card:hover img{border-color:var(--accent)}
+  /* Placeholders in the shape of what is coming, holding the layout so nothing
+     jumps when the real cards arrive. Deliberately still: the usual shimmer is
+     motion with nothing to say — there is no content to preview, so it only
+     draws the eye to the waiting. The shape alone says cards are coming.
+
+     They also fade in after a moment rather than immediately, so a load that
+     finishes quickly shows nothing at all instead of a flash of scaffolding. */
+  .skel .sk{width:100%;aspect-ratio:3/4;border:1px solid var(--rule);border-radius:10px;
+    background:var(--field);opacity:0;animation:skin .5s ease .35s forwards}
+  @keyframes skin{to{opacity:.72}}
+  @media (prefers-reduced-motion:reduce){.skel .sk{animation:none;opacity:.72}}
   .card .n{
     position:absolute;top:7px;right:7px;background:rgba(22,22,29,.82);color:#fff;
     font-size:11px;font-weight:600;padding:2px 8px;border-radius:100px;
@@ -1006,7 +1017,7 @@
       </button>
       <p class="set-delnote hidden" id="delNote">Deletes your account, not the cards shared with you.</p>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.2</span> · <span class="setver">v2026.09.24.0449</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.2</span> · <span class="setver">v2026.09.24.0502</span></p>
   </div>
 </div>
 
@@ -1990,7 +2001,10 @@
   function openArchive(){
     $('start').classList.add('hidden');
     $('view').classList.remove('hidden');
-    $('groups').innerHTML='<p class="empty">Loading your cards…</p>';
+    /* Four, not a full screen of them. Enough to show the shape of what is
+       coming without filling the display with placeholders. */
+    $('groups').innerHTML='<div class="group skel"><div class="grid">'
+      +new Array(4).join('<div class="sk"></div>')+'<div class="sk"></div></div></div>';
     loadCloud();
   }
 
@@ -2012,6 +2026,7 @@
   }
   function loadCloud(providerFn){
     providerFn=providerFn||signIn;
+    var t0=Date.now(), tDoc=0;      // timing, shared across the chain's callbacks
     $('cloudSub').textContent='Opening…';
 
     currentUser().then(function(u){
@@ -2036,6 +2051,10 @@
     }).then(function(granted){
       if(!authUser)return null;
       cloudCode=SPACE;
+      /* Two candidates for the wait — one large document, or a Storage lookup
+         per page of every card — and guessing which has already cost time.
+         Timed so the answer is in the console next time it feels slow. */
+      t0=Date.now();
       var read=function(){return fbDb.collection('tinyCards').doc(SPACE).get();};
       // A freshly-granted claim (or any shared space) needs a token refresh first.
       if((granted&&granted.length)||SPACE!==myUid)return authUser.getIdToken(true).then(read);
@@ -2043,6 +2062,8 @@
     }).then(function(doc){
       if(!doc)return;
       var rows=(doc.exists&&doc.data().cards)||[];
+      if(window.console)console.log('cards: document, '+rows.length+' rows in '+(Date.now()-t0)+'ms');
+      tDoc=Date.now();
       if(!rows.length){
         // Auto-open hides #start, so the empty message must live in #view
         cards=[];fromCloud=true;
@@ -2118,6 +2139,7 @@
           });
         }
         if(--pending<=0){
+          if(window.console)console.log('cards: thumbnails in '+(Date.now()-tDoc)+'ms, '+(Date.now()-t0)+'ms total');
           if(paintTimer){clearTimeout(paintTimer);paintTimer=null;}
           sortCards();people();render();loadSpaces();openCardFromURL();openSettingsFromURL();
         }else paintSoon();
@@ -2141,6 +2163,13 @@
       });
       return;
     }).catch(function(e){
+      /* The archive may be on screen showing placeholders. Anything that fails
+         here has to clear them, or they shimmer forever and the app looks like
+         it is still working — which is exactly what a scope bug in this chain
+         did. A failure should look like a failure. */
+      var g=$('groups');
+      if(g&&g.querySelector('.skel'))
+        g.innerHTML='<p class="empty">Could not load your cards. Check your connection and reopen this tab.</p>';
       var code=e&&e.code||'';
       if(/unauthorized-domain/.test(code)){
         $('cloudSub').textContent='This site is not authorised for sign-in yet.';
