@@ -213,6 +213,25 @@
   .invitee a{ font-weight:600; color:var(--accent); text-decoration:none; white-space:nowrap; }
   .invitee a:hover{ color:var(--accent-ink); }
 
+  /* Pricing — a page a payment provider can verify, and a question buyers
+     ask before they download. Two plans, no table: there are only two. */
+  .pricing{ padding:8px 0 0; }
+  .pricing .lead{ max-width:640px; margin-bottom:28px; }
+  .pricing .lead h2{ font-size:clamp(26px,3.4vw,34px); font-weight:700; letter-spacing:-0.02em;
+                     line-height:1.15; margin:12px 0 0; text-wrap:balance; }
+  .plan{ background:var(--card); border:1px solid var(--line); border-radius:16px; padding:26px 26px 28px; }
+  .plan.featured{ border-color:var(--accent); }
+  .plan h3{ font-size:18px; font-weight:700; letter-spacing:-0.01em; margin-bottom:12px; }
+  .plan .amount{ font-size:34px; font-weight:800; letter-spacing:-0.02em; line-height:1; }
+  .plan .amount span{ font-size:15px; font-weight:600; color:var(--muted); letter-spacing:0; }
+  .plan .per{ color:var(--muted); font-size:14.5px; margin-top:6px; }
+  .plan ul{ list-style:none; margin:18px 0 0; padding:0; }
+  .plan li{ font-size:15px; color:#3a3a3a; margin-top:9px; padding-left:18px; position:relative; }
+  .plan li::before{ content:"\2022"; position:absolute; left:4px; color:var(--accent); }
+  .pricenote{ margin-top:22px; font-size:14px; color:var(--muted); max-width:72ch; }
+  .pricenote a{ color:var(--accent); font-weight:600; text-decoration:none; }
+  .pricenote a:hover{ text-decoration:underline; }
+
   /* Closing */
   .closing{ text-align:center; padding:84px 0 72px; }
   .closing h2{ font-size:clamp(28px,4.4vw,44px); font-weight:800; letter-spacing:-0.02em; line-height:1.08; margin-bottom:26px; text-wrap:balance; max-width:22ch; margin-inline:auto; }
@@ -311,6 +330,42 @@
         <p><b>Someone shared their cards with you?</b> Open them on the web. No app, no account.</p>
         <a href="viewer.html">Open the viewer &rarr;</a>
       </div>
+    </section>
+  </div>
+
+  <div class="wrap">
+    <section class="pricing" id="pricing">
+      <div class="lead">
+        <span class="eyebrow">Pricing</span>
+        <h2>Free for twenty cards. $19.99 a year after that.</h2>
+      </div>
+      <div class="grid">
+        <div class="plan">
+          <h3>Free</h3>
+          <p class="amount">$0</p>
+          <p class="per">an archive of up to 20 cards</p>
+          <ul>
+            <li>Every feature included — nothing is held back</li>
+            <li>Scanning, search, sharing and export</li>
+            <li>Handwriting read into searchable text</li>
+          </ul>
+        </div>
+        <div class="plan featured">
+          <h3>Kept Unlimited</h3>
+          <p class="amount">$19.99<span>&#8201;/ year</span></p>
+          <p class="per">no limit on how many cards you keep</p>
+          <ul>
+            <li>Everything in Free, without the 20-card limit</li>
+            <li>Billed once a year — cancel any time</li>
+            <li>One subscription covers all your devices</li>
+          </ul>
+        </div>
+      </div>
+      <p class="pricenote">Prices in US dollars; local taxes may apply at checkout. In the iPhone app, Kept
+        Unlimited is sold by Apple through the App Store. On the web it is sold by Paddle, acting as
+        merchant of record. Cancelling keeps your access until the end of the period you have paid for —
+        see <a href="terms#refunds">refunds and cancellation</a>. Cards already in your archive stay yours
+        either way.</p>
     </section>
   </div>
 
