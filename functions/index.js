@@ -848,7 +848,14 @@ exports.transcribeCard = onCall(
           'x-api-key': ANTHROPIC_API_KEY.value(),
         },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-6',
+          /* Sonnet 5 is the current model in this tier and costs a third less
+             than Sonnet 4.6 ($2/$10 per MTok against $3/$15). Thinking is
+             stated rather than left to the default: Sonnet 5 thinks when the
+             parameter is absent, where 4.6 did not, and reading handwriting is
+             perception rather than reasoning — the thinking tokens would be
+             billed as output for no gain. */
+          model: 'claude-sonnet-5',
+          thinking: {type: 'disabled'},
           max_tokens: 1024,
           messages: [{
             role: 'user',
@@ -955,7 +962,8 @@ exports.translateCard = onCall(
         headers: {'content-type': 'application/json', 'anthropic-version': '2023-06-01',
                   'x-api-key': ANTHROPIC_API_KEY.value()},
         body: JSON.stringify({
-          model: 'claude-sonnet-4-6', max_tokens: 1024,
+          // Same reasoning as transcribeCard: current tier model, thinking off.
+          model: 'claude-sonnet-5', thinking: {type: 'disabled'}, max_tokens: 1024,
           messages: [{role: 'user', content: [{type: 'text', text:
             'Translate the following handwritten card message into ' + targetName + '. ' +
             'Preserve line breaks. Reply with the name of the source language in English on ' +
