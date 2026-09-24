@@ -36,10 +36,24 @@
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html{-webkit-text-size-adjust:100%}
+  /* Room for the keyboard, so a field near the bottom has somewhere to scroll
+     to, and the sheet sits on top of it rather than behind it. Zero until the
+     keyboard says otherwise. */
+  :root{--kb:0px}
+  /* The sheet sits above the keyboard AND shrinks to fit what is left — lifting
+     a 90vh sheet by the keyboard's height pushed its Cancel and Save off the
+     top of the screen. */
+  .tsheet-scrim{padding-bottom:var(--kb)}
+  .tsheet{max-height:calc(92vh - var(--kb))}
+  /* iOS zooms the page whenever a focused field is under 16px, which makes the
+     layout wider than the screen and pans it around as you type — it reads as
+     the whole app wiggling. Every field here is 16px for that reason; this is
+     the floor that keeps it true when someone adds the next one. */
+  input,textarea,select{font-size:16px}
   body{
     font-family:-apple-system,BlinkMacSystemFont,system-ui,'Segoe UI',sans-serif;
     background:var(--paper);color:var(--ink);line-height:1.6;
-    padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+    padding:env(safe-area-inset-top) 0 calc(env(safe-area-inset-bottom) + var(--kb));
     /* No touch-action:manipulation here. It disables double-tap-to-zoom,
        which is the way back out of a pinch-zoom on iOS — without it you can
        zoom into the crop stage and not get out, since the header and tab bar
@@ -1015,7 +1029,7 @@
         <span>Delete Account</span>
       </button>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.2</span> · <span class="setver">v2026.09.24.0409</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.2</span> · <span class="setver">v2026.09.24.0449</span></p>
   </div>
 </div>
 
@@ -2908,5 +2922,56 @@
     <span>View</span>
   </a>
 </nav>
+
+<script>
+  /* The keyboard, handled deliberately.
+     WKWebView's default is to resize and scroll the whole web view when the
+     keyboard appears, which moves everything anchored to the viewport — the tab
+     bar, the overlays, the sheet — and made the app shake on every screen with
+     a text field. The plugin is configured resize:none, so nothing moves on its
+     own and we say what should happen instead: publish the keyboard's height as
+     --kb, give the page that much room to scroll into, and bring the focused
+     field into view ourselves. On the web there is no plugin and browsers
+     already do something sensible, so this is a no-op. */
+  (function () {
+    var P = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Keyboard;
+    if (!P || !P.addListener) return;
+    var root = document.documentElement;
+    var reveal = function () {
+      var a = document.activeElement;
+      if (!a || !/^(INPUT|TEXTAREA)$/.test(a.tagName)) return;
+      // A field inside a fixed overlay is positioned by that overlay; scrolling
+      // it into view only fights the layout and shifts the whole screen.
+      if (a.closest('.tsheet, .box, .scrim, .pvov')) return;
+      setTimeout(function () {
+        try { a.scrollIntoView({ block: 'center' }); } catch (e) {}
+      }, 60);
+    };
+    /* With resize:none iOS no longer dismisses the keyboard for you. Tapping a
+       neutral part of the screen should put it away; taps on anything
+       interactive are left alone so buttons still receive them. */
+    document.addEventListener('pointerdown', function (e) {
+      var a = document.activeElement;
+      if (!a || !/^(INPUT|TEXTAREA)$/.test(a.tagName)) return;
+      if (e.target === a || a.contains(e.target)) return;
+      if (e.target.closest && e.target.closest('button,a,input,textarea,select,label')) return;
+      a.blur();
+      if (P.hide) P.hide().catch(function () {});
+    }, true);
+    // Return finishes a single-line field, as it does everywhere else.
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter') return;
+      var a = document.activeElement;
+      if (a && a.tagName === 'INPUT') { a.blur(); if (P.hide) P.hide().catch(function () {}); }
+    });
+    P.addListener('keyboardWillShow', function (e) {
+      root.style.setProperty('--kb', ((e && e.keyboardHeight) || 0) + 'px');
+      reveal();
+    });
+    P.addListener('keyboardWillHide', function () {
+      root.style.setProperty('--kb', '0px');
+    });
+  })();
+</script>
 </body>
 </html>

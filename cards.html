@@ -48,10 +48,35 @@
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html{-webkit-text-size-adjust:100%}
+  /* Room for the keyboard, so a field near the bottom has somewhere to scroll
+     to, and the sheet sits on top of it rather than behind it. Zero until the
+     keyboard says otherwise. */
+  :root{--kb:0px}
+  /* The sheet sits above the keyboard AND shrinks to fit what is left — lifting
+     a 90vh sheet by the keyboard's height pushed its Cancel and Save off the
+     top of the screen. */
+  .tsheet-scrim{padding-bottom:var(--kb)}
+  .tsheet{max-height:calc(92vh - var(--kb))}
+  /* Editing is a screen, not a sheet. A bottom sheet negotiating with the
+     keyboard has a height in vh, a slide animation and a drag handle, and the
+     keyboard moves the ground under all three — which is how Cancel and Save
+     ended up off the top of the display. Pinned top and bottom instead: the bar
+     cannot leave, the foot sits exactly on the keyboard, nothing animates. */
+  .tsheet.editing{
+    position:fixed;left:0;right:0;top:0;bottom:var(--kb);
+    height:auto;max-height:none;max-width:none;border-radius:0;
+    padding-top:env(safe-area-inset-top);padding-bottom:0;transition:none;
+  }
+  .tsheet.editing .tsheet-grip{display:none}
+  /* iOS zooms the page whenever a focused field is under 16px, which makes the
+     layout wider than the screen and pans it around as you type — it reads as
+     the whole app wiggling. Every field here is 16px for that reason; this is
+     the floor that keeps it true when someone adds the next one. */
+  input,textarea,select{font-size:16px}
   body{
     font-family:-apple-system,BlinkMacSystemFont,system-ui,'Segoe UI',sans-serif;
     background:var(--paper);color:var(--ink);line-height:1.6;
-    padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+    padding:env(safe-area-inset-top) 0 calc(env(safe-area-inset-bottom) + var(--kb));
     -webkit-font-smoothing:antialiased;
   }
   .wrap{max-width:760px;margin:0 auto;padding:26px 18px calc(60px + var(--barh))}
@@ -346,7 +371,7 @@
   .ts-cancel{font:inherit;font-size:15px;background:none;border:none;color:#FF6B85;cursor:pointer;padding:4px 0}
   .ts-editbody{flex:1 1 auto;min-height:0;display:flex;padding:0 20px 16px}
   .ts-textarea{
-    width:100%;height:100%;min-height:120px;resize:none;box-sizing:border-box;font:inherit;font-size:15px;line-height:1.6;
+    width:100%;height:100%;min-height:120px;resize:none;box-sizing:border-box;font:inherit;font-size:16px;line-height:1.6;
     color:#fff;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);border-radius:12px;padding:12px 14px;
     -webkit-appearance:none;appearance:none;
   }
@@ -981,7 +1006,7 @@
       </button>
       <p class="set-delnote hidden" id="delNote">Deletes your account, not the cards shared with you.</p>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.2</span> · <span class="setver">v2026.09.24.0409</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.2</span> · <span class="setver">v2026.09.24.0449</span></p>
   </div>
 </div>
 
@@ -2975,8 +3000,13 @@
   function tText(){return (tsCard&&tsCard.raw&&tsCard.raw.transcription)||'';}
 
   function tSetDetent(d){tDetent=d;$('tSheet').classList.toggle('full',d==='full');}
-  function openSheet(state){$('tScrim').classList.remove('hidden');tSetDetent(state==='edit'?'full':'half');tRender(state);}
-  function dismissSheet(){$('tScrim').classList.add('hidden');}
+  function openSheet(state){
+    $('tScrim').classList.remove('hidden');
+    $('tSheet').classList.toggle('editing',state==='edit');   // editing takes the whole screen
+    tSetDetent(state==='edit'?'full':'half');
+    tRender(state);
+  }
+  function dismissSheet(){$('tScrim').classList.add('hidden');$('tSheet').classList.remove('editing');}
 
   /* ---- transcript on the card (Inside page) ----
      Transcription runs on its own when a card with an inside page is saved
@@ -3196,5 +3226,56 @@
     <span>View</span>
   </a>
 </nav>
+
+<script>
+  /* The keyboard, handled deliberately.
+     WKWebView's default is to resize and scroll the whole web view when the
+     keyboard appears, which moves everything anchored to the viewport — the tab
+     bar, the overlays, the sheet — and made the app shake on every screen with
+     a text field. The plugin is configured resize:none, so nothing moves on its
+     own and we say what should happen instead: publish the keyboard's height as
+     --kb, give the page that much room to scroll into, and bring the focused
+     field into view ourselves. On the web there is no plugin and browsers
+     already do something sensible, so this is a no-op. */
+  (function () {
+    var P = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Keyboard;
+    if (!P || !P.addListener) return;
+    var root = document.documentElement;
+    var reveal = function () {
+      var a = document.activeElement;
+      if (!a || !/^(INPUT|TEXTAREA)$/.test(a.tagName)) return;
+      // A field inside a fixed overlay is positioned by that overlay; scrolling
+      // it into view only fights the layout and shifts the whole screen.
+      if (a.closest('.tsheet, .box, .scrim, .pvov')) return;
+      setTimeout(function () {
+        try { a.scrollIntoView({ block: 'center' }); } catch (e) {}
+      }, 60);
+    };
+    /* With resize:none iOS no longer dismisses the keyboard for you. Tapping a
+       neutral part of the screen should put it away; taps on anything
+       interactive are left alone so buttons still receive them. */
+    document.addEventListener('pointerdown', function (e) {
+      var a = document.activeElement;
+      if (!a || !/^(INPUT|TEXTAREA)$/.test(a.tagName)) return;
+      if (e.target === a || a.contains(e.target)) return;
+      if (e.target.closest && e.target.closest('button,a,input,textarea,select,label')) return;
+      a.blur();
+      if (P.hide) P.hide().catch(function () {});
+    }, true);
+    // Return finishes a single-line field, as it does everywhere else.
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter') return;
+      var a = document.activeElement;
+      if (a && a.tagName === 'INPUT') { a.blur(); if (P.hide) P.hide().catch(function () {}); }
+    });
+    P.addListener('keyboardWillShow', function (e) {
+      root.style.setProperty('--kb', ((e && e.keyboardHeight) || 0) + 'px');
+      reveal();
+    });
+    P.addListener('keyboardWillHide', function () {
+      root.style.setProperty('--kb', '0px');
+    });
+  })();
+</script>
 </body>
 </html>
