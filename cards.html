@@ -241,7 +241,34 @@
      of different shapes doesn't jump — and the whole thing fits the screen, so
      nothing is letterboxed away or pushed into a scroll. */
   .box .imgstage{flex:1 1 auto;min-height:0;width:100%;display:flex;align-items:center;justify-content:center}
-  .box img{max-width:100%;max-height:100%;object-fit:contain;border-radius:8px;display:block}
+  /* Hugs the photo rather than the stage, so the control lands on the picture's
+     corner and not out on the dark background beside a narrow card. */
+  .box .imgwrap{position:relative;height:100%;display:flex;align-items:center;justify-content:center}
+  /* A labelled pill, not a bare glyph. An icon alone on a photograph has to be
+     guessed at — three lines read as a menu — and guessing is not a thing to ask
+     of someone looking at their grandmother's handwriting. */
+  .scriptbtn{
+    position:absolute;right:10px;bottom:10px;padding:7px 13px 7px 10px;
+    display:flex;align-items:center;gap:6px;
+    border-radius:100px;border:1px solid rgba(255,255,255,.3);
+    background:rgba(22,22,29,.72);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+    color:#fff;cursor:pointer;font:inherit;font-size:13px;font-weight:600;letter-spacing:-0.01em;
+  }
+  .scriptbtn svg{width:17px;height:17px;display:block;flex:0 0 auto}
+  .scriptbtn:hover,.scriptbtn:focus-visible{background:rgba(22,22,29,.78);border-color:#fff;outline:none}
+  /* The icon carries the state, so nothing has to be opened to know one is coming. */
+  .scriptbtn.pending{opacity:.55;animation:scriptpulse 1.4s ease-in-out infinite}
+  .scriptbtn.failed{border-color:rgba(255,158,158,.6);color:#FF9E9E}
+  @keyframes scriptpulse{0%,100%{opacity:.45}50%{opacity:.85}}
+  @media (prefers-reduced-motion:reduce){.scriptbtn.pending{animation:none}}
+  /* Sized by the stage, not by the file. With only max-* constraints an <img>
+     lays out at its own pixel size, so the thumbnail shown first rendered small
+     and the full photo that replaced it rendered large — the picture appeared
+     to jump a moment after opening. Tying the height to the stage and letting
+     width follow the aspect ratio makes both render identically, so the swap
+     changes sharpness alone. width:auto keeps the box hugging the picture, so
+     the rounded corners stay on the photo rather than on empty letterboxing. */
+  .box img{height:100%;width:auto;max-width:100%;object-fit:contain;border-radius:8px;display:block}
   /* Editing: the form can be taller than the screen, so scroll from the top and
      shrink the photo to leave room for the fields. */
   .box.editing{justify-content:flex-start}
@@ -268,18 +295,11 @@
   }
   .box button.boxx:hover{background:rgba(255,255,255,.16)}
   .box button.boxx svg{width:20px;height:20px;display:block}
-  /* Transcript block under the caption on the Inside page: quiet light text on
-     the dark overlay, with small underlined links (Edit / Translate / Retry).
-     The links override the .box button pill styles. */
-  .box .boxtrans{max-width:520px;margin:2px auto 0;padding:0 14px;text-align:center;color:rgba(255,255,255,.85);font-size:13.5px;line-height:1.5}
-  .box .boxtrans .tx{white-space:pre-wrap;overflow-wrap:anywhere;max-height:26vh;overflow-y:auto;overscroll-behavior:contain}
-  .box .boxtrans .tx.tr{margin-top:4px}
-  .box .boxtrans .tq{color:rgba(255,255,255,.5);font-style:italic}
-  .box .boxtrans .tl{color:rgba(255,255,255,.5);font-size:12px;margin-top:8px}
-  .box .boxtrans .acts{margin-top:6px}
-  .box .boxtrans button{border:none;background:none;padding:2px 4px;border-radius:0;text-transform:none;font:inherit;font-size:13px;color:rgba(255,255,255,.55);text-decoration:underline;text-underline-offset:3px;text-decoration-color:rgba(255,255,255,.28);cursor:pointer}
-  .box .boxtrans button:hover{background:none;color:#fff;text-decoration-color:rgba(255,255,255,.6)}
-
+  /* Transcript styles live with the sheet below: the card overlay shows the
+     photo and its control, nothing else. */
+  .ts-note{font-size:14px;color:rgba(255,255,255,.72);padding:14px 2px;line-height:1.5}
+  .ts-from{font-size:12px;color:rgba(255,255,255,.5);margin:14px 0 4px}
+  .ts-trans{opacity:.92}
   /* ---- transcription bottom sheet (dark, draggable) ----------------------------
      A new sheet component — deliberately NOT the light static Settings/Share sheet.
      Two detents (half ~45vh default, full ~90vh) + drag-down-to-dismiss. Kept
@@ -313,22 +333,28 @@
   .ts-text{white-space:pre-wrap;font-size:15px;line-height:1.6;color:rgba(255,255,255,.9)}
   .ts-foot{flex:0 0 auto;text-align:center;font-size:12.5px;color:rgba(255,255,255,.4);padding:12px 20px 16px}
 
-  .ts-head-edit{justify-content:flex-start;position:relative}
+  /* Cancel, title, Save — laid out, not overlaid. The title used to be absolutely
+     positioned across the whole bar, sitting on top of Cancel; a real three-column
+     bar centres it without overlapping anything. Cancel stays on the leading edge
+     and Save on the trailing one, as every iOS editing sheet does: putting the
+     discarding action where muscle memory expects the confirming one is how people
+     lose work. */
+  .ts-head-edit{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px}
+  .ts-head-edit .ts-cancel{justify-self:start}
+  .ts-head-edit .ts-title{justify-self:center;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ts-head-edit .ts-save{justify-self:end}
   .ts-cancel{font:inherit;font-size:15px;background:none;border:none;color:#FF6B85;cursor:pointer;padding:4px 0}
-  .ts-title-center{position:absolute;left:0;right:0;text-align:center;pointer-events:none}
-  .ts-editbody{flex:1 1 auto;min-height:0;display:flex;padding:0 20px}
+  .ts-editbody{flex:1 1 auto;min-height:0;display:flex;padding:0 20px 16px}
   .ts-textarea{
     width:100%;height:100%;min-height:120px;resize:none;box-sizing:border-box;font:inherit;font-size:15px;line-height:1.6;
     color:#fff;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);border-radius:12px;padding:12px 14px;
     -webkit-appearance:none;appearance:none;
   }
   .ts-textarea:focus{outline:none;border-color:rgba(255,255,255,.4)}
-  .ts-savebar{flex:0 0 auto;padding:14px 20px 16px}
-  .ts-save{
-    width:100%;font:inherit;font-size:15.5px;font-weight:600;padding:15px;border-radius:12px;
-    background:var(--ink);color:#fff;border:1px solid rgba(255,255,255,.16);cursor:pointer;
-  }
-  .ts-save:hover{background:#0f0f14}
+  /* Save lives in the bar now rather than in a full-width button at the foot of
+     the sheet, which the keyboard shoved around whenever it opened. */
+  .ts-save{font:inherit;font-size:15px;font-weight:700;background:none;border:none;color:#fff;cursor:pointer;padding:4px 0}
+  .ts-save:hover{opacity:.82}
 
   .ts-errmsg{color:rgba(255,255,255,.85);font-size:14.5px;text-align:center;line-height:1.55}
   .ts-retry{font:inherit;font-size:14px;padding:9px 20px;border-radius:100px;border:1px solid rgba(255,255,255,.3);background:none;color:#fff;cursor:pointer}
@@ -344,6 +370,9 @@
   }
   /* While any sheet is open, lock the page behind it so scrolling the sheet (or
      its dim backdrop) doesn't drag the background up and down. */
+  /* Nothing in this app scrolls sideways, and a stray overflow is what lets iOS
+     drag a fixed overlay left and right while it scrolls a caret into view. */
+  html,body{overflow-x:hidden}
   html:has(.scrim:not(.hidden), .tsheet-scrim:not(.hidden)),
   body:has(.scrim:not(.hidden), .tsheet-scrim:not(.hidden)){overflow:hidden}
   /* The dialog is the one overlay that must win: it is raised from inside the
@@ -753,12 +782,24 @@
   <button id="boxClose" class="boxx" type="button" aria-label="Close">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
   </button>
-  <div class="imgstage" id="boxStage"><img id="boxImg" alt=""></div>
+  <div class="imgstage" id="boxStage">
+    <div class="imgwrap">
+      <img id="boxImg" alt="">
+      <!-- Reading the message is a tool, not the keepsake: it sits on the photo
+           rather than under it, so every page of every card renders the same size. -->
+      <button type="button" class="scriptbtn hidden" id="boxScript" aria-label="Read the message">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="5.5" y="3.5" width="13" height="17" rx="2.5"/>
+          <path d="M9 8.5h6M9 12h6M9 15.5h4"/>
+        </svg>
+        <span id="boxScriptLabel">Transcript</span>
+      </button>
+    </div>
+  </div>
   <div class="cap">
     <strong id="boxName"></strong>
     <small id="boxSub"></small>
   </div>
-  <div id="boxTrans" class="boxtrans hidden"></div>
   <div class="nav" id="boxNav"></div>
   <div class="rowbtns hidden" id="boxTools">
     <button class="minibtn" id="boxEdit">Edit</button>
@@ -940,7 +981,7 @@
       </button>
       <p class="set-delnote hidden" id="delNote">Deletes your account, not the cards shared with you.</p>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.2</span> · <span class="setver">v2026.09.24.0223</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.2</span> · <span class="setver">v2026.09.24.0409</span></p>
   </div>
 </div>
 
@@ -976,7 +1017,7 @@
 <!-- Transcription bottom sheet: dark, draggable (half/full/dismiss). Content is
      mock-driven for now; wired to the card + transcribeCard in later tasks. -->
 <div class="tsheet-scrim hidden" id="tScrim">
-  <div class="tsheet" id="tSheet" role="dialog" aria-modal="true" aria-label="Transcription">
+  <div class="tsheet" id="tSheet" role="dialog" aria-modal="true" aria-label="Transcript">
     <div class="tsheet-grip" id="tHandle" aria-hidden="true"></div>
     <div class="tsheet-content" id="tContent"></div>
   </div>
@@ -2269,10 +2310,23 @@
     // Show the thumbnail immediately so the lightbox is never blank, then swap in
     // the full image. The guard stops a slow fetch from overwriting a page the
     // user has since paged past.
-    $('boxImg').src=p.url||p.thumb||'';
+    /* Setting .src does not clear what the <img> is already showing until the
+       new file decodes, so paging Front -> Inside kept the front on screen for
+       a beat before the inside replaced it. Drop the old pixels first: a blank
+       stage for a moment is honest, the page you just left is not. */
+    var bimg=$('boxImg'), want=p.url||p.thumb||'';
+    if(bimg.getAttribute('src')!==want)bimg.removeAttribute('src');
+    if(want)bimg.src=want;
     pageUrl(p).then(function(u){
-      if(openCard===card&&openPage===page)$('boxImg').src=u;
+      if(openCard===card&&openPage===page&&bimg.getAttribute('src')!==u)bimg.src=u;
     },function(){});
+    /* Warm the card's other pages. Almost everyone who opens the front then
+       opens the inside, and an already-decoded image makes that switch
+       instant rather than merely honest. */
+    card.pages.forEach(function(pg,i){
+      if(i===page)return;
+      pageUrl(pg).then(function(u){var pre=new Image();pre.src=u;},function(){});
+    });
     $('boxName').textContent=card.person+(card.recipient?' \u2192 '+card.recipient:'');
     $('boxSub').textContent=(card.date?card.date+' \u00b7 ':'')+card.event;
     var nav=$('boxNav');nav.innerHTML='';
@@ -2965,44 +3019,34 @@
     if(sc==='han'&&d==='kana')return false;   // Japanese text is often mostly kanji
     return sc!==d;
   }
+  /* Paints the control on the photo. The transcript itself is never laid out
+     in the card overlay any more — that is what made the picture a different
+     size on Front and Inside, and jump when you switched between them. */
   function renderTrans(card,p,owner){
-    var box=$('boxTrans');stopTransPoll();
+    var btn=$('boxScript');stopTransPoll();
     var raw=card&&card.raw, on=!!(fromCloud&&p&&p.label==='inside'&&raw);
     var st=on?transState(raw):'none';
     if(on&&!owner&&st!=='text')on=false;                 // viewers: only a finished transcript
-    box.classList.toggle('hidden',!on);box.innerHTML='';
+    btn.classList.toggle('hidden',!on);
+    btn.classList.toggle('pending',st==='pending');
+    btn.classList.toggle('failed',st==='failed');
+    var words={pending:'Reading…',text:'Transcript',failed:'Not read',unread:'Read it'};
+    $('boxScriptLabel').textContent=words[st]||'Message';
+    btn.setAttribute('aria-label',
+      st==='pending'?'Reading the handwriting':(st==='text'?'Read the transcript':'Transcript'));
     if(!on)return;
-    var el=function(tag,cls,txt){var e=document.createElement(tag);if(cls)e.className=cls;if(txt!=null)e.textContent=txt;return e;};
-    var link=function(label,fn){var b=el('button',null,label);b.type='button';b.onclick=function(e){e.stopPropagation();fn();};return b;};
-    if(st==='pending'){
-      box.appendChild(el('div','tq','Reading the handwriting…'));
-      transPoll=setTimeout(function(){pollTrans(card,p,owner);},4000);
-      return;
-    }
-    if(st==='failed'||st==='unread'){
-      var a=el('div','acts');
-      if(raw.transcriptionFailed==='limit'){
-        a.appendChild(el('span','tq','Reading limit reached'));
-      }else{
-        a.appendChild(el('span','tq',st==='failed'?'Couldn’t read this one · ':'Not read yet · '));
-        a.appendChild(link(st==='failed'?'Retry':'Read now',function(){readNow(card,p,owner);}));
-      }
-      box.appendChild(a);
-      return;
-    }
-    box.appendChild(el('div','tx',raw.transcription));
-    var acts=el('div','acts'), lang=deviceLang(), cached=raw.translations&&raw.translations[lang];
-    if(owner)acts.appendChild(link('Edit',function(){tsCard=card;tsReadonly=false;tsPath=p.path||'';openSheet('edit');}));
-    if(needsTranslate(raw.transcription)){
-      if(owner)acts.appendChild(el('span','tq',' · '));
-      acts.appendChild(link(cached?'Show translation':'Translate',function(){translate(card,lang);}));
-    }
-    box.appendChild(acts);
-    if(cached&&transShown[card.id]===lang){
-      box.appendChild(el('div','tl','Translated from '+(cached.from||'the original')));
-      box.appendChild(el('div','tx tr',cached.text));
-    }
+    if(st==='pending')transPoll=setTimeout(function(){pollTrans(card,p,owner);},4000);
+    // If the sheet is already open on this card, it has to follow along.
+    if(!$('tScrim').classList.contains('hidden')&&tsCard===card)tRender('view');
   }
+  $('boxScript').onclick=function(e){
+    e.stopPropagation();
+    if(!openCard)return;
+    tsCard=openCard;tsReadonly=!(fromCloud&&isOwner());
+    tsPath=(openCard.pages[openPage]||{}).path||'';
+    openSheet('view');
+  };
+
   function refreshTrans(){if(openCard)renderTrans(openCard,openCard.pages[openPage],fromCloud&&isOwner());}
   function pollTrans(card,p,owner){
     if(openCard!==card)return;
@@ -3044,7 +3088,7 @@
     var cached=raw.translations&&raw.translations[lang];
     if(cached){transShown[card.id]=lang;refreshTrans();return;}      // from the card: no call
     var key='tr:'+raw.id;if(transBusy[key])return;transBusy[key]=true;
-    var note=document.createElement('div');note.className='tq';note.textContent='Translating…';$('boxTrans').appendChild(note);
+    tRender('view');                                  // shows "Translating…" in the sheet
     fns().httpsCallable('translateCard')({space:cloudCode,cardId:card.id,target:lang}).then(function(r){
       delete transBusy[key];
       var d=(r&&r.data)||{};raw.translations=raw.translations||{};raw.translations[lang]={text:d.text||'',from:d.from||''};
@@ -3066,20 +3110,58 @@
   function tRender(state){
     var c=$('tContent');
     if(state==='view'){
-      c.innerHTML='<div class="ts-head"><span class="ts-title">Transcription</span>'
-        +(tsReadonly?'':'<button type="button" class="ts-editlink" id="tEdit">Edit</button>')+'</div>'
-        +'<div class="ts-scroll"><div class="ts-text"></div></div>'
-        +'<p class="ts-foot">'+(tsReadonly?'Swipe down to close':'Saved · Swipe down to close')+'</p>';
-      c.querySelector('.ts-text').textContent=tText();
-      if(!tsReadonly)$('tEdit').onclick=function(){openSheet('edit');};
+      /* Every state the transcript can be in lives here now, because the card
+         overlay shows none of it: waiting, failed, never read, the text itself,
+         and its translation. */
+      var raw=(tsCard&&tsCard.raw)||null, st=transState(raw), owner=!tsReadonly;
+      var lang=deviceLang(), cached=raw&&raw.translations&&raw.translations[lang];
+      var showTr=!!(cached&&transShown[tsCard.id]===lang);
+      var busy=!!(raw&&transBusy['tr:'+raw.id]);
+      var head='<div class="ts-head"><span class="ts-title">Transcript</span>'
+        +((owner&&st==='text')?'<button type="button" class="ts-editlink" id="tEdit">Edit</button>':'')+'</div>';
+      var body,foot='<p class="ts-foot">Swipe down to close</p>';
+      if(st==='pending'){
+        body='<p class="ts-note">Reading the handwriting…</p>';
+      }else if(st==='text'){
+        body='<div class="ts-scroll"><div class="ts-text"></div>'
+          +(showTr?'<p class="ts-from"></p><div class="ts-text ts-trans"></div>':'')+'</div>';
+        if(busy)foot='<p class="ts-foot">Translating…</p>';
+        else if(needsTranslate(raw.transcription))
+          foot='<p class="ts-foot"><button type="button" class="ts-editlink" id="tTr">'
+            +(cached?'Show translation':'Translate')+'</button></p>';
+      }else if(raw&&raw.transcriptionFailed==='limit'){
+        body='<p class="ts-note">This account has reached its handwriting-reading limit.</p>';
+      }else{
+        body='<p class="ts-note">'+((st==='failed')?'Couldn’t read this one.':'Not read yet.')
+          +(owner?' <button type="button" class="ts-editlink" id="tRead">'
+              +((st==='failed')?'Retry':'Read now')+'</button>':'')+'</p>';
+      }
+      c.innerHTML=head+body+foot;
+      if(st==='text'){
+        c.querySelector('.ts-text').textContent=raw.transcription;
+        if(showTr){
+          c.querySelector('.ts-from').textContent='Translated from '+(cached.from||'the original');
+          c.querySelector('.ts-trans').textContent=cached.text;
+        }
+      }
+      if($('tEdit'))$('tEdit').onclick=function(){openSheet('edit');};
+      if($('tRead'))$('tRead').onclick=function(){readNow(tsCard,tsCard.pages[openPage],true);};
+      if($('tTr'))$('tTr').onclick=function(){translate(tsCard,lang);};
     }else if(state==='edit'){
-      c.innerHTML='<div class="ts-head ts-head-edit"><button type="button" class="ts-cancel" id="tCancel">Cancel</button><span class="ts-title ts-title-center">Edit transcription</span></div>'
-        +'<div class="ts-editbody"><textarea class="ts-textarea" id="tArea"></textarea></div>'
-        +'<div class="ts-savebar"><button type="button" class="ts-save" id="tSave">Save</button></div>';
+      c.innerHTML='<div class="ts-head ts-head-edit">'
+        +'<button type="button" class="ts-cancel" id="tCancel">Cancel</button>'
+        +'<span class="ts-title">Transcript</span>'
+        +'<button type="button" class="ts-save" id="tSave">Save</button></div>'
+        +'<div class="ts-editbody"><textarea class="ts-textarea" id="tArea"></textarea></div>';
       $('tArea').value=tText();
       $('tCancel').onclick=function(){tSetDetent('half');tRender('view');};              // discard edits
       $('tSave').onclick=function(){saveTranscription($('tArea').value);};
-      setTimeout(function(){try{$('tArea').focus();}catch(e){}},50);
+      /* Deliberately not focused. Autofocus opened the keyboard before the text
+         could be read, scrolled the box to its end so the message started from
+         the bottom, and on iOS made the whole sheet shift as WKWebView hunted
+         for the caret inside a fixed element. You are correcting a word, not
+         composing — tap where the mistake is and the keyboard comes then. */
+      setTimeout(function(){try{$('tArea').scrollTop=0;}catch(e){}},0);
     }
   }
 
