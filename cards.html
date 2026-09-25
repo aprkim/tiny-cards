@@ -219,6 +219,10 @@
   }
   .card p{font-size:13.5px;font-weight:500;color:var(--ink);margin-top:8px;letter-spacing:-.01em}
   .card small{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+  /* Why this card matched, when the reason is inside it. One line, never two. */
+  .card .snip{display:block;font-size:12px;color:var(--muted);margin-top:3px;line-height:1.3;
+              white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .card .snip b{color:var(--ink);font-weight:600}
 
   .empty{text-align:center;padding:48px 20px;color:var(--muted);font-size:14px}
   /* Owner empty state: one heading, one pink action, two quiet stacked links.
@@ -2317,15 +2321,80 @@
     }
   }
 
+  /* --- search helpers ---
+     One box, three sources: who sent it / who it was to / the occasion and
+     date, OR the words written inside. Matching ignores case and punctuation
+     on both sides, so "love, Mom" finds "Love Mom" and "grandma's" finds
+     "grandmas". The transcript match is done with a regex that tolerates
+     punctuation between the query's characters, so the match position maps
+     back onto the original text for the snippet. */
+  var PUNCT='[\\p{P}\\p{S}]';
+  function normQ(str){
+    return String(str||'').toLowerCase().replace(new RegExp(PUNCT,'gu'),'').replace(/\s+/g,' ').trim();
+  }
+  var qReCache={};
+  function queryRe(q){
+    if(qReCache[q])return qReCache[q];
+    var parts=[];
+    for(var i=0;i<q.length;i++){
+      var ch=q[i];
+      if(ch===' '){parts.push('[\\s\\p{P}\\p{S}]+');continue;}
+      parts.push(ch.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'));
+      // punctuation may sit between any two characters of the query
+      if(i<q.length-1&&q[i+1]!==' ')parts.push(PUNCT+'*');
+    }
+    return (qReCache[q]=new RegExp(parts.join(''),'iu'));
+  }
+  // {index,length} of the first tolerant match in text, or null.
+  function transHit(text,q){
+    if(!text||!q)return null;
+    var m=queryRe(q).exec(text);
+    return m?{index:m.index,length:m[0].length}:null;
+  }
+  /* A one-line window of ~70 characters around a match, cut at word
+     boundaries (space or punctuation - which is also how Korean breaks), with
+     an ellipsis on any end that was cut. Returns the three pieces so the
+     match can be emphasised without ever handing text to innerHTML. */
+  function snippet(text,q){
+    // Flatten whitespace first (one line, always), then find the match again
+    // on the flattened text so the indices are right.
+    var WIN=70, flat=String(text).replace(/\s+/g,' '), m=transHit(flat,q);
+    if(!m)return null;
+    var idx=m.index,len=m.length,L=flat.length;
+    var start=Math.max(0,idx-Math.floor((WIN-len)/2)), end=Math.min(L,start+WIN);
+    if(end===L)start=Math.max(0,end-WIN);
+    var bnd=new RegExp('[\\s\\p{P}\\p{S}]','u');
+    if(start>0){                                   // advance to just after a boundary
+      var s2=start;while(s2<idx&&s2-start<15&&!bnd.test(flat[s2-1]))s2++;
+      if(s2<idx)start=s2;
+      while(start<idx&&flat[start]===' ')start++;
+    }
+    if(end<L){                                     // retreat to just before a boundary
+      var e2=end;while(e2>idx+len&&end-e2<15&&!bnd.test(flat[e2]))e2--;
+      if(e2>idx+len)end=e2;
+      while(end>idx+len&&flat[end-1]===' ')end--;
+    }
+    return {before:(start>0?'…':'')+flat.slice(start,idx),
+            match:flat.slice(idx,idx+len),
+            after:flat.slice(idx+len,end)+(end<L?'…':'')};
+  }
+  /* --- end search helpers --- */
+
   function render(){
     $('q').classList.toggle('hidden',!cards.length);   // present whenever this space has any cards
     document.querySelector('.wrap').classList.toggle('is-empty',!cards.length);
-    var q=$('q').value.trim().toLowerCase();
+    var q=normQ($('q').value);
     var list=cards.filter(function(x){
+      x.snip=null;
       if(filter&&x.person!==filter)return false;
       if(yearFilter&&x.year!==yearFilter)return false;
       if(!q)return true;
-      return (x.person+' '+x.recipient+' '+x.event+' '+x.date).toLowerCase().indexOf(q)>-1;
+      if(normQ(x.person+' '+x.recipient+' '+x.event+' '+x.date).indexOf(q)>-1)return true;
+      // Only the words inside matched: show where, since nothing else on the
+      // tile explains why this card is in the results.
+      var t=x.raw&&x.raw.transcription;
+      if(!transHit(t,q))return false;
+      x.snip=snippet(t,q);return true;
     });
 
     // Library stats live in Settings (computed there from the full archive).
@@ -2360,6 +2429,13 @@
         var sub=(x.date?fmtCardDate(x.date):'no date')+(x.recipient?' · to '+x.recipient:'');
         b.innerHTML='<img loading="lazy" src="'+(x.pages[0].thumb||x.pages[0].url)+'" alt="'+esc(x.person)+'">'+badge+
                     '<p>'+esc(x.person)+'</p><small>'+esc(sub)+'</small>';
+        if(x.snip){
+          var sn=document.createElement('span');sn.className='snip';
+          sn.appendChild(document.createTextNode(x.snip.before));
+          var bb=document.createElement('b');bb.textContent=x.snip.match;sn.appendChild(bb);
+          sn.appendChild(document.createTextNode(x.snip.after));
+          b.appendChild(sn);
+        }
         b.onclick=function(){show(x,0)};
         g.appendChild(b);
       });
