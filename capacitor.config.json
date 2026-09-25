@@ -4,6 +4,7 @@
   "webDir": "www",
   "plugins": {
     "FirebaseAuthentication": {
+      "authDomain": "auth.kept.cards",
       "skipNativeAuth": true,
       "providers": [
         "apple.com",
