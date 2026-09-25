@@ -14,9 +14,9 @@
 
    The RevenueCat app_user_id is always the Firebase uid: configure() runs on
    the first auth event with that uid, and later sign-ins/outs call
-   logIn/logOut. The public SDK key comes from rc-config.js, which the build
-   writes into www/ from REVENUECAT_IOS_KEY; it is never in the repo and never
-   requested on the web. */
+   logIn/logOut. The public SDK keys come from rc-config.js, which the build
+   writes into www/ from REVENUECAT_IOS_KEY and REVENUECAT_ANDROID_KEY; they
+   are never in the repo and never requested on the web. */
 (function(){
   var ENTITLEMENT='unlimited';
 
@@ -111,11 +111,18 @@
   }
 
   // The key ships as www/rc-config.js (build output, never on the web site).
+  // One file, one key per platform: Apple and Google are separate RevenueCat
+  // apps with separate public keys, and configure() with the wrong one fails
+  // in a way that looks exactly like "no products".
+  function platformKey(){
+    var p='';try{p=window.Capacitor.getPlatform();}catch(e){}
+    return p==='android'?(window.RC_ANDROID_KEY||''):(window.RC_IOS_KEY||'');
+  }
   function loadKey(){
     return new Promise(function(res){
-      if(window.RC_IOS_KEY)return res(window.RC_IOS_KEY);
+      if(window.RC_IOS_KEY||window.RC_ANDROID_KEY)return res(platformKey());
       var s=document.createElement('script');s.src='rc-config.js';
-      s.onload=function(){res(window.RC_IOS_KEY||'');};s.onerror=function(){res('');};
+      s.onload=function(){res(platformKey());};s.onerror=function(){res('');};
       document.head.appendChild(s);
     });
   }

@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "497477643272",
+    "project_id": "tiny-wins25",
+    "storage_bucket": "tiny-wins25.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:497477643272:android:20e864268869e2b1e5f5bd",
+        "android_client_info": {
+          "package_name": "com.lihallc.kept"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "497477643272-qb0ko8scr5nrdjjf1l3nqiojlc69juvl.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.lihallc.kept",
+            "certificate_hash": "2fc8c9fb3a03370e7a48726acc98f774a4c04473"
+          }
+        },
+        {
+          "client_id": "497477643272-h423ouj38qjmi5r9r3g2e96s24sdbjki.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDQSbM75_M6hO6N_TcW6I6UUxapLmzvwIw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "497477643272-h423ouj38qjmi5r9r3g2e96s24sdbjki.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "497477643272-k88rdbori6akqir4a3914o814mtktsfr.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "space.tinywins.cards"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
