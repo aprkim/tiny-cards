@@ -210,7 +210,11 @@
      They also fade in after a moment rather than immediately, so a load that
      finishes quickly shows nothing at all instead of a flash of scaffolding. */
   .skel .sk{width:100%;aspect-ratio:3/4;border:1px solid var(--rule);border-radius:10px;
-    background:var(--field);opacity:0;animation:skin .5s ease .35s forwards}
+    background:var(--field);opacity:0;animation:skin .5s ease .35s forwards;
+    /* A small grey card mark in each: "a card goes here", in Kept's own hand,
+       quiet enough that ten of them stay a placeholder and not a pattern. */
+    background-image:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='500 52 104 122'><rect x='520' y='62' width='72' height='100' rx='8' fill='%23BDB9B0' opacity='.45' transform='rotate(8 556 112)'/><g transform='rotate(-6 546 110)'><rect x='510' y='60' width='72' height='100' rx='8' fill='%23BDB9B0'/><path d='M546 117 C536 109 530 103 530 96.5 C530 90.5 534 87 538.5 87 C542 87 545 89.5 546 92.5 C547 89.5 550 87 553.5 87 C558 87 562 90.5 562 96.5 C562 103 556 109 546 117 Z' fill='%23FAF9F6'/><path d='M526 138 h40' stroke='%23FAF9F6' stroke-width='5' stroke-linecap='round'/></g></svg>");
+    background-repeat:no-repeat;background-position:center;background-size:24px auto}
   @keyframes skin{to{opacity:.72}}
   @media (prefers-reduced-motion:reduce){.skel .sk{animation:none;opacity:.72}}
   .card .n{
