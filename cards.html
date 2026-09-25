@@ -2360,18 +2360,27 @@
     var m=queryRe(q).exec(text);
     return m?{index:m.index,length:m[0].length}:null;
   }
-  /* A one-line window of ~70 characters around a match, cut at word
-     boundaries (space or punctuation - which is also how Korean breaks), with
-     an ellipsis on any end that was cut. Returns the three pieces so the
-     match can be emphasised without ever handing text to innerHTML. */
+  /* A one-line window around a match, cut at word boundaries (space or
+     punctuation - which is also how Korean breaks), with an ellipsis on any
+     end that was cut. The lead-in before the match is kept SHORT: a phone
+     tile shows ~25 characters before CSS truncates, so a match centred in 70
+     fell off the visible end and the bold word never appeared. A few words of
+     context, then the match, then as much trailing text as fits. Returns the
+     three pieces so the match is emphasised without handing text to
+     innerHTML. */
   function snippet(text,q){
     // Flatten whitespace first (one line, always), then find the match again
     // on the flattened text so the indices are right.
     var WIN=70, flat=String(text).replace(/\s+/g,' '), m=transHit(flat,q);
     if(!m)return null;
-    var idx=m.index,len=m.length,L=flat.length;
-    var start=Math.max(0,idx-Math.floor((WIN-len)/2)), end=Math.min(L,start+WIN);
-    if(end===L)start=Math.max(0,end-WIN);
+    var idx=m.index,len=m.length,L=flat.length, LEAD=14;
+    // Lead-in measured in display width: Hangul and CJK take about two
+    // Latin letters' room, so fourteen of them would push the match off a
+    // phone tile just as a centred window did.
+    var wide=/[\u1100-\u11FF\u2E80-\u9FFF\uAC00-\uD7AF\uF900-\uFAFF\uFF00-\uFFEF]/;
+    var start=idx, w=0;
+    while(start>0&&w<LEAD){start--;w+=wide.test(flat[start])?2:1;}
+    var end=Math.min(L,idx+len+(WIN-LEAD));
     var bnd=new RegExp('[\\s\\p{P}\\p{S}]','u');
     if(start>0){                                   // advance to just after a boundary
       var s2=start;while(s2<idx&&s2-start<15&&!bnd.test(flat[s2-1]))s2++;
