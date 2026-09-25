@@ -2024,10 +2024,15 @@
   function openArchive(){
     $('start').classList.add('hidden');
     $('view').classList.remove('hidden');
-    /* Four, not a full screen of them. Enough to show the shape of what is
-       coming without filling the display with placeholders. */
+    /* Two full rows, whatever the width. On a phone that is the four it
+       always was; on a desktop the grid is five across, and four placeholders
+       left a ragged first row that read as a bug rather than as waiting. The
+       column count mirrors the grid's CSS: minmax(128px,1fr) with a 14px gap. */
+    var gw=$('groups').clientWidth||$('view').clientWidth||(window.innerWidth-36);
+    var cols=Math.max(1,Math.floor((gw+14)/(128+14)));
+    var n=Math.min(12,Math.max(4,cols*2));
     $('groups').innerHTML='<div class="group skel"><div class="grid">'
-      +new Array(4).join('<div class="sk"></div>')+'<div class="sk"></div></div></div>';
+      +new Array(n+1).join('<div class="sk"></div>')+'</div></div>';
     loadCloud();
   }
 
