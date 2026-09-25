@@ -228,17 +228,24 @@
     });
   }
 
-  // Apple's subscription management page for this account.
+  // The store's subscription management page for this account. RevenueCat
+  // supplies the exact one when there is a subscription; the fallback must be
+  // the right store for the phone we are on — an Android user handed Apple's
+  // page is a dead end wearing a helpful face.
+  function storePage(){
+    var p='';try{p=window.Capacitor.getPlatform();}catch(e){}
+    return p==='android'?'https://play.google.com/store/account/subscriptions'
+                        :'https://apps.apple.com/account/subscriptions';
+  }
   function manage(){
-    var apple='https://apps.apple.com/account/subscriptions';
-    // A web subscriber has no Apple subscription to open, and sending them to
-    // one would be a dead end wearing a helpful face.
+    // A web subscriber has no store subscription to open at all.
     if(!native)return Promise.resolve(WEB_PORTAL?window.open(WEB_PORTAL,'_blank'):null);
+    var fallback=storePage();
     return ready().then(function(why){
-      if(why)return apple;
+      if(why)return fallback;
       return plugin('Purchases').getCustomerInfo().then(function(r){
-        return (r&&r.customerInfo&&r.customerInfo.managementURL)||apple;
-      }).catch(function(){return apple;});
+        return (r&&r.customerInfo&&r.customerInfo.managementURL)||fallback;
+      }).catch(function(){return fallback;});
     }).then(function(url){window.open(url,'_blank');});
   }
 
