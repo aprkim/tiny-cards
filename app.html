@@ -685,6 +685,12 @@
       return firebase.auth().signInWithCredential(cred);
     }).then(function(r){authUser=r.user;return authUser;});
   }
+  // A failure that can only be read from a debugger is a failure nobody can
+  // report. The code goes in the alert, short, in parentheses.
+  function errTag(e){
+    var t=e&&(e.code||e.message);if(!t)return '';
+    return ' ('+String(t).slice(0,80)+')';
+  }
   function signInApple(){
     if(!fbInit())return Promise.reject(new Error('firebase unavailable'));
     if(isNativeApp())return nativeAppleSignIn();
@@ -787,7 +793,7 @@
       if(/unauthorized-domain/.test(c)){
         openAlert('This site isn’t authorised for sign-in yet. Add kept.cards in the Firebase console under Authentication → Settings → Authorized domains.','Sign-in not set up');
       }else if(!isSignInCancel(e)){
-        openAlert('Could not sign in. Check your connection and try again.','Sign-in failed');
+        openAlert('Could not sign in. Check your connection and try again.'+errTag(e),'Sign-in failed');
       }
       if(window.console)console.warn(e);
     }).then(function(){
@@ -805,7 +811,7 @@
       if(/unauthorized-domain/.test(c)){
         openAlert('This site isn’t authorised for sign-in yet. Add kept.cards in the Firebase console under Authentication → Settings → Authorized domains.','Sign-in not set up');
       }else if(!isSignInCancel(e)){
-        openAlert('Could not sign in with Apple. Check your connection and try again.','Sign-in failed');
+        openAlert('Could not sign in with Apple. Check your connection and try again.'+errTag(e),'Sign-in failed');
       }
       if(window.console)console.warn(e);
     }).then(function(){
