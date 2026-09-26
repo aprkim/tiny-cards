@@ -3253,6 +3253,12 @@
     tsCard=openCard;tsReadonly=!(fromCloud&&isOwner());
     tsPath=(openCard.pages[openPage]||{}).path||'';
     openSheet('view');
+    /* "Read it" is already an instruction, so tapping it does it: the sheet
+       opens on "Reading the handwriting…" and fills in, instead of opening on
+       "Not read yet" and asking a second time. A failed read still opens on
+       the explanation and its Try again - a silent retry would hide why. */
+    if(!tsReadonly&&transState(openCard.raw)==='unread')
+      readNow(openCard,openCard.pages[openPage],true);
   };
 
   function refreshTrans(){if(openCard)renderTrans(openCard,openCard.pages[openPage],fromCloud&&isOwner());}
