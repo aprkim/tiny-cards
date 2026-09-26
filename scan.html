@@ -1570,11 +1570,17 @@
       else{var m=KeptPurchases.explain(res);if(m)openAlert(m,'Kept Unlimited');}   // closed on purpose: silent
     });
   };
+  // The store account a restore looks in: an Apple ID on iPhone, a Google
+  // account on Android. Only the phone apps show Restore at all.
+  function storeAccount(){
+    var p='';try{p=window.Capacitor.getPlatform();}catch(e){}
+    return p==='android'?'Google account':'Apple ID';
+  }
   $('setRestore').onclick=function(){
     var b=$('setRestore');b.disabled=true;
     KeptPurchases.restore().then(function(plus){
       paintUnlimited();
-      openAlert(plus?'Your subscription is active on this device.':'No purchases to restore for this Apple ID.','Restore purchases');
+      openAlert(plus?'Your subscription is active on this device.':'No purchases to restore for this '+storeAccount()+'.','Restore purchases');
     }).catch(function(){
       openAlert('Couldn’t restore right now. Check your connection and try again.','Restore purchases');
     }).then(function(){b.disabled=false;});
