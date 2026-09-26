@@ -385,6 +385,13 @@
   .ts-title{font-size:16px;font-weight:700;color:#fff}
   .ts-editlink{font:inherit;font-size:14px;background:none;border:none;color:rgba(255,255,255,.6);cursor:pointer;padding:4px}
   .ts-editlink:hover{color:#fff}
+  /* Same pill as the Transcript/Read it button on the photo, so the two read as
+     the same kind of control. */
+  .ts-act{padding:0 20px 8px}
+  .ts-pill{font:inherit;font-size:14px;font-weight:600;color:#fff;cursor:pointer;
+    padding:9px 16px;border-radius:100px;border:1px solid rgba(255,255,255,.35);
+    background:rgba(255,255,255,.08)}
+  .ts-pill:hover,.ts-pill:focus-visible{background:rgba(255,255,255,.16);border-color:#fff;outline:none}
   .ts-scroll{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 20px}
   .ts-text{white-space:pre-wrap;font-size:15px;line-height:1.6;color:rgba(255,255,255,.9)}
   .ts-foot{flex:0 0 auto;text-align:center;font-size:12.5px;color:rgba(255,255,255,.4);padding:12px 20px 16px}
@@ -3333,9 +3340,12 @@
       }else if(raw&&raw.transcriptionFailed==='limit'){
         body='<p class="ts-note">This account has reached its handwriting-reading limit.</p>';
       }else{
-        body='<p class="ts-note">'+((st==='failed')?'Couldn’t read this one.':'Not read yet.')
-          +(owner?' <button type="button" class="ts-editlink" id="tRead">'
-              +((st==='failed')?'Retry':'Read now')+'</button>':'')+'</p>';
+        /* The action gets its own line and a real button shape. Inline and in
+           the sentence's grey, "Read now" read as part of "Not read yet." -
+           people did not know it could be tapped. */
+        body='<p class="ts-note">'+((st==='failed')?'Couldn’t read this one.':'Not read yet.')+'</p>'
+          +(owner?'<div class="ts-act"><button type="button" class="ts-pill" id="tRead">'
+              +((st==='failed')?'Try again':'Read the handwriting')+'</button></div>':'');
       }
       c.innerHTML=head+body+foot;
       if(st==='text'){
