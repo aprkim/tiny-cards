@@ -1665,10 +1665,14 @@
      Duplicated verbatim in cards.html and scan.html. These pages are standalone
      documents with no module system, so "shared" means identical, and a change
      to one belongs in the other. */
-  // App Store link kept in one place so it's easy to change later.
-  var APP_STORE_URL='https://apps.apple.com/app/id6809942529';
+  /* Where an invite sends people. The sender cannot know whether the person
+     they invite has an iPhone, an Android phone or only a laptop, so this is
+     the homepage rather than a store: it shows each visitor the right way in
+     (App Store, Google Play or the web app), and it stays correct when a
+     store link changes. */
+  var INVITE_URL='https://kept.cards';
   function inviteMessage(email){
-    return 'I saved our cards in Kept and shared them with you! Download Kept here: '+APP_STORE_URL+'\n'+
+    return 'I saved our cards in Kept and shared them with you! Get Kept here: '+INVITE_URL+'\n'+
            'Sign in with '+email+' (this exact email) and your cards will be waiting for you.';
   }
   // Dismissing the sheet is an ordinary outcome, not a failure — the invite
