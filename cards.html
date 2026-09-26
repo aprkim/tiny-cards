@@ -125,10 +125,21 @@
   .drop span{font-size:13px;color:var(--muted)}
 
   input[type=search]{
-    width:100%;font:inherit;font-size:16px;padding:12px 14px;
+    width:100%;font:inherit;font-size:16px;padding:12px 44px 12px 14px;
     border:1px solid var(--rule);border-radius:10px;background:var(--field);
     color:var(--ink);-webkit-appearance:none;appearance:none;
   }
+  /* One clear button everywhere. Chrome and Android draw their own; the iPhone
+     app draws none, so a query had to be backspaced away. Ours replaces theirs
+     rather than sitting beside it, and shows only while there is something to
+     clear - :placeholder-shown is true exactly when the box is empty. */
+  input[type=search]::-webkit-search-cancel-button{-webkit-appearance:none;display:none}
+  .qwrap{position:relative}
+  .qclear{position:absolute;top:0;right:0;width:44px;height:100%;border:0;background:none;
+    padding:0;cursor:pointer;color:var(--muted);font-size:20px;line-height:1;
+    display:flex;align-items:center;justify-content:center}
+  .qclear:hover{color:var(--ink)}
+  #q:placeholder-shown + .qclear,#q.hidden + .qclear{display:none}
   input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
   .switcher{
     width:100%;font:inherit;font-size:16px;padding:11px 14px;margin-bottom:10px;
@@ -816,7 +827,10 @@
       <div class="relayrow"><code id="relayAddr"></code><button type="button" id="relayCopy">Copy</button></div>
     </div>
     <select id="spaceSwitcher" class="switcher hidden" aria-label="Choose whose cards to view"></select>
-    <input type="search" id="q" placeholder="Search names, occasions, or words inside" autocomplete="off">
+    <div class="qwrap">
+      <input type="search" id="q" placeholder="Search names, occasions, or words inside" autocomplete="off">
+      <button type="button" class="qclear" id="qClear" aria-label="Clear search">&times;</button>
+    </div>
     <div class="chips" id="people"></div>
     <div id="groups"></div>
   </section>
@@ -1026,7 +1040,7 @@
       </button>
       <p class="set-delnote hidden" id="delNote">Deletes your account, not the cards shared with you.</p>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.2</span> · <span class="setver">v2026.09.24.1841</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.2</span> · <span class="setver">v2026.09.25.2340</span></p>
   </div>
 </div>
 
@@ -2788,6 +2802,11 @@
   },{passive:true});
 
   $('q').addEventListener('input',render);
+  /* Clearing must not decide the keyboard for you: pointerdown is cancelled so
+     the box keeps whatever focus it had - still typing if you were, still just
+     browsing if you weren't. */
+  $('qClear').addEventListener('pointerdown',function(e){e.preventDefault();});
+  $('qClear').onclick=function(){$('q').value='';render();};
 
   /* ---- delete everything ----
      Irreversible and, for the cloud archive, affects every device sharing the
