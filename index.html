@@ -155,19 +155,19 @@
   .hero h1{ font-size:clamp(38px,6vw,62px); font-weight:800; letter-spacing:-0.03em; line-height:1.04; margin:16px 0 20px; text-wrap:balance; }
   .hero p.sub{ font-size:clamp(17px,2.2vw,20px); color:#333; max-width:34ch; margin-bottom:30px; }
   .cta-row{ display:flex; align-items:center; gap:18px; flex-wrap:wrap; }
-  .appstore{ display:inline-flex; align-items:center; gap:12px; background:#000; color:#fff; text-decoration:none;
-             padding:12px 20px 12px 18px; border-radius:14px; transition:transform .12s ease, box-shadow .12s ease; }
-  .appstore:hover{ transform:translateY(-1px); box-shadow:0 8px 24px rgba(0,0,0,.18); }
-  .appstore svg{ width:26px; height:26px; fill:#fff; }
-  .appstore .ast{ display:flex; flex-direction:column; line-height:1.05; text-align:left; }
-  .appstore .ast small{ font-size:11px; opacity:.9; letter-spacing:.01em; }
-  .appstore .ast b{ font-size:19px; font-weight:600; letter-spacing:-0.01em; }
+  /* Official store badges, shown as supplied: no recolouring, border, shadow or
+     radius of our own. Apple's is 48px tall. Google's artwork carries 41px of
+     clear space on every side of a 250px-tall file, so it is drawn taller and
+     pulled in by that margin: the black shapes end up the same height and the
+     gap between them is the row's own. */
+  .badge{ display:inline-block; line-height:0; }
+  .badge img{ display:block; height:48px; width:auto; }
+  .badge.play img{ height:71.43px; margin:-11.71px; }
   .weblink{ font-size:15px; font-weight:600; color:var(--accent); text-decoration:none; }
   .weblink:hover{ color:var(--accent-ink); }
 
-  /* The Google Play button is the App Store button's twin. A phone hides the
-     store that is not its own; everything else shows both. */
-  html.on-ios .appstore.play, html.on-android .appstore:not(.play){ display:none; }
+  /* A phone hides the store that is not its own; everything else shows both. */
+  html.on-ios .badge.play, html.on-android .badge.apple{ display:none; }
 
   .heroart{ justify-self:center; width:min(320px,80vw); aspect-ratio:1/1; border-radius:32px; background:var(--cream);
             display:flex; align-items:center; justify-content:center; box-shadow:0 24px 60px rgba(22,22,29,.14); }
@@ -261,14 +261,8 @@
         <h1>Keep the handwriting. Lose the shoebox.</h1>
         <p class="sub">Kept scans both sides of a card, the printed front and the message written inside, and keeps every one searchable by who sent it and when.</p>
         <div class="cta-row">
-          <a class="appstore" href="https://apps.apple.com/app/id6809942529" aria-label="Download Kept on the App Store">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.05 12.04c-.03-2.85 2.33-4.21 2.44-4.28-1.33-1.94-3.4-2.21-4.13-2.24-1.76-.18-3.43 1.03-4.32 1.03-.89 0-2.26-1.01-3.72-.98-1.91.03-3.68 1.11-4.66 2.82-1.99 3.45-.51 8.56 1.42 11.36.94 1.37 2.07 2.91 3.53 2.86 1.42-.06 1.96-.92 3.67-.92 1.71 0 2.19.92 3.69.89 1.53-.03 2.49-1.4 3.42-2.78.65-.95.92-1.44 1.44-2.51-3.78-1.44-3.19-6.63-.02-8.13zM14.13 4.02c.79-.95 1.32-2.28 1.18-3.6-1.13.05-2.5.76-3.31 1.71-.73.84-1.36 2.19-1.19 3.48 1.26.1 2.54-.64 3.32-1.59z"/></svg>
-            <span class="ast"><small>Download on the</small><b>App Store</b></span>
-          </a>
-          <a class="appstore play" href="https://play.google.com/store/apps/details?id=com.lihallc.kept" aria-label="Get Kept on Google Play">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.6 2.3c-.4.3-.6.8-.6 1.4v16.6c0 .6.2 1.1.6 1.4l9.5-9.7-9.5-9.7zm10.9 8.3l2.6-2.7L5.6 1.4l8.9 9.2zm0 2.8l-8.9 9.2 11.5-6.5-2.6-2.7zm6.3-3.1l-2.5-1.4-2.9 3.1 2.9 3.1 2.5-1.4c.9-.5.9-2.9 0-3.4z"/></svg>
-            <span class="ast"><small>Get it on</small><b>Google Play</b></span>
-          </a>
+          <a class="badge apple" href="https://apps.apple.com/app/id6809942529" target="_blank" rel="noopener"><img src="badges/app-store.svg" alt="Download on the App Store" width="120" height="40"></a>
+          <a class="badge play" href="https://play.google.com/store/apps/details?id=com.lihallc.kept" target="_blank" rel="noopener"><img src="badges/google-play.png" alt="Get it on Google Play" width="646" height="250"></a>
           <a class="weblink" href="app.html">Open on the web &rarr;</a>
         </div>
       </div>
@@ -366,14 +360,8 @@
     <section class="closing">
       <h2>Start with the one card you'd be saddest to lose.</h2>
       <div class="cta-row">
-        <a class="appstore" href="https://apps.apple.com/app/id6809942529" aria-label="Download Kept on the App Store">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.05 12.04c-.03-2.85 2.33-4.21 2.44-4.28-1.33-1.94-3.4-2.21-4.13-2.24-1.76-.18-3.43 1.03-4.32 1.03-.89 0-2.26-1.01-3.72-.98-1.91.03-3.68 1.11-4.66 2.82-1.99 3.45-.51 8.56 1.42 11.36.94 1.37 2.07 2.91 3.53 2.86 1.42-.06 1.96-.92 3.67-.92 1.71 0 2.19.92 3.69.89 1.53-.03 2.49-1.4 3.42-2.78.65-.95.92-1.44 1.44-2.51-3.78-1.44-3.19-6.63-.02-8.13zM14.13 4.02c.79-.95 1.32-2.28 1.18-3.6-1.13.05-2.5.76-3.31 1.71-.73.84-1.36 2.19-1.19 3.48 1.26.1 2.54-.64 3.32-1.59z"/></svg>
-          <span class="ast"><small>Download on the</small><b>App Store</b></span>
-        </a>
-        <a class="appstore play" href="https://play.google.com/store/apps/details?id=com.lihallc.kept" aria-label="Get Kept on Google Play">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.6 2.3c-.4.3-.6.8-.6 1.4v16.6c0 .6.2 1.1.6 1.4l9.5-9.7-9.5-9.7zm10.9 8.3l2.6-2.7L5.6 1.4l8.9 9.2zm0 2.8l-8.9 9.2 11.5-6.5-2.6-2.7zm6.3-3.1l-2.5-1.4-2.9 3.1 2.9 3.1 2.5-1.4c.9-.5.9-2.9 0-3.4z"/></svg>
-          <span class="ast"><small>Get it on</small><b>Google Play</b></span>
-        </a>
+        <a class="badge apple" href="https://apps.apple.com/app/id6809942529" target="_blank" rel="noopener"><img src="badges/app-store.svg" alt="Download on the App Store" width="120" height="40"></a>
+        <a class="badge play" href="https://play.google.com/store/apps/details?id=com.lihallc.kept" target="_blank" rel="noopener"><img src="badges/google-play.png" alt="Get it on Google Play" width="646" height="250"></a>
         <a class="weblink" href="app.html">Open on the web &rarr;</a>
       </div>
     </section>
