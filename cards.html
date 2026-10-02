@@ -355,7 +355,10 @@
   /* Close is an X pinned to the top-right of the lightbox. Fixed, so it stays
      put while a tall card scrolls; overrides the pill button styles above. */
   .box button.boxx{
-    position:fixed;top:calc(env(safe-area-inset-top) + 12px);right:14px;z-index:51;
+    /* --edge is the card's right edge, measured by alignToCard(): on a phone
+       that is the screen's corner, on a wide screen it is wherever the card
+       ends, not a monitor's width away from it. */
+    position:fixed;top:calc(env(safe-area-inset-top) + 12px);right:var(--edge,14px);z-index:51;
     width:40px;height:40px;padding:0;border-radius:50%;text-transform:none;
     display:flex;align-items:center;justify-content:center;
     /* No ring: the dark disc alone keeps the X readable over a white card,
@@ -371,7 +374,10 @@
      favourites of their own to keep. */
   .box .cap{position:relative;align-self:stretch;width:100%;box-sizing:border-box;padding:0 60px}
   .box .cap strong{line-height:24px}
-  .box button.boxfav{position:absolute;right:12px;top:-10px;   /* 44px button centred on the 24px name line */
+  /* The heart's right edge lines up with the card's and the X's. The caption
+     starts 14px in from the screen and the 24px heart sits 10px inside its
+     44px button, hence the 24px. */
+  .box button.boxfav{position:absolute;right:calc(var(--edge,14px) - 24px);top:-10px;   /* 44px button centred on the 24px name line */
     width:44px;height:44px;padding:0;border:none;border-radius:50%;
     background:none;display:flex;align-items:center;justify-content:center;text-transform:none}
   .box button.boxfav:hover{background:rgba(255,255,255,.12)}
@@ -1767,7 +1773,12 @@
       endExportUI();
       if(cancelled){$('setExportHint').textContent=exportSubtext();return;}
       window.location.href=info.url;
-      $('setExportHint').textContent='Downloading — check your downloads';
+      /* The browser owns the download from here and never tells the page when
+         it finishes, so "Downloading" stayed up long after the file had landed.
+         Say what is known - it started - and step back to the usual line. */
+      var hint=$('setExportHint'),started='Download started \u2014 check your Downloads folder';
+      hint.textContent=started;
+      setTimeout(function(){if(hint.textContent===started)hint.textContent=exportSubtext();},8000);
     }).catch(function(e){
       endExportUI();
       if(cancelled||(e&&e.name==='AbortError')){$('setExportHint').textContent=exportSubtext();return;}
@@ -2586,6 +2597,19 @@
     });
   };
 
+  /* X, card and heart share one right edge. The card's width depends on the
+     photo and the window, so the edge is measured: on load, on every page
+     switch and on resize. A narrow card would pull the heart into the name,
+     so the edge never comes closer to the centre than 150px. */
+  function alignToCard(){
+    var box=$('box');if(box.classList.contains('hidden'))return;
+    var r=$('boxImg').getBoundingClientRect();if(!r.width)return;
+    var half=Math.max(r.width/2,150), mid=r.left+r.width/2;
+    box.style.setProperty('--edge',Math.max(14,Math.round(window.innerWidth-(mid+half)))+'px');
+  }
+  $('boxImg').addEventListener('load',alignToCard);
+  window.addEventListener('resize',alignToCard);
+
   function show(card,page){
     openCard=card;openPage=page;
     var p=card.pages[page];
@@ -2634,6 +2658,7 @@
     $('boxDel').classList.toggle('hidden',!owner);
     $('boxForm').classList.add('hidden');$('box').classList.remove('editing');
     $('box').classList.remove('hidden');
+    alignToCard();
   }
 
   function close(){
