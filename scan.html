@@ -1030,7 +1030,7 @@
         <span>Delete Account</span>
       </button>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.2</span> · <span class="setver">v2026.09.24.1841</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.4</span> · <span class="setver">v2026.10.02.0019</span></p>
   </div>
 </div>
 
@@ -1807,6 +1807,7 @@
   }
 
   var syncChain=Promise.resolve();
+  var archiveCount=0;                         // cards in the archive as of the last save
   function saveCard(){                        // upsert current card; resolves true/false/null
     syncChain=syncChain.then(runSync,runSync); // run regardless of the previous result
     return syncChain;
@@ -2016,7 +2017,7 @@
           }
           rows=rows.map(function(x){if(x&&x.id===curCardId){found=true;return rec}return x});
           if(!found)rows.push(rec);
-          recordCreated=true;
+          recordCreated=true;archiveCount=rows.length;
           return ref.set({cards:rows,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
         }).then(function(){
           if(toTranscribe)autoTranscribe(curCardId,toTranscribe);   // background; never awaited
@@ -2385,7 +2386,7 @@
      took. The box is hidden rather than emptied: the polygon and the four
      corner handles live inside it and carry listeners bound once at startup. */
   function clearStage(){
-    img=null;
+    img=null;curSource=null;                   // no photo on the stage until one loads
     var cv=$('cv'),pv=$('pv'),box=$('cbox');
     if(cv){cv.width=1;cv.height=1}
     if(pv){pv.width=1;pv.height=1}
@@ -2529,6 +2530,7 @@
   /* ---- end warp ---- */
 
   $('applyCrop').onclick=function(){
+    if(!img||!img.naturalWidth||corners.length!==4)return;   // photo still loading
     var btn=$('applyCrop');btn.disabled=true;btn.textContent='Cropping\u2026';
     setTimeout(function(){
       var dc=warp();
@@ -2537,7 +2539,12 @@
       // Encode once, at the quality the upload would have used anyway: going
       // 0.92 here and 0.8 again before upload costs a generation of loss for
       // nothing. Output is already capped at 1600px, so it needs no resize.
-      dc.toBlob(function(bl){if(bl)warpOutput.add(bl);acceptPage(bl)},'image/jpeg',UP_QUALITY);
+      // A canvas that cannot be encoded (iOS under memory pressure) yields null;
+      // the uncropped photo is a better page than no page.
+      dc.toBlob(function(bl){
+        if(bl)warpOutput.add(bl);else if(window.console)console.warn('crop encode failed; keeping original');
+        acceptPage(bl||curSource);
+      },'image/jpeg',UP_QUALITY);
     },30);
   };
 
@@ -2605,7 +2612,10 @@
     dctx.putImageData(out,0,0);
   }
 
-  $('noCrop').onclick=function(){acceptPage(curSource||files[cursor])};
+  $('noCrop').onclick=function(){
+    var src=curSource||(mode==='batch'?files[cursor]:null);
+    if(src)acceptPage(src);                    // tapped before the photo arrived: nothing to keep yet
+  };
 
   // A way out of the crop screen. If the card already has captured pages (or we're
   // re-cropping an existing one), go back to naming and keep the card; otherwise
@@ -2625,7 +2635,15 @@
     if(e.key==='Escape'&&!$('crop').classList.contains('hidden'))cancelCrop();
   });
 
+  /* The crop stage is on screen before the camera's photo has been fetched and
+     decoded, so its buttons can be tapped with nothing behind them. A page that
+     is not an image must never reach pages[]: the naming screen threw on it and
+     the upload then sat on "Saving…" for good, until the app was restarted. */
   function acceptPage(blob){
+    if(!(blob instanceof Blob)){
+      if(window.console)console.warn('acceptPage: not an image',blob);
+      return;
+    }
     if(redoIndex>-1){                       // re-cropping an existing page
       pages[redoIndex]=blob;
       cornerSets[redoIndex]=corners.slice();
@@ -2654,8 +2672,8 @@
     var src=sources[i];
     if(!src)return;
     redoIndex=i;
-    curSource=src;
     clearStage();
+    curSource=src;                             // after clearStage, which empties it
     $('meta').classList.add('hidden');
     $('crop').classList.remove('hidden');document.body.classList.add('scanning');document.body.classList.add('cropping');
     $('pageTag').textContent=(pageLabels[i]||('p'+(i+1)))+' · redo';
@@ -2891,8 +2909,10 @@
     if(e.key==='Enter'||e.key===' '){e.preventDefault();viewSavedCard();}
   });
 
+  var justSaved=false;
   function finishCard(n){
     savedCards++;savedFiles+=n;
+    justSaved=true;
     // Remember which card was just saved (so its thumbnail can open the detail)
     // and its front image, before pages is cleared below.
     finishCardId=curCardId;
@@ -2931,7 +2951,33 @@
     if(cloudFailed){
       openAlert('Your cards could not be reached, so this card is not saved to the cloud yet. '+
                 'It will upload next time you open the app with a connection.','Not saved yet');
+      return;
     }
+    // Only straight after a save: this screen is also where Discard lands.
+    if(justSaved)askForRating();
+    justSaved=false;
+  }
+
+  /* The store's own rating sheet, asked once, on the phone only, on the
+     finish screen straight after a save, and only when the archive already
+     holds REVIEW_AT cards — someone who has kept that many has an opinion
+     worth asking for. The count comes from the save that just happened
+     (archiveCount), not a fresh read: waiting on the network put the sheet on
+     top of the camera for anyone who had already tapped Take Another Card.
+     For the same reason it is dropped, not delayed, if the finish screen is
+     gone by the time it would show. The flag is set before the call because
+     the plugin cannot say whether the sheet appeared (the store decides, and
+     rations it), and asking on every save after that would be nagging. */
+  var REVIEW_AT=5, REVIEW_KEY='kept_reviewAsked';
+  function askForRating(){
+    var R=KeptPurchases.native&&window.Capacitor.Plugins&&window.Capacitor.Plugins.InAppReview;
+    if(!R||archiveCount<REVIEW_AT)return;
+    try{if(localStorage.getItem(REVIEW_KEY))return}catch(e){return}
+    setTimeout(function(){
+      if($('finish').classList.contains('hidden'))return;   // already moved on: ask another day
+      try{localStorage.setItem(REVIEW_KEY,'1')}catch(e){}
+      R.requestReview().catch(function(){});
+    },350);
   }
 
   window.addEventListener('resize',function(){
