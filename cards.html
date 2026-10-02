@@ -215,7 +215,20 @@
     width:100%;aspect-ratio:3/4;object-fit:cover;background:var(--field);
     border:1px solid var(--rule);border-radius:10px;display:block;
   }
-  .card:hover img{border-color:var(--accent)}
+  /* Hover lifts the card off the table, the way you would pick one up before
+     opening it: a few pixels and a soft shadow, no colour laid over someone's
+     artwork. A crimson outline said "selected", and was too thin to say even
+     that. Only where there is a real pointer: a tap on a phone would leave the
+     card stuck in the air. The page count rides up with its picture. */
+  .card img,.card .n{transition:transform .16s ease,box-shadow .16s ease}
+  @media (hover:hover){
+    .card:hover img{transform:translateY(-4px);box-shadow:0 12px 24px rgba(22,22,29,.16)}
+    .card:hover .n{transform:translateY(-4px)}
+  }
+  /* The keyboard has nothing to lift with, so it gets a plain ring. */
+  .card:focus{outline:none}
+  .card:focus-visible img{outline:2px solid var(--accent);outline-offset:2px}
+  @media (prefers-reduced-motion:reduce){.card img,.card .n{transition:none}}
   /* Placeholders in the shape of what is coming, holding the layout so nothing
      jumps when the real cards arrive. Deliberately still: the usual shimmer is
      motion with nothing to say — there is no content to preview, so it only
@@ -357,16 +370,21 @@
   .box button.boxx{
     /* --edge is the card's right edge, measured by alignToCard(): on a phone
        that is the screen's corner, on a wide screen it is wherever the card
-       ends, not a monitor's width away from it. */
-    position:fixed;top:calc(env(safe-area-inset-top) + 12px);right:var(--edge,14px);z-index:51;
+       ends, not a monitor's width away from it. The button is 40px for a
+       finger; the disc drawn in it is 30px, so the 5px difference is taken
+       off to keep the disc, not the invisible button, on the card's edge. */
+    position:fixed;top:calc(env(safe-area-inset-top) + 12px);right:calc(var(--edge,14px) - 5px);z-index:51;
     width:40px;height:40px;padding:0;border-radius:50%;text-transform:none;
     display:flex;align-items:center;justify-content:center;
-    /* No ring: the dark disc alone keeps the X readable over a white card,
-       and a bare X over a photo would vanish on a pale one. */
-    border:none;background:rgba(0,0,0,.34);
+    border:none;background:none;
   }
-  .box button.boxx:hover{background:rgba(255,255,255,.16)}
-  .box button.boxx svg{width:20px;height:20px;display:block}
+  /* A small quiet disc. Grey, not white or black: it has to show on the dark
+     overlay, where the X normally sits, and still back the white X if a card
+     scrolls underneath it while editing. */
+  .box button.boxx::before{content:"";position:absolute;inset:5px;border-radius:50%;background:rgba(120,120,130,.45)}
+  .box button.boxx:hover{background:none}
+  .box button.boxx:hover::before{background:rgba(150,150,160,.6)}
+  .box button.boxx svg{width:16px;height:16px;display:block;position:relative}
   /* Favorite sits at the right edge of the caption, on the name's own line,
      as it does under a tile in the list: its own control, clear of the name (next to it, it read as part of
      the name) and low enough for a thumb. An outline heart until it is one;
