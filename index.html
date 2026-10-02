@@ -35,9 +35,9 @@
       "url": "https://kept.cards/",
       "description": "Kept scans both sides of a greeting card, the printed front and the handwritten message inside, and keeps every card in a private, searchable archive sorted by who sent it and when. Reads the handwriting into text, shares with family, exports anytime.",
       "applicationCategory": "LifestyleApplication",
-      "operatingSystem": "iOS",
-      "installUrl": "https://apps.apple.com/app/id6809942529",
-      "downloadUrl": "https://apps.apple.com/app/id6809942529",
+      "operatingSystem": "iOS, Android",
+      "installUrl": ["https://apps.apple.com/app/id6809942529", "https://play.google.com/store/apps/details?id=com.lihallc.kept"],
+      "downloadUrl": ["https://apps.apple.com/app/id6809942529", "https://play.google.com/store/apps/details?id=com.lihallc.kept"],
       "image": "https://kept.cards/og-image.png",
       "screenshot": "https://kept.cards/og-image.png",
       "offers": [
@@ -78,6 +78,7 @@
       "email": "hello@lihallc.com",
       "sameAs": [
         "https://apps.apple.com/app/id6809942529",
+        "https://play.google.com/store/apps/details?id=com.lihallc.kept",
         "https://www.instagram.com/kept.cards/"
       ]
     },
@@ -100,27 +101,27 @@
   if (window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform()) {
     location.replace('app.html');
   }
-  /* Roughly 40% of visitors cannot use the App Store, and the page was handing
-     them a large black button that goes nowhere as its primary action. Mark the
-     document before first paint so the CTAs are already the right way round
-     rather than swapping under them. iPadOS reports itself as a Mac, so the
-     touch check keeps iPads on the App Store path where they belong. */
+  /* Kept is on both stores, so a desktop visitor is shown both buttons. A
+     phone is shown only its own: the other store's button goes nowhere useful
+     there. Marked before first paint so nothing swaps under the reader. iPadOS
+     reports itself as a Mac, so the touch check keeps iPads on the App Store. */
   (function () {
     var ua = navigator.userAgent || '';
-    var iOS = /iPhone|iPod/.test(ua) ||
-              (/iPad/.test(ua)) ||
+    var iOS = /iPhone|iPod|iPad/.test(ua) ||
               (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
-    if (!iOS) document.documentElement.className += ' no-ios';
+    if (iOS) document.documentElement.className += ' on-ios';
+    else if (/Android/.test(ua)) document.documentElement.className += ' on-android';
   })();
 </script>
 <script>
-  /* The header link and the eyebrow say "iPhone" too; keep them honest. */
+  /* The header button goes to the visitor's own store; on a computer, where
+     neither store installs anything, it opens Kept in the browser instead. */
   document.addEventListener('DOMContentLoaded', function () {
-    if (!/(^| )no-ios( |$)/.test(document.documentElement.className)) return;
-    var cta = document.getElementById('navCta');
-    if (cta) { cta.textContent = 'Open'; cta.setAttribute('href', 'app.html'); }
-    var eb = document.getElementById('eyebrow');
-    if (eb) eb.textContent = 'Works in your browser \u00b7 iPhone app too';
+    var cta = document.getElementById('navCta'); if (!cta) return;
+    var c = document.documentElement.className;
+    if (/(^| )on-ios( |$)/.test(c)) return;
+    if (/(^| )on-android( |$)/.test(c)) { cta.setAttribute('href', 'https://play.google.com/store/apps/details?id=com.lihallc.kept'); return; }
+    cta.textContent = 'Open'; cta.setAttribute('href', 'app.html');
   });
 </script>
 <style>
@@ -164,19 +165,9 @@
   .weblink{ font-size:15px; font-weight:600; color:var(--accent); text-decoration:none; }
   .weblink:hover{ color:var(--accent-ink); }
 
-  /* Off iPhone, the App Store button is a dead end and the web app is the real
-     offer, so the two swap places: .no-ios is set on <html> before first paint.
-     Both links stay present either way — an Android visitor may well own an
-     iPad, and someone on a desktop may be reading it to decide on a phone. */
-  .webbtn{ display:none; align-items:center; gap:10px; background:var(--accent); color:#fff; text-decoration:none;
-           padding:14px 24px; border-radius:14px; font-size:17px; font-weight:600; letter-spacing:-0.01em;
-           transition:transform .12s ease, box-shadow .12s ease; }
-  .webbtn:hover{ transform:translateY(-1px); box-shadow:0 8px 24px rgba(176,24,79,.28); color:#fff; }
-  .storelink{ display:none; font-size:15px; font-weight:600; color:var(--accent); text-decoration:none; }
-  .storelink:hover{ color:var(--accent-ink); }
-  html.no-ios .appstore, html.no-ios .weblink{ display:none; }
-  html.no-ios .webbtn{ display:inline-flex; }
-  html.no-ios .storelink{ display:inline; }
+  /* The Google Play button is the App Store button's twin. A phone hides the
+     store that is not its own; everything else shows both. */
+  html.on-ios .appstore.play, html.on-android .appstore:not(.play){ display:none; }
 
   .heroart{ justify-self:center; width:min(320px,80vw); aspect-ratio:1/1; border-radius:32px; background:var(--cream);
             display:flex; align-items:center; justify-content:center; box-shadow:0 24px 60px rgba(22,22,29,.14); }
@@ -266,7 +257,7 @@
   <div class="wrap">
     <section class="hero">
       <div class="herotext">
-        <span class="eyebrow" id="eyebrow">iPhone app · Also on web</span>
+        <span class="eyebrow" id="eyebrow">iPhone · Android · Web</span>
         <h1>Keep the handwriting. Lose the shoebox.</h1>
         <p class="sub">Kept scans both sides of a card, the printed front and the message written inside, and keeps every one searchable by who sent it and when.</p>
         <div class="cta-row">
@@ -274,9 +265,11 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.05 12.04c-.03-2.85 2.33-4.21 2.44-4.28-1.33-1.94-3.4-2.21-4.13-2.24-1.76-.18-3.43 1.03-4.32 1.03-.89 0-2.26-1.01-3.72-.98-1.91.03-3.68 1.11-4.66 2.82-1.99 3.45-.51 8.56 1.42 11.36.94 1.37 2.07 2.91 3.53 2.86 1.42-.06 1.96-.92 3.67-.92 1.71 0 2.19.92 3.69.89 1.53-.03 2.49-1.4 3.42-2.78.65-.95.92-1.44 1.44-2.51-3.78-1.44-3.19-6.63-.02-8.13zM14.13 4.02c.79-.95 1.32-2.28 1.18-3.6-1.13.05-2.5.76-3.31 1.71-.73.84-1.36 2.19-1.19 3.48 1.26.1 2.54-.64 3.32-1.59z"/></svg>
             <span class="ast"><small>Download on the</small><b>App Store</b></span>
           </a>
+          <a class="appstore play" href="https://play.google.com/store/apps/details?id=com.lihallc.kept" aria-label="Get Kept on Google Play">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.6 2.3c-.4.3-.6.8-.6 1.4v16.6c0 .6.2 1.1.6 1.4l9.5-9.7-9.5-9.7zm10.9 8.3l2.6-2.7L5.6 1.4l8.9 9.2zm0 2.8l-8.9 9.2 11.5-6.5-2.6-2.7zm6.3-3.1l-2.5-1.4-2.9 3.1 2.9 3.1 2.5-1.4c.9-.5.9-2.9 0-3.4z"/></svg>
+            <span class="ast"><small>Get it on</small><b>Google Play</b></span>
+          </a>
           <a class="weblink" href="app.html">Open on the web &rarr;</a>
-          <a class="webbtn" href="app.html">Open Kept on the web</a>
-          <a class="storelink" href="https://apps.apple.com/app/id6809942529">Also on iPhone &rarr;</a>
         </div>
       </div>
       <div class="heroart" aria-hidden="true">
@@ -362,7 +355,7 @@
         </div>
       </div>
       <p class="pricenote">Prices in US dollars; local taxes may apply at checkout. In the iPhone app, Kept
-        Unlimited is sold by Apple through the App Store. On the web it is sold by Paddle, acting as
+        Unlimited is sold by Apple through the App Store; in the Android app, by Google through Google Play. On the web it is sold by Paddle, acting as
         merchant of record. Cancelling keeps your access until the end of the period you have paid for —
         see <a href="terms#refunds">refunds and cancellation</a>. Cards already in your archive stay yours
         either way.</p>
@@ -377,9 +370,11 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.05 12.04c-.03-2.85 2.33-4.21 2.44-4.28-1.33-1.94-3.4-2.21-4.13-2.24-1.76-.18-3.43 1.03-4.32 1.03-.89 0-2.26-1.01-3.72-.98-1.91.03-3.68 1.11-4.66 2.82-1.99 3.45-.51 8.56 1.42 11.36.94 1.37 2.07 2.91 3.53 2.86 1.42-.06 1.96-.92 3.67-.92 1.71 0 2.19.92 3.69.89 1.53-.03 2.49-1.4 3.42-2.78.65-.95.92-1.44 1.44-2.51-3.78-1.44-3.19-6.63-.02-8.13zM14.13 4.02c.79-.95 1.32-2.28 1.18-3.6-1.13.05-2.5.76-3.31 1.71-.73.84-1.36 2.19-1.19 3.48 1.26.1 2.54-.64 3.32-1.59z"/></svg>
           <span class="ast"><small>Download on the</small><b>App Store</b></span>
         </a>
+        <a class="appstore play" href="https://play.google.com/store/apps/details?id=com.lihallc.kept" aria-label="Get Kept on Google Play">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.6 2.3c-.4.3-.6.8-.6 1.4v16.6c0 .6.2 1.1.6 1.4l9.5-9.7-9.5-9.7zm10.9 8.3l2.6-2.7L5.6 1.4l8.9 9.2zm0 2.8l-8.9 9.2 11.5-6.5-2.6-2.7zm6.3-3.1l-2.5-1.4-2.9 3.1 2.9 3.1 2.5-1.4c.9-.5.9-2.9 0-3.4z"/></svg>
+          <span class="ast"><small>Get it on</small><b>Google Play</b></span>
+        </a>
         <a class="weblink" href="app.html">Open on the web &rarr;</a>
-        <a class="webbtn" href="app.html">Open Kept on the web</a>
-        <a class="storelink" href="https://apps.apple.com/app/id6809942529">Also on iPhone &rarr;</a>
       </div>
     </section>
   </div>
