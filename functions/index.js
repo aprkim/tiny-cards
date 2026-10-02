@@ -392,7 +392,7 @@ exports.exportAll = onRequest({
 
       // transcription last, so older readers of this file are unaffected; csvCell
       // quotes the newlines and commas handwriting tends to have.
-      const rows = [['id', 'sender', 'recipient', 'occasion', 'date', 'pages', 'files', 'storagePaths', 'totalBytes', 'savedAt', 'transcription'].join(',')];
+      const rows = [['id', 'sender', 'recipient', 'occasion', 'date', 'pages', 'files', 'storagePaths', 'totalBytes', 'savedAt', 'transcription', 'favorite'].join(',')];
 
       // Two cards with the same date, occasion, recipient and sender produce the
       // same base, and so identical page filenames — which collide in the zip
@@ -425,7 +425,8 @@ exports.exportAll = onRequest({
           csvCell(card.id), csvCell(card.sender), csvCell(card.recipient), csvCell(card.occasion),
           csvCell(card.date), csvCell(paths.length), csvCell(names.join(' | ')),
           csvCell(paths.join(' | ')), csvCell(card.totalBytes || ''), csvCell(card.savedAt || ''),
-          csvCell(card.transcription || '')
+          csvCell(card.transcription || ''),
+          csvCell(card.fav ? 'yes' : '')        // new columns go last, as transcription did
         ].join(','));
       }
 

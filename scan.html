@@ -1030,7 +1030,7 @@
         <span>Delete Account</span>
       </button>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.4</span> · <span class="setver">v2026.10.02.0019</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.4</span> · <span class="setver">v2026.10.02.1105</span></p>
   </div>
 </div>
 
@@ -2001,6 +2001,7 @@
           var ii=pageLabels.indexOf('inside'), inside=ii>=0?(upPaths[ii]||''):'';
           if(prev)['transcription','transcriptionOf','transcriptionPendingAt','transcriptionFailed','translations']
             .forEach(function(k){if(prev[k]!==undefined)rec[k]=prev[k];});
+          if(prev&&prev.fav)rec.fav=true;             // a re-save keeps the favourite
           if(inside){
             // Older card read by hand, before transcriptionOf existed: adopt its text
             // only if the inside image is still the one it was saved with.

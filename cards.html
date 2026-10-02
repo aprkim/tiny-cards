@@ -169,6 +169,9 @@
   @media (hover:hover){.chip:hover{border-color:var(--accent);color:var(--accent)}}
   .chip.on{background:var(--ink);border-color:var(--ink);color:#fff}
   .chip b{font-weight:500;opacity:.5;margin-left:5px}
+  .favchip{display:inline-flex;align-items:center;gap:6px}
+  .favchip svg{width:13px;height:13px;fill:var(--accent);flex:none}
+  .favchip.on svg{fill:#fff}
   /* "+N more" / "Show less" — tappable chip to expand/collapse the strip. */
   .morechip{color:var(--muted)}
   /* Year filter is the first chip: a native <select> dressed as a pill so it keeps
@@ -232,6 +235,14 @@
     position:absolute;top:7px;right:7px;background:rgba(22,22,29,.82);color:#fff;
     font-size:11px;font-weight:600;padding:2px 8px;border-radius:100px;
   }
+  /* A favourite carries a small heart at the far end of its name line, under
+     the picture's right edge: the same corner the heart keeps on the open
+     card. Not beside the name, where it read as part of the name; not on the
+     picture, where it sat on someone's card like a sticker. */
+  .card p.hasfv{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .card p.hasfv .nm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .card p .fv{flex:none;margin-right:2px}
+  .card p .fv svg{width:18px;height:18px;fill:var(--accent);display:block}
   .card p{font-size:13.5px;font-weight:500;color:var(--ink);margin-top:8px;letter-spacing:-.01em}
   .card small{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
   /* Why this card matched, when the reason is inside it. One line, never two. */
@@ -347,10 +358,26 @@
     position:fixed;top:calc(env(safe-area-inset-top) + 12px);right:14px;z-index:51;
     width:40px;height:40px;padding:0;border-radius:50%;text-transform:none;
     display:flex;align-items:center;justify-content:center;
-    border:1px solid rgba(255,255,255,.28);background:rgba(0,0,0,.28);
+    /* No ring: the dark disc alone keeps the X readable over a white card,
+       and a bare X over a photo would vanish on a pale one. */
+    border:none;background:rgba(0,0,0,.34);
   }
   .box button.boxx:hover{background:rgba(255,255,255,.16)}
   .box button.boxx svg{width:20px;height:20px;display:block}
+  /* Favorite sits at the right edge of the caption, on the name's own line,
+     as it does under a tile in the list: its own control, clear of the name (next to it, it read as part of
+     the name) and low enough for a thumb. An outline heart until it is one;
+     then it fills. The owner's alone: a viewer of a shared archive has no
+     favourites of their own to keep. */
+  .box .cap{position:relative;align-self:stretch;width:100%;box-sizing:border-box;padding:0 60px}
+  .box .cap strong{line-height:24px}
+  .box button.boxfav{position:absolute;right:12px;top:-10px;   /* 44px button centred on the 24px name line */
+    width:44px;height:44px;padding:0;border:none;border-radius:50%;
+    background:none;display:flex;align-items:center;justify-content:center;text-transform:none}
+  .box button.boxfav:hover{background:rgba(255,255,255,.12)}
+  .box button.boxfav svg{width:24px;height:24px;display:block;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linejoin:round}
+  .box button.boxfav.on{background:none;color:#fff}
+  .box button.boxfav.on svg{fill:#E0457B;stroke:#E0457B}
   /* Transcript styles live with the sheet below: the card overlay shows the
      photo and its control, nothing else. */
   .ts-note{font-size:14px;color:rgba(255,255,255,.72);padding:14px 20px;line-height:1.5}   /* the sheet's 20px gutter, same as .ts-head */
@@ -865,6 +892,9 @@
   <div class="cap">
     <strong id="boxName"></strong>
     <small id="boxSub"></small>
+    <button id="boxFav" class="boxfav hidden" type="button" aria-label="Favorite" aria-pressed="false">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 8.8 6c1.3 0 2.5.6 3.2 1.6C12.700 6.600 13.900 6 15.200 6a4.3 4.3 0 0 1 4.300 4.300C19.500 15.900 12 20.500 12 20.500z"/></svg>
+    </button>
   </div>
   <div class="nav" id="boxNav"></div>
   <div class="rowbtns hidden" id="boxTools">
@@ -1047,7 +1077,7 @@
       </button>
       <p class="set-delnote hidden" id="delNote">Deletes your account, not the cards shared with you.</p>
     </div>
-    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.4</span> · <span class="setver">v2026.10.02.0019</span></p>
+    <p class="set-legal"><a href="https://kept.cards/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://kept.cards/terms" target="_blank" rel="noopener">Terms</a> · <span class="setmv">1.0.4</span> · <span class="setver">v2026.10.02.1105</span></p>
   </div>
 </div>
 
@@ -1314,7 +1344,7 @@
         else if(!existingIds[id])missing++;
       });
       if(existingIds[id]){skipped++;return;}
-      if(pages.length)plan.push({id:id,date:r.date||'',occasion:r.occasion||'',sender:r.sender||'',recipient:r.recipient||'',transcription:r.transcription||'',
+      if(pages.length)plan.push({id:id,date:r.date||'',occasion:r.occasion||'',sender:r.sender||'',recipient:r.recipient||'',transcription:r.transcription||'',fav:/^yes$/i.test((r.favorite||'').trim()),
                  savedAt:(/^\d+$/.test(r.savedAt||'')?Number(r.savedAt):Date.now()),pages:pages});
     });
     return {plan:plan,skipped:skipped,missing:missing};
@@ -1364,6 +1394,7 @@
             var rec={id:k.id,date:k.date,occasion:k.occasion,sender:k.sender,recipient:k.recipient,
                      labels:labels,paths:paths,savedAt:k.savedAt,bytes:bytes,totalBytes:bytes.reduce(function(a,b){return a+(b||0)},0)};
             if(k.transcription)rec.transcription=k.transcription;   // restored, not re-read: no API call, no cap
+            if(k.fav)rec.fav=true;
             var ref=fbDb.collection('tinyCards').doc(SPACE);
             return ref.get().then(function(doc){
               var rows=(doc.exists&&doc.data().cards)||[],found=false;
@@ -1896,7 +1927,7 @@
   $('setSignOut').onclick=function(){closeSettings();doSignOut()};
   function doSignOut(){
     var reset=function(){
-      authUser=null;myUid=null;SPACE=null;cards=[];filter=null;yearFilter=null;showAllPeople=false;
+      authUser=null;myUid=null;SPACE=null;cards=[];filter=null;yearFilter=null;favOnly=false;showAllPeople=false;
       var sw=$('spaceSwitcher');if(sw){sw.classList.add('hidden');sw.innerHTML='';}
       $('gearBtn').classList.add('hidden');
       $('view').classList.add('hidden');
@@ -2268,7 +2299,7 @@
     });
     sel.innerHTML=html;sel.value=SPACE;sel.classList.remove('hidden');
     sel.onchange=function(){
-      SPACE=sel.value;$('groups').innerHTML='';$('q').value='';filter=null;yearFilter=null;showAllPeople=false;
+      SPACE=sel.value;$('groups').innerHTML='';$('q').value='';filter=null;yearFilter=null;favOnly=false;showAllPeople=false;
       $('cloudSub').textContent='Opening…';
       // Switching to a shared space: refresh the token so a freshly-granted viewOf
       // claim (just approved) is present before the read.
@@ -2294,6 +2325,7 @@
   }
 
   var yearFilter=null;
+  var favOnly=false;         // the Favorites chip: show only cards marked with the heart
   var showAllPeople=false;   // tapping "+N more" expands the strip to show every sender
 
   // Year filter, rendered as the first chip in the sender strip: a native <select>
@@ -2320,6 +2352,17 @@
     var c={},box=$('people');box.innerHTML='';
     box.classList.toggle('expanded',showAllPeople);
     var yc=buildYearChip();if(yc)box.appendChild(yc);   // year filter sits first
+    // Favorites next, once there is at least one: an empty filter is a dead end.
+    var favs=cards.filter(isFav).length;
+    if(!favs)favOnly=false;
+    else{
+      var fc=document.createElement('button');
+      fc.className='chip favchip'+(favOnly?' on':'');fc.type='button';
+      fc.setAttribute('aria-pressed',favOnly?'true':'false');
+      fc.innerHTML=HEART_SVG+'Favorites<b>'+favs+'</b>';
+      fc.onclick=function(){favOnly=!favOnly;people();render()};
+      box.appendChild(fc);
+    }
     cards.forEach(function(x){if(x.ok)c[x.person]=(c[x.person]||0)+1});
     var names=Object.keys(c).sort(function(a,b){return c[b]-c[a]||a.localeCompare(b)});
     names.forEach(function(n){
@@ -2350,13 +2393,13 @@
     for(var i=0;i<chips.length;i++){if(over(chips[i])){firstOver=i;break;}}
     if(firstOver<0)return;                                   // everything fits
     while(box.children.length>firstOver)box.removeChild(box.lastChild);
-    var shown=box.querySelectorAll('.chip:not(.yearchip)').length;
+    var shown=box.querySelectorAll('.chip:not(.yearchip):not(.favchip)').length;
     var hidden=totalSenders-shown;
     var more=moreChip('+'+hidden+' more',function(){showAllPeople=true;people();});
     box.appendChild(more);
     while(over(more)){                                       // make room for the +N chip
       var prev=more.previousElementSibling;
-      if(!prev||prev.classList.contains('yearchip')){box.removeChild(more);break;}
+      if(!prev||prev.classList.contains('yearchip')||prev.classList.contains('favchip')){box.removeChild(more);break;}
       box.removeChild(prev);hidden++;more.textContent='+'+hidden+' more';
     }
   }
@@ -2437,6 +2480,7 @@
       x.snip=null;
       if(filter&&x.person!==filter)return false;
       if(yearFilter&&x.year!==yearFilter)return false;
+      if(favOnly&&!isFav(x))return false;
       if(!q)return true;
       if(normQ(x.person+' '+x.recipient+' '+x.event+' '+x.date).indexOf(q)>-1)return true;
       // Only the words inside matched: show where, since nothing else on the
@@ -2476,8 +2520,10 @@
         var b=document.createElement('button');b.className='card';b.type='button';
         var badge=x.pages.length>1?'<span class="n">'+x.pages.length+'</span>':'';
         var sub=(x.date?fmtCardDate(x.date):'no date')+(x.recipient?' · to '+x.recipient:'');
+        var fav=isFav(x)?'<span class="fv" role="img" aria-label="Favorite">'+HEART_SVG+'</span>':'';
         b.innerHTML='<img loading="lazy" src="'+(x.pages[0].thumb||x.pages[0].url)+'" alt="'+esc(x.person)+'">'+badge+
-                    '<p>'+esc(x.person)+'</p><small>'+esc(sub)+'</small>';
+                    (fav?'<p class="hasfv"><span class="nm">'+esc(x.person)+'</span>'+fav+'</p>':'<p>'+esc(x.person)+'</p>')+
+                    '<small>'+esc(sub)+'</small>';
         if(x.snip){
           var sn=document.createElement('span');sn.className='snip';
           sn.appendChild(document.createTextNode(x.snip.before));
@@ -2501,6 +2547,44 @@
     if(!pg.path)return Promise.reject(new Error('no path'));
     return fbStore.ref().child(pg.path).getDownloadURL().then(function(u){pg.url=u;return u;});
   }
+
+  /* ---- favourites ----
+     One flag on the card's own row (fav:true, absent otherwise), so it travels
+     with the card to every device the owner signs in on. The heart flips at
+     once and the write follows; if the write fails it flips back and says so,
+     rather than showing a favourite that the next launch would forget. */
+  var HEART_SVG='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 8.8 6c1.3 0 2.5.6 3.2 1.6C12.700 6.600 13.900 6 15.200 6a4.3 4.3 0 0 1 4.300 4.300C19.500 15.900 12 20.500 12 20.500z"/></svg>';
+  function isFav(x){return !!(x&&x.raw&&x.raw.fav);}
+  function paintFav(card){
+    var b=$('boxFav'),on=isFav(card);
+    b.classList.toggle('on',on);
+    b.setAttribute('aria-pressed',on?'true':'false');
+    b.setAttribute('aria-label',on?'Remove from favorites':'Add to favorites');
+  }
+  function setFav(card,on){
+    if(!card.raw)card.raw={};
+    if(on)card.raw.fav=true;else delete card.raw.fav;
+    if(openCard===card)paintFav(card);
+    people();render();
+  }
+  $('boxFav').onclick=function(e){
+    e.stopPropagation();
+    var card=openCard;
+    if(!card||!fromCloud||!isOwner())return;
+    var on=!isFav(card);
+    setFav(card,on);
+    cloudMutate(function(rows){
+      return rows.map(function(r){
+        if(!r||r.id!==card.id)return r;
+        if(on)r.fav=true;else delete r.fav;
+        return r;
+      });
+    }).catch(function(err){
+      setFav(card,!on);
+      openAlert('Could not save that. Check your connection and try again.','Not saved');
+      if(window.console)console.warn('favorite failed',err);
+    });
+  };
 
   function show(card,page){
     openCard=card;openPage=page;
@@ -2544,6 +2628,7 @@
     // Transcript block, Inside page only; re-evaluated on every page switch.
     renderTrans(card,p,owner);
     $('boxTools').classList.toggle('hidden',!fromCloud);
+    $('boxFav').classList.toggle('hidden',!owner);paintFav(card);
     $('boxEdit').classList.toggle('hidden',!owner);
     $('boxCrop').classList.toggle('hidden',!owner);
     $('boxDel').classList.toggle('hidden',!owner);
