@@ -39,6 +39,11 @@ const ASC_KEY_ID = '64UWYHUT4U';
 const ASC_ISSUER_ID = '3b91da73-8eac-4afe-9953-382360955284';
 const ASC_VENDOR = '94815949';
 const APPLE_APP_ID = '6809942529';
+// Google Play's reports bucket (Play Console -> Play apps reports -> Statistics
+// -> Copy Cloud Storage URI). Read as the functions' own service account, which
+// Play Console lists as a user with "view app information" on Kept: no key file.
+const PLAY_BUCKET = 'pubsite_prod_8532189224813703418';
+const PLAY_PACKAGE = 'com.lihallc.kept';
 
 // Access model: each user owns tinyCards/{uid}. Read access to another user's
 // space is granted by a `viewOf` custom claim (see redeemInvite). Mirrors rules.
@@ -624,6 +629,42 @@ async function appStoreDownloads(db) {
     days: Object.keys(days).sort().map((d) => ({d, dl: days[d].dl}))};
 }
 
+/* Google Play installs, from the monthly overview CSV Play writes to its
+   reports bucket (stats/installs/installs_<package>_<YYYYMM>_overview.csv,
+   UTF-16). One row per day: new user installs, uninstalls, and the one number
+   Apple never gives — devices with the app installed right now. The current
+   month and the previous one cover any 30-day window; a month with no file yet
+   is simply absent. Play writes a day's row a day or two later. */
+async function playInstalls() {
+  const bucket = admin.storage().bucket(PLAY_BUCKET);
+  const now = new Date(), months = [];
+  for (let i = 0; i < 2; i++) {
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
+    months.push(d.getUTCFullYear() + String(d.getUTCMonth() + 1).padStart(2, '0'));
+  }
+  const rows = {};
+  for (const ym of months) {
+    const file = bucket.file('stats/installs/installs_' + PLAY_PACKAGE + '_' + ym + '_overview.csv');
+    let text;
+    try { text = (await file.download())[0].toString('utf16le'); }
+    catch (e) { if (e.code === 404) continue; throw e; }
+    const lines = text.replace(/^\ufeff/, '').split(/\r?\n/).filter(Boolean);
+    const cols = lines[0].split(',').map((c) => c.trim());
+    const col = (name) => cols.indexOf(name);
+    const iDate = col('Date'), iNew = col('Daily User Installs'), iUn = col('Daily User Uninstalls'), iActive = col('Active Device Installs');
+    for (const line of lines.slice(1)) {
+      const f = line.split(',');
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(f[iDate] || '')) continue;
+      rows[f[iDate]] = {dl: Number(f[iNew]) || 0, un: Number(f[iUn]) || 0, active: Number(f[iActive]) || 0};
+    }
+  }
+  const days = Object.keys(rows).sort().slice(-30);
+  if (!days.length) return {through: null, dl7: 0, dl30: 0, un30: 0, active: null, days: []};
+  const sum = (n, k) => days.slice(-n).reduce((a, d) => a + rows[d][k], 0);
+  return {through: days[days.length - 1], dl7: sum(7, 'dl'), dl30: sum(30, 'dl'), un30: sum(30, 'un'),
+    active: rows[days[days.length - 1]].active, days: days.map((d) => ({d, dl: rows[d].dl}))};
+}
+
 exports.keptStatus = onCall({secrets: [ASC_PRIVATE_KEY], timeoutSeconds: 120}, async (req) => {
   const auth = req.auth;
   requireVerified(auth);
@@ -641,10 +682,11 @@ exports.keptStatus = onCall({secrets: [ASC_PRIVATE_KEY], timeoutSeconds: 120}, a
   const fresh = (id) => ({id: id.slice(0, 4), firstSeen: 0, lastSeen: 0, lastCard: 0, lastActive: 0,
     cards: 0, days: 0, transcribed: 0, favorites: 0, unlimited: false});
 
-  const [usersSnap, cardsSnap, appstore] = await Promise.all([
+  const [usersSnap, cardsSnap, appstore, play] = await Promise.all([
     db.collection('users').get(), db.collection('tinyCards').get(),
     // The stores are a separate system: if Apple is down the people still count.
     appStoreDownloads(db).catch((e) => { logger.warn('keptStatus: appstore', {err: e.message}); return {error: e.message}; }),
+    playInstalls().catch((e) => { logger.warn('keptStatus: play', {err: e.message}); return {error: e.message}; }),
   ]);
   const accounts = new Map();
   usersSnap.forEach((d) => {
@@ -691,7 +733,7 @@ exports.keptStatus = onCall({secrets: [ASC_PRIVATE_KEY], timeoutSeconds: 120}, a
       unlimited: n((r) => r.unlimited),
     },
     totals,
-    stores: {appstore},
+    stores: {appstore, play},
     accounts: list,
   };
 });
