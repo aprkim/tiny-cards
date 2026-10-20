@@ -9,6 +9,7 @@ Disallow: /app.html
 Disallow: /cards.html
 Disallow: /scan.html
 Disallow: /viewer.html
+Disallow: /status.html
 Disallow: /vendor/
 
 # AI assistants' crawlers, allowed explicitly so a default-deny list somewhere

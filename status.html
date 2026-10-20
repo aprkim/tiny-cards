@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kept status</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* The owner's page: is anyone using Kept? Counts and dates, nothing else.
+     Styled like the public site (index/404), not like the app, because it is
+     read at a desk and never bundled into the phone apps. */
+  :root { --bg:#f2f2f0; --card:#fff; --ink:#111; --muted:#5c5c5c; --line:#e0e0dd; --accent:#B0184F; --accent-soft:#FBEDF2; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--ink); font-family:'Inter',-apple-system,sans-serif; font-size:16px; line-height:1.5; -webkit-font-smoothing:antialiased; min-height:100vh; }
+  a { color:var(--ink); }
+  header.site { display:flex; align-items:center; justify-content:space-between; padding:28px 6vw; }
+  .logo { white-space:nowrap; font-weight:700; font-size:18px; letter-spacing:-0.01em; text-decoration:none; }
+  .eyebrow { font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:0.14em; text-transform:uppercase; color:var(--muted); }
+  main { max-width:900px; margin:0 auto; padding:10px 6vw 80px; }
+  h1 { font-size:clamp(28px,4vw,36px); font-weight:700; letter-spacing:-0.02em; line-height:1.1; margin:8px 0 6px; }
+  .sub { color:var(--muted); margin-bottom:28px; }
+  .sub b { color:var(--ink); font-weight:600; }
+  .btn { display:inline-block; font:inherit; font-size:15px; font-weight:600; padding:12px 22px; border-radius:10px; background:var(--accent); border:1px solid var(--accent); color:#fff; cursor:pointer; text-decoration:none; }
+  .btn.quiet { background:var(--card); color:var(--ink); border-color:var(--line); }
+  .btn:disabled { opacity:.5; cursor:default; }
+  .notice { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:28px; max-width:520px; }
+  .notice p { color:var(--muted); margin:8px 0 20px; }
+  .hidden { display:none !important; }
+
+  /* The stores keep their own numbers (impressions, downloads) to themselves,
+     so the page links out rather than pretending. */
+  .links { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:34px; }
+  .links a { font-size:13.5px; font-weight:500; text-decoration:none; color:var(--ink); background:var(--card); border:1px solid var(--line); border-radius:100px; padding:7px 14px; }
+  .links a:hover { border-color:var(--accent); color:var(--accent); }
+
+  h2 { font-size:15px; font-weight:700; letter-spacing:-0.01em; margin:0 0 12px; }
+  section { margin-bottom:38px; }
+  .funnel { background:var(--card); border:1px solid var(--line); border-radius:14px; overflow:hidden; }
+  .step { display:grid; grid-template-columns:1fr auto; gap:4px 18px; align-items:center; padding:14px 20px; border-top:1px solid var(--line); }
+  .step:first-child { border-top:none; }
+  .step .label { font-weight:500; }
+  .step .hint { font-size:12.5px; color:var(--muted); grid-column:1; }
+  .step .num { font-size:26px; font-weight:700; letter-spacing:-0.02em; font-variant-numeric:tabular-nums; grid-column:2; grid-row:1 / span 3; text-align:right; align-self:center; }
+  .step .bar { grid-column:1; height:6px; border-radius:3px; background:var(--accent-soft); overflow:hidden; margin-top:2px; }
+  .step .bar i { display:block; height:100%; background:var(--accent); border-radius:3px; }
+  .step.drop .num { color:var(--muted); }
+
+  .totals { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; }
+  .tile { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px 18px; }
+  .tile .num { font-size:26px; font-weight:700; letter-spacing:-0.02em; font-variant-numeric:tabular-nums; }
+  .tile .label { font-size:13px; color:var(--muted); }
+
+  table { width:100%; border-collapse:collapse; background:var(--card); border:1px solid var(--line); border-radius:14px; overflow:hidden; font-size:14px; }
+  th, td { text-align:left; padding:10px 14px; border-top:1px solid var(--line); font-variant-numeric:tabular-nums; white-space:nowrap; }
+  th { font-size:12px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); font-weight:600; border-top:none; }
+  td.n, th.n { text-align:right; }
+  td.mono { font-family:'IBM Plex Mono',monospace; font-size:13px; }
+  td .ago { color:var(--muted); font-size:12.5px; margin-left:6px; }
+  tr.quiet td { color:var(--muted); }
+  .tablewrap { overflow-x:auto; }
+  .foot { font-size:13px; color:var(--muted); margin-top:14px; max-width:60ch; }
+  .err { color:#BF3143; }
+</style>
+</head>
+<body>
+<header class="site">
+  <a class="logo" href="/">Kept</a>
+  <span class="eyebrow">Owner only</span>
+</header>
+
+<main>
+  <h1>Status</h1>
+  <p class="sub" id="sub">Is anyone using Kept?</p>
+
+  <div class="notice" id="gate">
+    <p id="gateText">Sign in with the account that owns Kept.</p>
+    <button class="btn" id="signIn" type="button">Sign in with Google</button>
+  </div>
+
+  <div id="report" class="hidden">
+    <div class="links">
+      <a href="https://appstoreconnect.apple.com/apps/6809942529/analytics" target="_blank" rel="noopener">App Store Connect</a>
+      <a href="https://play.google.com/console/" target="_blank" rel="noopener">Play Console</a>
+      <a href="https://app.revenuecat.com/" target="_blank" rel="noopener">RevenueCat</a>
+      <a href="https://search.google.com/search-console?resource_id=sc-domain%3Akept.cards" target="_blank" rel="noopener">Search Console</a>
+      <a href="https://console.firebase.google.com/project/tiny-wins25/firestore/data/~2FtinyCards" target="_blank" rel="noopener">Firestore</a>
+    </div>
+
+    <section>
+      <h2>People</h2>
+      <div class="funnel" id="funnel"></div>
+      <p class="foot">Your own, review and test accounts are left out. "Signed in" counts accounts that have opened Kept itself, not the other apps on the same project.</p>
+    </section>
+
+    <section>
+      <h2>Cards</h2>
+      <div class="totals" id="totals"></div>
+    </section>
+
+    <section>
+      <h2>Accounts</h2>
+      <div class="tablewrap"><table id="accounts"></table></div>
+      <p class="foot">Four letters of each account id, so a row can be matched in RevenueCat or Firestore. "Last active" is the latest of: a card saved, the archive edited, or Kept opened. Opens are only recorded from October 2026 on.</p>
+    </section>
+
+    <button class="btn quiet" id="refresh" type="button">Refresh</button>
+  </div>
+</main>
+
+<script src="vendor/firebase/firebase-app.js"></script>
+<script src="vendor/firebase/firebase-auth.js"></script>
+<script src="vendor/firebase/firebase-functions.js"></script>
+<script>
+(function(){
+  var $=function(id){return document.getElementById(id)};
+  var FB={
+    apiKey:"AIzaSyBycFP3HfMF7tyshQixvwzoaAE3Df8Fz_8",
+    authDomain:"auth.kept.cards",
+    projectId:"tiny-wins25",
+    storageBucket:"tiny-wins25.firebasestorage.app",
+    messagingSenderId:"497477643272",
+    appId:"1:497477643272:web:9f8e43fbffd18003e5f5bd"
+  };
+  if(!firebase.apps.length)firebase.initializeApp(FB);
+  function fns(){return firebase.app().functions('us-east1');}
+
+  function signIn(){
+    var p=new firebase.auth.GoogleAuthProvider();
+    p.setCustomParameters({prompt:'select_account'});
+    return firebase.auth().signInWithPopup(p).catch(function(e){
+      var c=e&&e.code||'';
+      if(/popup-blocked|popup-closed-by-user|operation-not-supported|cancelled-popup-request/.test(c)){
+        return firebase.auth().signInWithRedirect(p);
+      }
+      throw e;
+    });
+  }
+  $('signIn').onclick=function(){
+    $('signIn').disabled=true;
+    signIn().catch(function(e){$('gateText').textContent='Sign-in failed'+(e&&e.code?' ('+e.code+')':'')+'.';$('signIn').disabled=false;});
+  };
+  $('refresh').onclick=load;
+  firebase.auth().onAuthStateChanged(function(u){ if(u)load(); else gate('Sign in with the account that owns Kept.'); });
+
+  function gate(msg,isErr){
+    $('report').classList.add('hidden');$('gate').classList.remove('hidden');
+    $('gateText').textContent=msg;$('gateText').classList.toggle('err',!!isErr);
+    $('signIn').disabled=false;
+  }
+
+  function load(){
+    $('sub').textContent='Counting…';
+    fns().httpsCallable('keptStatus')({}).then(function(r){render(r.data||{});}).catch(function(e){
+      var code=(e&&e.code)||'';
+      if(/permission-denied/.test(code)){
+        firebase.auth().signOut();
+        gate('That account does not own Kept. Sign in with the owner account.',true);
+      }else{
+        gate('Could not load the status'+(code?' ('+code+')':'')+'. Try again in a moment.',true);
+      }
+      $('sub').textContent='Is anyone using Kept?';
+    });
+  }
+
+  var DAY=86400000;
+  function fmtDate(t){
+    if(!t)return '—';
+    var d=new Date(t),m=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return m[d.getMonth()]+' '+d.getDate();
+  }
+  function ago(t){
+    if(!t)return '';
+    var n=Math.floor((Date.now()-t)/DAY);
+    return n<=0?'today':n===1?'yesterday':n+'d ago';
+  }
+  function esc(t){var d=document.createElement('div');d.textContent=t;return d.innerHTML}
+
+  function render(d){
+    var f=d.funnel||{},t=d.totals||{},rows=d.accounts||[];
+    $('gate').classList.add('hidden');$('report').classList.remove('hidden');
+    var when=new Date(d.generatedAt||Date.now());
+    $('sub').innerHTML='<b>'+f.savedAny+'</b> '+(f.savedAny===1?'person has':'people have')+' saved a card · <b>'+f.active7+'</b> active this week · as of '+esc(when.toLocaleString());
+
+    // Each step as a share of "signed in"; the hint says what was lost from the step before.
+    var steps=[
+      ['signedIn','Signed in to Kept','opened the app and signed in'],
+      ['savedAny','Saved at least one card','the first real use'],
+      ['saved5','Saved 5 or more','past the first try'],
+      ['returned','Came back on another day','saved cards on two or more days'],
+      ['active7','Active in the last 7 days','saved, edited or opened'],
+      ['active30','Active in the last 30 days',''],
+      ['nearLimit','Close to the free limit (15+ cards)','the next people who might subscribe'],
+      ['unlimited','Kept Unlimited subscribers','']
+    ];
+    var base=f.signedIn||0,prev=null,html='';
+    steps.forEach(function(s,i){
+      var v=f[s[0]]||0,pct=base?Math.round(v/base*100):0;
+      var parts=[];
+      if(i>0&&i<4&&prev!==null&&prev>v)parts.push((prev-v)+' stopped here');
+      if(s[2])parts.push(s[2]);
+      if(base&&i>0)parts.push(pct+'% of signed in');
+      html+='<div class="step'+(v===0?' drop':'')+'"><span class="label">'+esc(s[1])+'</span><span class="num">'+v+'</span>'+
+            '<span class="hint">'+esc(parts.join(' \u00b7 '))+'</span>'+
+            '<span class="bar"><i style="width:'+pct+'%"></i></span></div>';
+      if(i<4)prev=v;
+    });
+    $('funnel').innerHTML=html;
+
+    $('totals').innerHTML=[
+      [t.cards||0,'cards in all archives'],
+      [t.cards7||0,'saved in the last 7 days'],
+      [t.cards30||0,'saved in the last 30 days'],
+      [t.transcribed||0,'with the handwriting read']
+    ].map(function(x){return '<div class="tile"><div class="num">'+x[0]+'</div><div class="label">'+esc(x[1])+'</div></div>';}).join('');
+
+    var th='<tr><th>Account</th><th>First seen</th><th>Last active</th><th class="n">Cards</th><th class="n">Days</th><th class="n">Read</th><th class="n">♥</th><th>Plan</th></tr>';
+    var tr=rows.map(function(r){
+      var quiet=!r.cards;
+      return '<tr'+(quiet?' class="quiet"':'')+'><td class="mono">'+esc(r.id)+'…</td><td>'+fmtDate(r.firstSeen)+'</td>'+
+             '<td>'+fmtDate(r.lastActive)+'<span class="ago">'+ago(r.lastActive)+'</span></td>'+
+             '<td class="n">'+r.cards+'</td><td class="n">'+r.days+'</td><td class="n">'+r.transcribed+'</td><td class="n">'+(r.favorites||'')+'</td>'+
+             '<td>'+(r.unlimited?'Unlimited':'Free')+'</td></tr>';
+    }).join('');
+    $('accounts').innerHTML=th+(tr||'<tr><td colspan="8">No accounts yet.</td></tr>');
+  }
+  window.keptStatusRender=render;   // so the page can be checked with sample data
+})();
+</script>
+</body>
+</html>

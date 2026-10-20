@@ -544,6 +544,95 @@ function normEmail(raw) {
   return local + '@' + domain;
 }
 
+/* ---- Status --------------------------------------------------------------
+   kept.cards/status asks one question — is anyone using Kept? — and this
+   answers it in one call, so it no longer means three dashboards and matching
+   uids by hand. Counts and dates only: nothing here reads a card's pictures,
+   names or text, and what goes back is a four-character account stub, never a
+   uid or an email. The caller must be signed in as one of STATUS_ADMINS, and
+   OWN_ACCOUNTS (April's own logins, the App Review one, the test one) are left
+   out of every number, so a night of testing never looks like traction.
+
+   What counts as what:
+     signed in     users/{uid} exists — syncSharedAccess creates it on the first
+                   open of THIS app, so the other apps on the project stay out
+     saved a card  tinyCards/{uid} holds at least one card
+     came back     cards saved on two or more different days
+     active        a card saved, the archive edited, or the app opened
+                   (lastSeenAt) inside the window */
+const STATUS_ADMINS = ['aprkim@gmail.com'];
+const OWN_ACCOUNTS = ['aprkim@gmail.com', 'lihallcapp@gmail.com', 'aprkim1@gmail.com'];
+const UID_RE = /^[A-Za-z0-9]{20,}$/;   // tinyCards also holds pre-account docs ("family", "cloudedit-…")
+
+exports.keptStatus = onCall(async (req) => {
+  const auth = req.auth;
+  requireVerified(auth);
+  const me = normEmail(auth.token.email || '');
+  if (!STATUS_ADMINS.map(normEmail).includes(me)) throw new HttpsError('permission-denied', 'This page is for the owner of Kept.');
+
+  const own = new Set();
+  for (const e of OWN_ACCOUNTS) {
+    const u = await admin.auth().getUserByEmail(e).catch(() => null);
+    if (u) own.add(u.uid);
+  }
+  const db = admin.firestore();
+  const DAY = 86400000, now = Date.now(), d7 = now - 7 * DAY, d30 = now - 30 * DAY;
+  const ms = (v) => (v && typeof v.toMillis === 'function') ? v.toMillis() : (typeof v === 'number' ? v : 0);
+  const fresh = (id) => ({id: id.slice(0, 4), firstSeen: 0, lastSeen: 0, lastCard: 0, lastActive: 0,
+    cards: 0, days: 0, transcribed: 0, favorites: 0, unlimited: false});
+
+  const [usersSnap, cardsSnap] = await Promise.all([
+    db.collection('users').get(), db.collection('tinyCards').get(),
+  ]);
+  const accounts = new Map();
+  usersSnap.forEach((d) => {
+    if (own.has(d.id) || !UID_RE.test(d.id)) return;
+    const u = d.data() || {}, row = fresh(d.id);
+    row.firstSeen = ms(u.createdAt); row.lastSeen = ms(u.lastSeenAt); row.unlimited = u.isUnlimited === true;
+    accounts.set(d.id, row);
+  });
+  const totals = {cards: 0, cards7: 0, cards30: 0, transcribed: 0};
+  cardsSnap.forEach((d) => {
+    if (own.has(d.id) || !UID_RE.test(d.id)) return;
+    const data = d.data() || {}, rows = (data.cards || []).filter(Boolean);
+    if (!rows.length) return;
+    const row = accounts.get(d.id) || fresh(d.id);
+    accounts.set(d.id, row);
+    const days = new Set();
+    rows.forEach((c) => {
+      const t = Number(c.savedAt) || 0;
+      totals.cards++; if (t > d7) totals.cards7++; if (t > d30) totals.cards30++;
+      if (t) { days.add(Math.floor(t / DAY)); if (t > row.lastCard) row.lastCard = t; }
+      if (c.transcription) { totals.transcribed++; row.transcribed++; }
+      if (c.fav) row.favorites++;
+    });
+    row.cards = rows.length; row.days = days.size;
+    // The first card predates lastSeenAt tracking for early accounts: let it stand in.
+    const first = Math.min(...rows.map((c) => Number(c.savedAt) || Infinity));
+    if (isFinite(first) && (!row.firstSeen || first < row.firstSeen)) row.firstSeen = first;
+    row.lastActive = Math.max(row.lastCard, ms(data.updatedAt));
+  });
+  const list = Array.from(accounts.values());
+  list.forEach((r) => { r.lastActive = Math.max(r.lastActive, r.lastSeen); });
+  list.sort((a, b) => b.lastActive - a.lastActive || b.cards - a.cards);
+  const n = (f) => list.filter(f).length;
+  return {
+    generatedAt: now,
+    funnel: {
+      signedIn: list.length,
+      savedAny: n((r) => r.cards >= 1),
+      saved5: n((r) => r.cards >= 5),
+      returned: n((r) => r.days >= 2),
+      active7: n((r) => r.lastActive > d7),
+      active30: n((r) => r.lastActive > d30),
+      nearLimit: n((r) => r.cards >= 15 && !r.unlimited),
+      unlimited: n((r) => r.unlimited),
+    },
+    totals,
+    accounts: list,
+  };
+});
+
 // Owner grants view access to an email. If a verified account already exists for
 // it, the claim is set immediately (the viewer picks it up on their next open);
 // otherwise it's stored and granted when that email first signs in (syncSharedAccess).
@@ -594,6 +683,9 @@ exports.syncSharedAccess = onCall(async (req) => {
   await db.collection('users').doc(uid).create({
     isUnlimited: false, unlimitedSource: null, createdAt: admin.firestore.FieldValue.serverTimestamp(),
   }).catch((e) => { if (e.code !== 6) throw e; });   // 6 = ALREADY_EXISTS: every sign-in after the first
+  // The archive calls this on every open, so lastSeenAt is "when did they last
+  // open Kept". Only the status page reads it.
+  await db.collection('users').doc(uid).set({lastSeenAt: admin.firestore.FieldValue.serverTimestamp()}, {merge: true});
   if (!key) return {granted: []};
   const owners = await db.collection('emailGrants').doc(key).collection('owners').get();
   if (owners.empty) return {granted: []};
