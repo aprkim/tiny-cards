@@ -58,7 +58,9 @@
   /* Thirty thin bars, one per day: shape, not precision - the numbers are above. */
   .barrow { display:flex; align-items:flex-end; gap:12px; margin-top:12px; }
   .barlabel { font-size:12px; color:var(--muted); width:84px; flex:none; padding-bottom:1px; }
-  .bars { display:flex; align-items:flex-end; gap:3px; height:36px; flex:1; }
+  .barcol { flex:1; min-width:0; }
+  .bars { display:flex; align-items:flex-end; gap:3px; height:36px; }
+  .axis { display:flex; justify-content:space-between; font-size:11px; color:var(--muted); margin-top:4px; font-variant-numeric:tabular-nums; }
   .bars i { flex:1; min-width:3px; background:var(--accent); border-radius:2px 2px 0 0; opacity:.85; }
   .bars i.zero { background:var(--line); height:2px; opacity:1; }
   table { width:100%; border-collapse:collapse; background:var(--card); border:1px solid var(--line); border-radius:14px; overflow:hidden; font-size:14px; }
@@ -100,8 +102,8 @@
     <section>
       <h2>Downloads</h2>
       <div class="totals" id="stores"></div>
-      <div class="barrow"><span class="barlabel">App Store</span><div class="bars" id="storeBars"></div></div>
-      <div class="barrow"><span class="barlabel">Google Play</span><div class="bars" id="playBars"></div></div>
+      <div class="barrow"><span class="barlabel">App Store</span><div class="barcol"><div class="bars" id="storeBars"></div><div class="axis" id="storeAxis"></div></div></div>
+      <div class="barrow"><span class="barlabel">Google Play</span><div class="barcol"><div class="bars" id="playBars"></div><div class="axis" id="playAxis"></div></div></div>
       <p class="foot" id="storesFoot"></p>
     </section>
 
@@ -187,6 +189,7 @@
     var d=new Date(t),m=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     return m[d.getMonth()]+' '+d.getDate();
   }
+  function fmtIso(d){return fmtDate(Date.parse(d+'T12:00:00Z'));}   // 'YYYY-MM-DD' -> 'Oct 18'
   function ago(t){
     if(!t)return '';
     var n=Math.floor((Date.now()-t)/DAY);
@@ -239,13 +242,17 @@
     }
     $('stores').innerHTML=tiles.map(function(x){return '<div class="tile"><div class="num">'+(x[0]==null?'\u2014':x[0])+'</div><div class="label">'+esc(x[1])+'</div></div>';}).join('')
       ||'<div class="tile"><div class="label">No store numbers yet.</div></div>';
-    function bars(id,days){
+    function bars(id,axisId,days){
       days=days||[];var max=Math.max.apply(null,days.map(function(x){return x.dl||0}).concat([1]));
       $(id).innerHTML=days.map(function(x){
-        return x.dl?'<i style="height:'+Math.max(8,Math.round(x.dl/max*100))+'%" title="'+esc(x.d+': '+x.dl)+'"></i>':'<i class="zero" title="'+esc(x.d+': 0')+'"></i>';
+        var t=fmtIso(x.d)+': '+(x.dl||0);
+        return x.dl?'<i style="height:'+Math.max(8,Math.round(x.dl/max*100))+'%" title="'+esc(t)+'"></i>':'<i class="zero" title="'+esc(t)+'"></i>';
       }).join('');
+      // First day, the middle one, the last: enough to place any bar within a day or two.
+      $(axisId).innerHTML=days.length<2?'':[days[0],days[Math.floor(days.length/2)],days[days.length-1]]
+        .map(function(x){return '<span>'+esc(fmtIso(x.d))+'</span>';}).join('');
     }
-    bars('storeBars',a.days);bars('playBars',g.days);
+    bars('storeBars','storeAxis',a.days);bars('playBars','playAxis',g.days);
     $('storesFoot').textContent=notes.join(' ')+' The stores run a day or two behind, and these counts include your own devices.';
     $('totals').innerHTML=[
       [t.cards||0,'cards in all archives'],
