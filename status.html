@@ -25,6 +25,10 @@
   h1 { font-size:clamp(28px,4vw,36px); font-weight:700; letter-spacing:-0.02em; line-height:1.1; margin:8px 0 6px; }
   .sub { color:var(--muted); margin-bottom:28px; }
   .sub b { color:var(--ink); font-weight:600; }
+  /* Says why the numbers appeared without a sign-in button: the browser already
+     knows who this is. The link is the way out. */
+  .who { font-size:13px; color:var(--muted); margin:-18px 0 26px; }
+  .who a { color:var(--muted); margin-left:8px; }
   .btn { display:inline-block; font:inherit; font-size:15px; font-weight:600; padding:12px 22px; border-radius:10px; background:var(--accent); border:1px solid var(--accent); color:#fff; cursor:pointer; text-decoration:none; }
   .btn.quiet { background:var(--card); color:var(--ink); border-color:var(--line); }
   .btn:disabled { opacity:.5; cursor:default; }
@@ -84,6 +88,7 @@
 <main>
   <h1>Status</h1>
   <p class="sub" id="sub">Is anyone using Kept?</p>
+  <p class="who hidden" id="who"></p>
 
   <div class="notice" id="gate">
     <p id="gateText">Sign in with the account that owns Kept.</p>
@@ -161,7 +166,12 @@
     signIn().catch(function(e){$('gateText').textContent='Sign-in failed'+(e&&e.code?' ('+e.code+')':'')+'.';$('signIn').disabled=false;});
   };
   $('refresh').onclick=load;
-  firebase.auth().onAuthStateChanged(function(u){ if(u)load(); else gate('Sign in with the account that owns Kept.'); });
+  firebase.auth().onAuthStateChanged(function(u){
+    var w=$('who');
+    if(u){w.innerHTML='Signed in as '+esc(u.email||'')+'<a href="#" id="signOut">Sign out</a>';w.classList.remove('hidden');
+      $('signOut').onclick=function(e){e.preventDefault();firebase.auth().signOut();};load();}
+    else{w.classList.add('hidden');gate('Sign in with the account that owns Kept.');}
+  });
 
   function gate(msg,isErr){
     $('report').classList.add('hidden');$('gate').classList.remove('hidden');
