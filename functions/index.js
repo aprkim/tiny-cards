@@ -31,6 +31,14 @@ setGlobalOptions({region: 'us-east1', maxInstances: 10});
 // Set with: firebase functions:secrets:set ANTHROPIC_API_KEY
 const ANTHROPIC_API_KEY = defineSecret('ANTHROPIC_API_KEY');
 const RC_WEBHOOK_TOKEN = defineSecret('RC_WEBHOOK_TOKEN');
+// App Store Connect API key (role: Sales and Reports), for the status page's
+// download counts. The .p8 lives in Secret Manager; the ids beside it are not
+// secrets and are useless without it.
+const ASC_PRIVATE_KEY = defineSecret('ASC_PRIVATE_KEY');
+const ASC_KEY_ID = '64UWYHUT4U';
+const ASC_ISSUER_ID = '3b91da73-8eac-4afe-9953-382360955284';
+const ASC_VENDOR = '94815949';
+const APPLE_APP_ID = '6809942529';
 
 // Access model: each user owns tinyCards/{uid}. Read access to another user's
 // space is granted by a `viewOf` custom claim (see redeemInvite). Mirrors rules.
@@ -565,7 +573,58 @@ const OWN_ACCOUNTS = ['aprkim@gmail.com', 'aprkim1@gmail.com', 'lihallcapp@gmail
   'aprilmetnathan@gmail.com', 'hazelhillson@gmail.com'];
 const UID_RE = /^[A-Za-z0-9]{20,}$/;   // tinyCards also holds pre-account docs ("family", "cloudedit-…")
 
-exports.keptStatus = onCall(async (req) => {
+/* App Store downloads, from Apple's daily sales report. One report per day:
+   a gzipped TSV of every transaction for the vendor, which for a free app is
+   first downloads (product type 1*), redownloads (3*) and updates (7*). Apple
+   publishes a day's report the next morning Pacific time, so nothing younger
+   than two days is asked for, and a day Apple has no report for (404) is a
+   day with no transactions. Days are cached in status/appstore so a page
+   load costs at most one request per day not yet seen. */
+const b64url = (b) => Buffer.from(b).toString('base64').replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
+function ascToken() {
+  const now = Math.floor(Date.now() / 1000);
+  const head = b64url(JSON.stringify({alg: 'ES256', kid: ASC_KEY_ID, typ: 'JWT'}));
+  const body = b64url(JSON.stringify({iss: ASC_ISSUER_ID, iat: now, exp: now + 15 * 60, aud: 'appstoreconnect-v1'}));
+  const sig = crypto.sign('sha256', Buffer.from(head + '.' + body), {key: ASC_PRIVATE_KEY.value(), dsaEncoding: 'ieee-p1363'});
+  return head + '.' + body + '.' + b64url(sig);
+}
+async function ascSalesDay(date) {   // 'YYYY-MM-DD' -> {dl, re, up} or null when Apple has nothing for it
+  const q = 'filter[frequency]=DAILY&filter[reportDate]=' + date + '&filter[reportSubType]=SUMMARY' +
+    '&filter[reportType]=SALES&filter[vendorNumber]=' + ASC_VENDOR + '&filter[version]=1_1';
+  const res = await fetch('https://api.appstoreconnect.apple.com/v1/salesReports?' + q,
+    {headers: {Authorization: 'Bearer ' + ascToken(), Accept: 'application/a-gzip'}});
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error('App Store Connect ' + res.status + ': ' + (await res.text()).slice(0, 200));
+  const tsv = require('zlib').gunzipSync(Buffer.from(await res.arrayBuffer())).toString('utf8');
+  const lines = tsv.split(/\r?\n/).filter(Boolean), cols = lines[0].split('\t');
+  const iId = cols.indexOf('Apple Identifier'), iType = cols.indexOf('Product Type Identifier'), iUnits = cols.indexOf('Units');
+  const out = {dl: 0, re: 0, up: 0};
+  for (const line of lines.slice(1)) {
+    const f = line.split('\t');
+    if (f[iId] !== APPLE_APP_ID) continue;
+    const t = String(f[iType] || ''), n = Number(f[iUnits]) || 0;
+    if (t[0] === '1') out.dl += n; else if (t[0] === '3') out.re += n; else if (t[0] === '7') out.up += n;
+  }
+  return out;
+}
+const isoDay = (ms) => new Date(ms).toISOString().slice(0, 10);
+async function appStoreDownloads(db) {
+  const DAY = 86400000, ref = db.doc('status/appstore');
+  const cached = ((await ref.get()).data() || {}).days || {};
+  const through = isoDay(Date.now() - 2 * DAY), days = {}, fresh = {};
+  for (let i = 0; i < 30; i++) {
+    const d = isoDay(Date.now() - (2 + i) * DAY);
+    if (cached[d]) { days[d] = cached[d]; continue; }
+    const r = await ascSalesDay(d);
+    days[d] = fresh[d] = r || {dl: 0, re: 0, up: 0};
+  }
+  if (Object.keys(fresh).length) await ref.set({days: fresh}, {merge: true});
+  const sum = (n, k) => Object.keys(days).sort().slice(-n).reduce((a, d) => a + (days[d][k] || 0), 0);
+  return {through, dl7: sum(7, 'dl'), dl30: sum(30, 'dl'), re30: sum(30, 're'), up30: sum(30, 'up'),
+    days: Object.keys(days).sort().map((d) => ({d, dl: days[d].dl}))};
+}
+
+exports.keptStatus = onCall({secrets: [ASC_PRIVATE_KEY], timeoutSeconds: 120}, async (req) => {
   const auth = req.auth;
   requireVerified(auth);
   const me = normEmail(auth.token.email || '');
@@ -582,8 +641,10 @@ exports.keptStatus = onCall(async (req) => {
   const fresh = (id) => ({id: id.slice(0, 4), firstSeen: 0, lastSeen: 0, lastCard: 0, lastActive: 0,
     cards: 0, days: 0, transcribed: 0, favorites: 0, unlimited: false});
 
-  const [usersSnap, cardsSnap] = await Promise.all([
+  const [usersSnap, cardsSnap, appstore] = await Promise.all([
     db.collection('users').get(), db.collection('tinyCards').get(),
+    // The stores are a separate system: if Apple is down the people still count.
+    appStoreDownloads(db).catch((e) => { logger.warn('keptStatus: appstore', {err: e.message}); return {error: e.message}; }),
   ]);
   const accounts = new Map();
   usersSnap.forEach((d) => {
@@ -630,6 +691,7 @@ exports.keptStatus = onCall(async (req) => {
       unlimited: n((r) => r.unlimited),
     },
     totals,
+    stores: {appstore},
     accounts: list,
   };
 });

@@ -55,6 +55,10 @@
   .tile .num { font-size:26px; font-weight:700; letter-spacing:-0.02em; font-variant-numeric:tabular-nums; }
   .tile .label { font-size:13px; color:var(--muted); }
 
+  /* Thirty thin bars, one per day: shape, not precision - the numbers are above. */
+  .bars { display:flex; align-items:flex-end; gap:3px; height:44px; margin:12px 2px 0; }
+  .bars i { flex:1; min-width:3px; background:var(--accent); border-radius:2px 2px 0 0; opacity:.85; }
+  .bars i.zero { background:var(--line); height:2px; opacity:1; }
   table { width:100%; border-collapse:collapse; background:var(--card); border:1px solid var(--line); border-radius:14px; overflow:hidden; font-size:14px; }
   th, td { text-align:left; padding:10px 14px; border-top:1px solid var(--line); font-variant-numeric:tabular-nums; white-space:nowrap; }
   th { font-size:12px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); font-weight:600; border-top:none; }
@@ -90,6 +94,13 @@
       <a href="https://search.google.com/search-console?resource_id=sc-domain%3Akept.cards" target="_blank" rel="noopener">Search Console</a>
       <a href="https://console.firebase.google.com/project/tiny-wins25/firestore/data/~2FtinyCards" target="_blank" rel="noopener">Firestore</a>
     </div>
+
+    <section>
+      <h2>Downloads</h2>
+      <div class="totals" id="stores"></div>
+      <div class="bars" id="storeBars" title="App Store downloads per day, oldest to newest"></div>
+      <p class="foot" id="storesFoot"></p>
+    </section>
 
     <section>
       <h2>People</h2>
@@ -211,6 +222,23 @@
     });
     $('funnel').innerHTML=html;
 
+    var a=(d.stores||{}).appstore||{};
+    if(a.error||!a.through){
+      $('stores').innerHTML='<div class="tile"><div class="label">App Store numbers unavailable'+(a.error?': '+esc(String(a.error).slice(0,120)):'')+'</div></div>';
+      $('storeBars').innerHTML='';$('storesFoot').textContent='';
+    }else{
+      $('stores').innerHTML=[
+        [a.dl7,'App Store downloads, last 7 days'],
+        [a.dl30,'App Store downloads, last 30 days'],
+        [a.re30,'redownloads, 30 days'],
+        [a.up30,'updates installed, 30 days']
+      ].map(function(x){return '<div class="tile"><div class="num">'+(x[0]||0)+'</div><div class="label">'+esc(x[1])+'</div></div>';}).join('');
+      var days=a.days||[],max=Math.max.apply(null,days.map(function(x){return x.dl||0}).concat([1]));
+      $('storeBars').innerHTML=days.map(function(x){
+        return x.dl?'<i style="height:'+Math.max(8,Math.round(x.dl/max*100))+'%" title="'+esc(x.d+': '+x.dl)+'"></i>':'<i class="zero" title="'+esc(x.d+': 0')+'"></i>';
+      }).join('');
+      $('storesFoot').textContent='Through '+a.through+' - Apple reports run about two days behind. Google Play is not connected yet; its installs are in the Play Console.';
+    }
     $('totals').innerHTML=[
       [t.cards||0,'cards in all archives'],
       [t.cards7||0,'saved in the last 7 days'],
