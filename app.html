@@ -602,6 +602,7 @@
 <script src="vendor/firebase/firebase-app.js"></script>
 <script src="vendor/firebase/firebase-auth.js"></script>
 <script src="vendor/firebase/firebase-firestore.js"></script>
+<script src="vendor/firebase/firebase-functions.js"></script>
 <script>
 /* Home page only. The scanner lives on scan.html and the archive on cards.html
    — this page signs the user in, shows the running card count, and links out
@@ -740,8 +741,19 @@
   $('modal').onclick=function(e){if(e.target===$('modal'))closeConfirm()};
   document.addEventListener('keydown',function(e){if(e.key==='Escape'&&!$('modal').classList.contains('hidden'))closeConfirm()});
 
+  /* Mark the account as signed in to Kept (users/{uid}, created by the
+     function) as soon as there is one. The archive page does this too, but
+     someone who signs in here and goes straight to Scan never reached it, so
+     the owner's status page did not know they existed. Once per page, never
+     awaited: nothing on screen depends on it. */
+  var marked=false;
+  function markSignedIn(){
+    if(marked||!authUser||!fbReady)return;marked=true;
+    try{firebase.app().functions('us-east1').httpsCallable('syncSharedAccess')({}).catch(function(){});}catch(e){}
+  }
   function paintHome(){
     var signedIn=!!authUser;
+    if(signedIn)markSignedIn();
     $('signedIn').classList.toggle('hidden',!signedIn);
     $('signedOut').classList.toggle('hidden',signedIn);
     if($('homeGear'))$('homeGear').classList.toggle('hidden',!signedIn);

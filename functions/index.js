@@ -561,7 +561,8 @@ function normEmail(raw) {
      active        a card saved, the archive edited, or the app opened
                    (lastSeenAt) inside the window */
 const STATUS_ADMINS = ['aprkim@gmail.com'];
-const OWN_ACCOUNTS = ['aprkim@gmail.com', 'lihallcapp@gmail.com', 'aprkim1@gmail.com'];
+const OWN_ACCOUNTS = ['aprkim@gmail.com', 'aprkim1@gmail.com', 'lihallcapp@gmail.com',
+  'aprilmetnathan@gmail.com', 'hazelhillson@gmail.com'];
 const UID_RE = /^[A-Za-z0-9]{20,}$/;   // tinyCards also holds pre-account docs ("family", "cloudedit-…")
 
 exports.keptStatus = onCall(async (req) => {
