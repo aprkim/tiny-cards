@@ -222,6 +222,15 @@
     return n<=0?'today':n===1?'yesterday':n+'d ago';
   }
   function esc(t){var d=document.createElement('div');d.textContent=t;return d.innerHTML}
+  // 'GB' -> the flag, by way of the regional-indicator letters; '' -> a dash.
+  function flag(cc){
+    if(!/^[A-Z]{2}$/.test(cc||''))return '\u2014';
+    return String.fromCodePoint(0x1F1E6+cc.charCodeAt(0)-65,0x1F1E6+cc.charCodeAt(1)-65)+' '+esc(cc);
+  }
+  function platformName(p,v){
+    var n={ios:'iPhone',android:'Android',web:'Web',rc_billing:'Web',stripe:'Web',macos:'Mac',amazon:'Amazon'}[p]||(p?esc(p):'\u2014');
+    return v?'<span title="'+esc('version '+v)+'">'+n+'</span>':n;
+  }
 
   function render(d){
     var f=d.funnel||{},t=d.totals||{},rows=d.accounts||[];
@@ -287,15 +296,16 @@
       [t.transcribed||0,'with the handwriting read']
     ].map(function(x){return '<div class="tile"><div class="num">'+x[0]+'</div><div class="label">'+esc(x[1])+'</div></div>';}).join('');
 
-    var th='<tr><th>Account</th><th>First seen</th><th>Last active</th><th class="n">Cards</th><th class="n">Days</th><th class="n">Read</th><th class="n">♥</th><th>Plan</th></tr>';
+    var th='<tr><th>Account</th><th>Where</th><th>On</th><th>First seen</th><th>Last active</th><th class="n">Cards</th><th class="n">Days</th><th class="n">Read</th><th class="n">♥</th><th>Plan</th></tr>';
     var tr=rows.map(function(r){
       var quiet=!r.cards;
-      return '<tr'+(quiet?' class="quiet"':'')+'><td class="mono">'+esc(r.id)+'…</td><td>'+fmtDate(r.firstSeen)+'</td>'+
+      return '<tr'+(quiet?' class="quiet"':'')+'><td class="mono">'+esc(r.id)+'…</td>'+
+             '<td title="'+esc(r.country||'')+'">'+flag(r.country)+'</td><td>'+platformName(r.platform,r.version)+'</td><td>'+fmtDate(r.firstSeen)+'</td>'+
              '<td>'+fmtDate(r.lastActive)+'<span class="ago">'+ago(r.lastActive)+'</span></td>'+
              '<td class="n">'+r.cards+'</td><td class="n">'+r.days+'</td><td class="n">'+r.transcribed+'</td><td class="n">'+(r.favorites||'')+'</td>'+
              '<td>'+(r.unlimited?'Unlimited':'Free')+'</td></tr>';
     }).join('');
-    $('accounts').innerHTML=th+(tr||'<tr><td colspan="8">No accounts yet.</td></tr>');
+    $('accounts').innerHTML=th+(tr||'<tr><td colspan="10">No accounts yet.</td></tr>');
   }
   window.keptStatusRender=render;   // so the page can be checked with sample data
 })();

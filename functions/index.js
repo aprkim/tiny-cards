@@ -44,6 +44,10 @@ const APPLE_APP_ID = '6809942529';
 // Play Console lists as a user with "view app information" on Kept: no key file.
 const PLAY_BUCKET = 'pubsite_prod_8532189224813703418';
 const PLAY_PACKAGE = 'com.lihallc.kept';
+// RevenueCat v2 key with customer information read-only, for each account's
+// country and platform on the status page. The project id is not a secret.
+const RC_READ_KEY = defineSecret('RC_READ_KEY');
+const RC_PROJECT = 'bf92862a';
 
 // Access model: each user owns tinyCards/{uid}. Read access to another user's
 // space is granted by a `viewOf` custom claim (see redeemInvite). Mirrors rules.
@@ -665,7 +669,36 @@ async function playInstalls() {
     active: rows[days[days.length - 1]].active, days: days.map((d) => ({d, dl: rows[d].dl}))};
 }
 
-exports.keptStatus = onCall({secrets: [ASC_PRIVATE_KEY], timeoutSeconds: 120}, async (req) => {
+/* Where and on what: RevenueCat already notes each device's country and
+   platform when Kept opens (the flags in its customer list), keyed by the same
+   uid Kept uses. One request per account, cached a day in status/rc — the
+   answer changes only when someone opens the app somewhere new. An account
+   RevenueCat has never met (web only, or signed in and left) is simply blank. */
+const RC_CACHE_MS = 24 * 3600 * 1000;
+async function rcProfiles(db, uids) {
+  const ref = db.doc('status/rc');
+  const cached = (await ref.get()).data() || {}, out = {}, fresh = {};
+  for (const uid of uids) {
+    const c = cached[uid];
+    if (c && c.at && Date.now() - c.at < RC_CACHE_MS) { out[uid] = c; continue; }
+    const res = await fetch('https://api.revenuecat.com/v2/projects/' + RC_PROJECT + '/customers/' + encodeURIComponent(uid),
+      {headers: {Authorization: 'Bearer ' + RC_READ_KEY.value(), Accept: 'application/json'}});
+    let p = {at: Date.now(), country: '', platform: '', version: ''};
+    if (res.ok) {
+      const c = await res.json();
+      p.country = String(c.last_seen_country || c.country || '').toUpperCase();
+      p.platform = String(c.last_seen_platform || c.platform || '').toLowerCase();
+      p.version = String(c.last_seen_app_version || '');
+    } else if (res.status !== 404) {
+      throw new Error('RevenueCat ' + res.status + ': ' + (await res.text()).slice(0, 200));
+    }
+    out[uid] = fresh[uid] = p;
+  }
+  if (Object.keys(fresh).length) await ref.set(fresh, {merge: true});
+  return out;
+}
+
+exports.keptStatus = onCall({secrets: [ASC_PRIVATE_KEY, RC_READ_KEY], timeoutSeconds: 120}, async (req) => {
   const auth = req.auth;
   requireVerified(auth);
   const me = normEmail(auth.token.email || '');
@@ -718,6 +751,13 @@ exports.keptStatus = onCall({secrets: [ASC_PRIVATE_KEY], timeoutSeconds: 120}, a
   });
   const list = Array.from(accounts.values());
   list.forEach((r) => { r.lastActive = Math.max(r.lastActive, r.lastSeen); });
+  // Country and platform ride along per account; a RevenueCat outage leaves them blank.
+  const profiles = await rcProfiles(db, Array.from(accounts.keys()))
+    .catch((e) => { logger.warn('keptStatus: revenuecat', {err: e.message}); return {}; });
+  accounts.forEach((r, uid) => {
+    const p = profiles[uid] || {};
+    r.country = p.country || ''; r.platform = p.platform || ''; r.version = p.version || '';
+  });
   list.sort((a, b) => b.lastActive - a.lastActive || b.cards - a.cards);
   const n = (f) => list.filter(f).length;
   return {
