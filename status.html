@@ -31,6 +31,8 @@
   .who a { color:var(--muted); margin-left:8px; }
   .btn { display:inline-block; font:inherit; font-size:15px; font-weight:600; padding:12px 22px; border-radius:10px; background:var(--accent); border:1px solid var(--accent); color:#fff; cursor:pointer; text-decoration:none; }
   .btn.quiet { background:var(--card); color:var(--ink); border-color:var(--line); }
+  .refreshrow { display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+  .when { font-size:13px; color:var(--muted); font-variant-numeric:tabular-nums; }
   .btn:disabled { opacity:.5; cursor:default; }
   .notice { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:28px; max-width:520px; }
   .notice p { color:var(--muted); margin:8px 0 20px; }
@@ -129,7 +131,10 @@
       <p class="foot">Four letters of each account id, so a row can be matched in RevenueCat or Firestore. "Last active" is the latest of: a card saved, the archive edited, or Kept opened. Opens are only recorded from October 2026 on.</p>
     </section>
 
-    <button class="btn quiet" id="refresh" type="button">Refresh</button>
+    <div class="refreshrow">
+      <button class="btn quiet" id="refresh" type="button">Refresh</button>
+      <span class="when" id="when"></span>
+    </div>
   </div>
 </main>
 
@@ -180,7 +185,7 @@
   }
 
   function load(){
-    $('sub').textContent='Counting…';
+    $('sub').textContent='Counting…';$('when').textContent='Refreshing…';$('refresh').disabled=true;
     fns().httpsCallable('keptStatus')({}).then(function(r){render(r.data||{});}).catch(function(e){
       var code=(e&&e.code)||'';
       if(/permission-denied/.test(code)){
@@ -189,9 +194,20 @@
       }else{
         gate('Could not load the status'+(code?' ('+code+')':'')+'. Try again in a moment.',true);
       }
-      $('sub').textContent='Is anyone using Kept?';
-    });
+      $('sub').textContent='Is anyone using Kept?';$('when').textContent='';
+    }).then(function(){$('refresh').disabled=false;});
   }
+
+  /* "Updated 12:26 PM · 3 min ago", kept current by a once-a-minute tick, so an
+     old tab says so instead of looking fresh. */
+  var updatedAt=0;
+  function paintWhen(){
+    if(!updatedAt)return;
+    var d=new Date(updatedAt),mins=Math.floor((Date.now()-updatedAt)/60000);
+    var rel=mins<1?'just now':mins<60?mins+' min ago':Math.floor(mins/60)+' h ago';
+    $('when').textContent='Updated '+d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})+' \u00b7 '+rel;
+  }
+  setInterval(paintWhen,60000);
 
   var DAY=86400000;
   function fmtDate(t){
@@ -210,8 +226,8 @@
   function render(d){
     var f=d.funnel||{},t=d.totals||{},rows=d.accounts||[];
     $('gate').classList.add('hidden');$('report').classList.remove('hidden');
-    var when=new Date(d.generatedAt||Date.now());
-    $('sub').innerHTML='<b>'+f.savedAny+'</b> '+(f.savedAny===1?'person has':'people have')+' saved a card · <b>'+f.active7+'</b> active this week · as of '+esc(when.toLocaleString());
+    updatedAt=d.generatedAt||Date.now();paintWhen();
+    $('sub').innerHTML='<b>'+f.savedAny+'</b> '+(f.savedAny===1?'person has':'people have')+' saved a card · <b>'+f.active7+'</b> active this week';
 
     // Each step as a share of "signed in"; the hint says what was lost from the step before.
     var steps=[
