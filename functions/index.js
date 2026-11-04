@@ -682,7 +682,7 @@ async function rcProfiles(db, uids) {
     const c = cached[uid];
     if (c && c.at && Date.now() - c.at < RC_CACHE_MS) { out[uid] = c; continue; }
     const res = await fetch('https://api.revenuecat.com/v2/projects/' + RC_PROJECT + '/customers/' + encodeURIComponent(uid),
-      {headers: {Authorization: 'Bearer ' + RC_READ_KEY.value(), Accept: 'application/json'}});
+      {headers: {Authorization: 'Bearer ' + RC_READ_KEY.value().trim(), Accept: 'application/json'}});   // a pasted key can carry a newline
     let p = {at: Date.now(), country: '', platform: '', version: ''};
     if (res.ok) {
       const c = await res.json();
