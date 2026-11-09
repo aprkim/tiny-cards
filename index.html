@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Kept Cards: Greeting Card Archive app for iPhone and Android</title>
-<meta name="description" content="Kept Cards is the app that saves your greeting cards. Scan both sides, the front and the handwritten message inside, and keep every card organized and searchable by who sent it and when.">
+<meta name="description" content="Kept Cards is the app that saves and organizes your greeting cards. Scan both sides, the front and the handwritten message inside, and keep every card organized and searchable by who sent it and when.">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
@@ -204,6 +204,9 @@
   .invitee p{ font-size:15.5px; color:#333; }
   .invitee a{ font-weight:600; color:var(--accent); text-decoration:none; white-space:nowrap; }
   .invitee a:hover{ color:var(--accent-ink); }
+  .why{ max-width:640px; margin:64px 0 8px; }
+  .why h2{ font-size:clamp(24px,3vw,30px); font-weight:700; letter-spacing:-0.02em; line-height:1.15; margin:12px 0 14px; text-wrap:balance; }
+  .why p{ color:#3a3a3a; font-size:16.5px; line-height:1.6; }
 
   /* Pricing — a page a payment provider can verify, and a question buyers
      ask before they download. Two plans, no table: there are only two. */
@@ -260,7 +263,7 @@
       <div class="herotext">
         <span class="eyebrow" id="eyebrow">iPhone · Android · Web</span>
         <h1>Keep the handwriting. Lose the shoebox.</h1>
-        <p class="sub">Kept scans both sides of a card, the printed front and the message written inside, and keeps every one searchable by who sent it and when.</p>
+        <p class="sub">Kept Cards is the app for saving the greeting cards you can't throw away. It scans both sides of a card, the printed front and the message written inside, and keeps every one organized and searchable by who sent it and when.</p>
         <div class="cta-row">
           <a class="badge apple" href="https://apps.apple.com/app/id6809942529" target="_blank" rel="noopener"><img src="badges/app-store.svg" alt="Download on the App Store" width="120" height="40"></a>
           <a class="badge play" href="https://play.google.com/store/apps/details?id=com.lihallc.kept" target="_blank" rel="noopener"><img src="badges/google-play.png" alt="Get it on Google Play" width="646" height="250"></a>
@@ -279,7 +282,7 @@
     <section class="features">
       <div class="lead">
         <span class="eyebrow">What it does</span>
-        <h2>Every card. Both sides. Findable.</h2>
+        <h2>Every greeting card. Both sides. Organized and findable.</h2>
       </div>
       <div class="grid">
         <div class="feature">
@@ -290,12 +293,12 @@
         <div class="feature">
           <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9a2 2 0 0 1 2-2h1.6l1.2-1.8A1 1 0 0 1 9.6 5h4.8a1 1 0 0 1 .8.4L16.4 7H19a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="3.3"/></svg></div>
           <h3>Scan in seconds</h3>
-          <p>Photograph a card on the kitchen table and Kept finds the edges and crops it clean. No scanner, no fuss.</p>
+          <p>Photograph a card on the kitchen table and Kept finds the edges and crops it clean. Digitize a whole box of old cards without a scanner.</p>
         </div>
         <div class="feature">
           <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg></div>
           <h3>Find any card</h3>
-          <p>Your whole collection in one place, sorted by date and by who sent it — and searchable by what’s written inside, because Kept reads the handwriting for you. Twenty years of birthdays, one scroll.</p>
+          <p>Your whole collection organized in one place, by date, by occasion and by who sent it — and searchable by what’s written inside, because Kept reads the handwriting for you. Twenty years of birthdays, one scroll.</p>
         </div>
         <div class="feature">
           <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-4.5-7-9.3A3.7 3.7 0 0 1 12 8.3 3.7 3.7 0 0 1 19 11.7C19 16.5 12 21 12 21z"/></svg></div>
@@ -317,6 +320,12 @@
       <div class="invitee">
         <p><b>Someone shared their cards with you?</b> Open them on the web. No app, no account.</p>
         <a href="viewer.html">Open the viewer &rarr;</a>
+      </div>
+
+      <div class="why">
+        <span class="eyebrow">Why people use it</span>
+        <h2>What to do with old greeting cards</h2>
+        <p>Save the ones that matter, and let the box go. Scan each card into Kept Cards, front and inside, and the paper can be recycled or kept, knowing the message is safe. Birthday cards from your kids, Christmas cards from friends who moved away, the anniversary card in a handwriting you'd know anywhere: all stored in one place, organized by year and by sender, and searchable from your phone.</p>
       </div>
     </section>
   </div>
